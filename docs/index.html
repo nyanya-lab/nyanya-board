@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="style.css?v=20261020e">
+<link rel="stylesheet" href="style.css?v=20261020h">
 </head>
 <body class="locked">
 
@@ -59,6 +59,10 @@
     <header class="page-head">
       <h2>오늘</h2>
       <p class="muted" id="todayLabel"></p>
+      <div class="view-toggles" aria-label="달력에 보이기">
+        <button class="chip tg" type="button" data-act="toggleView" data-k="vocab" aria-pressed="true">📖 스페인어</button>
+        <button class="chip tg" type="button" data-act="toggleView" data-k="watch" aria-pressed="true">🎬 왓치로그</button>
+      </div>
     </header>
 
     <div class="tiles">
@@ -80,22 +84,24 @@
         <div class="cal-grid" id="calGrid"></div>
       </div>
 
-      <div class="home-side">
-      <div class="card day-card">
-        <h3 id="dayTitle"></h3>
-        <ul class="todo-list" id="todoList"></ul>
-        <form class="todo-add" id="todoForm" autocomplete="off">
-          <input type="text" id="todoInput" placeholder="할 일 적기" maxlength="80" aria-label="새 할 일">
-          <button class="btn" type="submit">추가</button>
-        </form>
-        <ul class="day-ext-list" id="dayExt" hidden></ul>
-      </div>
       <a class="card home-watching" id="homeWatching" href="#watch" hidden>
         <h3>🎬 보는 중</h3>
         <ul class="posters" id="homeWatchingList"></ul>
       </a>
-      </div>
     </div>
+
+    <!-- 날짜를 누르면 뜨는 그날 할 일 창 -->
+    <dialog class="day-dlg" id="dayDlg" aria-labelledby="dayTitle">
+      <div class="dlg-head">
+        <h3 id="dayTitle"></h3>
+        <button class="icon-btn" type="button" data-act="closeDay" aria-label="닫기">×</button>
+      </div>
+      <ul class="todo-list" id="todoList"></ul>
+      <form class="todo-add" id="todoForm" autocomplete="off">
+        <input type="text" id="todoInput" placeholder="할 일 적기" maxlength="80" aria-label="새 할 일">
+        <button class="btn" type="submit">추가</button>
+      </form>
+    </dialog>
   </section>
 
   <!-- 📖 스페인어 -->
@@ -172,6 +178,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script type="module" src="app.js?v=20261020e"></script>
+<script type="module" src="app.js?v=20261020f"></script>
 </body>
 </html>

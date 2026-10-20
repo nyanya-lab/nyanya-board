@@ -26,7 +26,7 @@
 ```
 docs/index.html          화면 마크업 (왼쪽 메뉴·아래 메뉴, 페이지 #home #spanish #watch #money #uri #settings)
 docs/style.css           색 토큰(욱진 보드와 같음, 대표 색 --me = 코랄), 폰 ≤720px
-docs/app.js              화면 로직 (상태 S, 달력 renderCalendar, 그날 할 일 renderDay, 페이지 전환 renderPage)
+docs/app.js              화면 로직 (상태 S, 달력 renderCalendar = 주(.cal-week)마다 7칸 + 🎬 막대 줄(weekBars), 날짜 누르면 그날 할 일 창 #dayDlg(renderDay), 페이지 전환 renderPage)
 docs/firebase-config.js   냐냐 보드 Firebase 설정
 docs/links.js             📖🎬 스페인어·왓치로그 읽기 (createLinks, 스페인어 연속·오늘 복습 계산, 왓치로그 보는 중·다 본 날)
 docs/uri/uri.js           🤝 우리 탭 (욱진 보드와 같이 쓰는 코드, mountUri). CSS도 이 안에서 넣음(uri- 클래스)
@@ -73,6 +73,8 @@ docs/manifest.webmanifest, *.png  홈 화면 앱 아이콘
   - 📖 스페인어 공부방 `../nyanya-spanish` — Firebase `nyanya-vocab`, `vocab/{비번}__v3/diary/{날짜}` (없으면 옛 `vocab/{비번}/nyanyaDiary`). 이 브라우저 키 `nyanya_sync_password`.
   - 🎬 Watch LOG `../watch-log` — Firebase `nyanya-watchlog`, `watchlog/{비번}__v3/items/{id}`. 이 브라우저 키 `watchlog_sync_password`.
 - 비밀번호: 보드 `settings.links` 먼저, 없으면 같은 주소(nyanya-lab.github.io)의 그 앱이 이 브라우저에 기억한 값. (아이폰 홈 화면 앱은 저장 공간이 따로라 설정에 넣어야 함)
-- 보여 주는 것: 첫 화면 요약 칸(스페인어 오늘 복습·🔥 연속 / 이번 달 다 본 작품 수) · 달력 📖(공부한 날)·🎬(다 본 날) · 그날 칸 아래 기록 · 첫 화면 '보는 중' 포스터 · 📖/🎬 탭.
+- 보여 주는 것: 첫 화면 요약 칸(스페인어 오늘 복습·🔥 연속 / 이번 달 다 본 작품 수) · 달력: 스페인어는 공부한 날 칸 위 📖 **표시만**, 왓치로그는 **본 기간 막대**(시작~끝, 보는 중이면 오늘까지, 다시 본 기간도. 한 주 최대 3줄 `MAX_LANES`) · 첫 화면 달력 아래 '보는 중' 포스터 · 📖/🎬 탭.
+- 달력의 📖·🎬는 '오늘' 옆 버튼으로 켜고 끔 (`settings.view` {vocab, watch} = false면 숨김, 모든 기기 같이). 💰 돈 표시도 나중에 여기 같은 버튼으로.
+- 첫 화면 오른쪽 '오늘' 칸은 냐냐 요청으로 뺌 (2026-10-20). 할 일은 날짜를 눌러 뜨는 창에서.
 - 계산 규칙은 각 앱과 같게: 스페인어 연속 = core.js `calcStreak`(10/9부터 복습 다 한 날만) · 학습 개수 = `dayActivity` · 오늘 복습 = 그날 일지 `reviewDone`/`reviewLeft`(앱이 마지막으로 저장한 때 기준). 왓치로그 보는 중 = 시작했는데 끝난 날 없음(다시 보기 포함), 다 본 날 = endDate·lastWatchEnd. **앱 쪽 규칙이 바뀌면 여기도 같이.**
 - 정확한 '오늘 복습할 단어 수'는 단어장 전체(약 1MB)를 받아야 해서 안 함 (냐냐와 정함).

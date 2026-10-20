@@ -2,9 +2,9 @@
 // 저장: 욱진 보드와 같은 방식. Firebase Realtime Database(nyanya-board)의 nyanya/{SHA-256("nyanya-board:"+비밀번호)} 아래.
 // 로그인 없음, 비밀번호 = 저장 위치. 항목마다 따로 저장해서 폰·PC가 서로 덮어쓰지 않음.
 
-import { firebaseConfig } from "./firebase-config.js?v=20261020e";
-import { mountUri } from "./uri/uri.js?v=20261020e";
-import { createLinks, vocabToday, vocabStreak, isWatching, finishDays, dayActivity } from "./links.js?v=20261020e";
+import { firebaseConfig } from "./firebase-config.js?v=20261020f";
+import { mountUri } from "./uri/uri.js?v=20261020f";
+import { createLinks, vocabToday, vocabStreak, isWatching, finishDays, watchPeriods, dayActivity } from "./links.js?v=20261020f";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -13,6 +13,7 @@ const OLD_LOCAL = "nyanya-board-v1";   // 뼈대 때 이 브라우저에만 저�
 const COLS = ["tasks"];
 const PAGES = ["home", "spanish", "watch", "money", "uri", "settings"];
 const DAY_ITEMS = 3; // PC 달력 칸에 보이는 할 일 수 (넘치면 +N)
+const MAX_LANES = 3; // 🎬 한 주에 겹쳐 그리는 작품 막대 줄 수 (넘치면 안 그림, 왓치로그 탭에서 보기)
 
 const $ = (s) => document.querySelector(s);
 const pad = (n) => String(n).padStart(2, "0");
@@ -122,6 +123,7 @@ async function firebaseStart() {
       update: tracked((c, id, patch) => rt.update(path(room, c, id), flattenPaths(patch))),
       remove: tracked((c, id) => rt.remove(path(room, c, id))),
       saveLinks: tracked((patch) => rt.update(path(room, "settings", "links"), patch)),
+      saveView: tracked((patch) => rt.update(path(room, "settings", "view"), patch)),
       async backups() { return (await rt.get(path(room, "_backup"))).val() || {}; },
       restore: tracked(async (kind) => {
         const bak = (await rt.get(path(room, "_backup", kind))).val(); if (!bak) throw new Error("no backup");
@@ -152,6 +154,8 @@ async function firebaseStart() {
       S.settings = snap.val() || {};
       links.setPasswords(S.settings.links);
       renderLinkSettings();
+      renderToggles();
+      renderCalendar();
     }, onErr));
     render();
     if (location.hash === "#settings") renderBackups();
@@ -256,15 +260,35 @@ function watchedIn(prefix) {
   }
   return out.sort((a, b) => b.day.localeCompare(a.day));
 }
-// 날짜별 스페인어 학습 개수·다 본 작품 (달력 그릴 때 한 번)
-function extByDay() {
-  const m = {};
-  const at = (d) => (m[d] = m[d] || { watch: [], vocab: 0 });
-  for (const x of Object.values(links.st.watch.items || {})) for (const d of finishDays(x)) at(d).watch.push(x);
-  for (const [d, e] of Object.entries(links.st.vocab.diary || {})) { const n = dayActivity(e); if (n > 0) at(d).vocab = n; }
-  return m;
+// 달력에 📖·🎬 보이기 (오늘 옆 버튼, 보드 설정 settings.view — 기본 켜짐, 모든 기기 같이)
+const viewOn = (k) => !(S.settings.view && S.settings.view[k] === false);
+function renderToggles() {
+  document.querySelectorAll('[data-act="toggleView"]').forEach((b) => b.setAttribute("aria-pressed", String(viewOn(b.dataset.k))));
+}
+// 🎬 이번 주(일~토)에 걸친 작품 막대: 주 밖은 잘라서, 겹치면 아래 줄로 [{a, b, lane, x, s, e, open}] (a·b = 0~6 칸)
+function weekBars(weekStart, weekEnd) {
+  if (!viewOn("watch")) return [];
+  const segs = [];
+  for (const x of Object.values(links.st.watch.items || {})) {
+    for (const p of watchPeriods(x, today())) {
+      if (p.e < weekStart || p.s > weekEnd) continue;
+      const s = p.s < weekStart ? weekStart : p.s, e = p.e > weekEnd ? weekEnd : p.e;
+      const a = Math.round((new Date(s + "T00:00:00") - new Date(weekStart + "T00:00:00")) / 86400000);
+      const b = Math.round((new Date(e + "T00:00:00") - new Date(weekStart + "T00:00:00")) / 86400000);
+      segs.push({ a, b, x, head: p.s >= weekStart, tail: p.e <= weekEnd && !p.open, open: p.open && p.e <= weekEnd, from: p.s, to: p.open ? "" : p.e });
+    }
+  }
+  segs.sort((p, q) => p.a - q.a || (q.b - q.a) - (p.b - p.a));
+  const ends = [];
+  for (const g of segs) {
+    let lane = ends.findIndex((end) => end < g.a);
+    if (lane < 0) { lane = ends.length; ends.push(g.b); } else ends[lane] = g.b;
+    g.lane = lane;
+  }
+  return segs.filter((g) => g.lane < MAX_LANES);
 }
 
+let weekHtml = "";
 function renderCalendar() {
   const [y, m] = ui.month.split("-").map(Number);
   $("#calTitle").textContent = `${y}년 ${m}월`;
@@ -272,11 +296,18 @@ function renderCalendar() {
   const start = new Date(y, m - 1, 1 - first.getDay());
   const weeks = Math.ceil((first.getDay() + new Date(y, m, 0).getDate()) / 7);
   const t = today();
-  const ext = extByDay();
+  const diary = viewOn("vocab") ? (links.st.vocab.diary || {}) : {};
   let html = "";
   for (let i = 0; i < weeks * 7; i++) {
     const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
     const key = ymd(d);
+    let bars = [];
+    if (i % 7 === 0) {   // 주 시작: 작품 막대 줄 수만큼 칸 안에 자리 비우기
+      const end = new Date(d); end.setDate(end.getDate() + 6);
+      bars = weekBars(key, ymd(end));
+      const lanes = bars.length ? Math.max(...bars.map((g) => g.lane)) + 1 : 0;
+      html += `<div class="cal-week" style="--lanes:${lanes}">`;
+    }
     const list = tasksOn(key);
     const cls = ["day",
       key.slice(0, 7) !== ui.month && "out",
@@ -288,9 +319,11 @@ function renderCalendar() {
       .map(([, x]) => `<span class="day-item${x.done ? " done" : ""}">${esc(x.title)}</span>`).join("");
     const more = list.length > DAY_ITEMS ? `<span class="day-more">+${list.length - DAY_ITEMS}</span>` : "";
     const dots = list.length ? `<span class="dots">${list.slice(0, 3).map(([, x]) => `<i${x.done ? ' class="done"' : ""}></i>`).join("")}</span>` : "";
-    const e = ext[key];
-    const marks = e ? `<span class="day-ext">${e.vocab ? `<i title="스페인어 ${e.vocab}개 학습">📖</i>` : ""}${e.watch.length ? `<i title="${esc(e.watch.map((x) => x.title || "").join(", "))}">🎬</i>` : ""}</span>` : "";
-    html += `<button type="button" class="${cls}" data-date="${key}" aria-label="${d.getMonth() + 1}월 ${d.getDate()}일, 할 일 ${list.length}개"><span class="day-top"><span class="num">${d.getDate()}</span>${marks}</span>${items}${more}${dots}</button>`;
+    const studied = dayActivity(diary[key]);
+    const marks = studied ? `<span class="day-ext"><i title="스페인어 ${studied}개 학습">📖</i></span>` : "";
+    html += `<button type="button" class="${cls}" data-date="${key}" aria-label="${d.getMonth() + 1}월 ${d.getDate()}일, 할 일 ${list.length}개"><span class="day-top"><span class="num">${d.getDate()}</span>${marks}</span><span class="day-gap"></span>${items}${more}${dots}</button>`;
+    if (i % 7 === 0) weekHtml = bars.map((g) => `<span class="wbar${g.head ? " s" : ""}${g.tail ? " e" : ""}${g.open ? " open" : ""}" style="grid-column:${g.a + 1} / ${g.b + 2};grid-row:${g.lane + 1}" title="${esc(g.x.title || "")} ${md(g.from)}~${g.to ? md(g.to) : " 보는 중"}">${g.head || g.a === 0 ? `🎬 ${esc(g.x.title || "")}${g.x.season ? ` ${esc(g.x.season)}` : ""}` : ""}</span>`).join("");
+    if (i % 7 === 6) html += `<div class="wk-bars" aria-hidden="true">${weekHtml}</div></div>`;
   }
   $("#calGrid").innerHTML = html;
 }
@@ -308,14 +341,6 @@ function renderDay() {
         <span class="t">${esc(t.title)}</span>
         <button type="button" class="del" data-del="${id}" aria-label="지우기">×</button></li>`).join("")
       : `<li class="empty">할 일이 없어요.</li>`;
-  // 그날 스페인어·왓치로그 기록
-  const v = links.st.vocab.diary && links.st.vocab.diary[ui.sel];
-  const w = Object.values(links.st.watch.items || {}).filter((x) => finishDays(x).includes(ui.sel));
-  const rows = [];
-  if (v && dayActivity(v) > 0) rows.push(`<li>📖 스페인어 ${dayActivity(v)}개 학습${v.reviewDone === true ? " · 복습 다 함 ✅" : typeof v.reviewLeft === "number" ? ` · 복습 ${v.reviewLeft}개 남김` : ""}</li>`);
-  w.forEach((x) => rows.push(`<li>🎬 ${esc(x.title || "")}${x.season ? ` ${esc(x.season)}` : ""} 다 봄${x.rating != null ? ` · ⭐ ${esc(x.rating)}` : ""}</li>`));
-  $("#dayExt").innerHTML = rows.join("");
-  $("#dayExt").hidden = !rows.length;
 }
 
 // 📖 스페인어 · 🎬 왓치로그 탭 + 첫 화면 '보는 중'
@@ -440,6 +465,12 @@ document.addEventListener("click", (e) => {
     if (a === "prevMonth") shiftMonth(-1);
     else if (a === "nextMonth") shiftMonth(1);
     else if (a === "goToday") { ui.sel = today(); ui.month = ui.sel.slice(0, 7); render(); }
+    else if (a === "closeDay") $("#dayDlg").close();
+    else if (a === "toggleView") {
+      if (!backend) return;
+      const k = act_.dataset.k;
+      act(backend.saveView({ [k]: !viewOn(k) })).catch(() => {});
+    }
     else if (a === "lock" && lockAction && confirm("이 기기를 잠글까요? 다시 열려면 비밀번호가 필요해요.")) lockAction();
     return;
   }
@@ -449,6 +480,9 @@ document.addEventListener("click", (e) => {
     if (ui.sel.slice(0, 7) !== ui.month) ui.month = ui.sel.slice(0, 7);
     renderCalendar();
     renderDay();
+    const dlg = $("#dayDlg");
+    if (!dlg.open) dlg.showModal();
+    if (matchMedia("(min-width: 721px)").matches) $("#todoInput").focus();   // 폰에선 자판이 바로 안 올라오게
     return;
   }
   const del = e.target.closest("[data-del]");
@@ -467,6 +501,9 @@ document.addEventListener("change", (e) => {
   if (!id || !S.tasks[id] || !backend) return;
   act(backend.update("tasks", id, { done: e.target.checked })).catch(() => { e.target.checked = !e.target.checked; });
 });
+
+// 창 바깥(어두운 곳)을 누르면 닫기
+$("#dayDlg").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
 
 $("#linkForm").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -514,6 +551,7 @@ renderPage();
 render();
 renderLinkPages();
 renderLinkSettings();
+renderToggles();
 setSync();
 firebaseStart().catch(() => {
   document.body.classList.add("locked");

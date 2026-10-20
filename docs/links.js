@@ -52,6 +52,16 @@ export function vocabToday(diary, today) {
 // ── 왓치로그 계산 ──
 // 보는 중 = 처음 보기 시작했는데 끝난 날이 없음, 또는 다시 보기 시작했는데 끝난 날이 없음
 export const isWatching = (x) => !!x && ((isDate(x.startDate) && !x.endDate) || (isDate(x.lastWatchStart) && !x.lastWatchEnd));
+// 본 기간들 [{s, e, open}] — 처음 본 기간 + 다시 본 기간. 아직 보는 중이면 오늘까지(open)
+export function watchPeriods(x, today) {
+  const out = [];
+  for (const [a, b] of [[x && x.startDate, x && x.endDate], [x && x.lastWatchStart, x && x.lastWatchEnd]]) {
+    if (!isDate(a)) continue;
+    const s = a.slice(0, 10), open = !isDate(b), e = open ? today : b.slice(0, 10);
+    if (e >= s) out.push({ s, e, open });
+  }
+  return out;
+}
 // 다 본 날들 (처음 끝낸 날 + 다시 본 끝낸 날)
 export const finishDays = (x) => [x && x.endDate, x && x.lastWatchEnd].filter(isDate).map((s) => s.slice(0, 10));
 
