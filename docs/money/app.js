@@ -5,7 +5,7 @@
 // ❤️ 공통: 지출에 common: true → ../uri/uri.js setMirror로 공통 저장소(uri-board)에 저절로 복사, '❤️ 공통' 탭에서 둘 다 보기 + 반반 정산.
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
-import { mountUri } from "../uri/uri.js?v=20261020o";
+import { mountUri } from "../uri/uri.js?v=20261020p";
 import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances } from "./money.js?v=20261020d";
 import { mountBalance } from "./balance.js?v=20261020a";
 import { mountImport } from "./import.js?v=20261020a";

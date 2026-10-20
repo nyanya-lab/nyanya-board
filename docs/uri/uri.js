@@ -130,7 +130,7 @@ export function mountUri(root, opts = {}) {
     if (!mirror || !room || !st.loaded || mirroring) return;
     const want = {};
     for (const [id, d] of Object.entries(mirror)) {
-      if (!d || !d.date || !(Number(d.amount) > 0)) continue;
+      if (!d || !d.date || !Number(d.amount)) continue;   // 마이너스(환불·취소)도 같이 — 합계·정산에서 빠지게
       want[`${who}-${id}`] = { date: d.date, title: d.memo || d.cat || "공통비용", amount: Number(d.amount), cat: d.cat || "기타", payer: who, by: who, src: "money", memo: null, _settled: !!d.settled };
     }
     const patch = {};
