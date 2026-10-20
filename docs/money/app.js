@@ -6,7 +6,8 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261020p";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances } from "./money.js?v=20261020d";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf } from "./money.js?v=20261020d";
+import { mountRepeat } from "./repeat.js?v=20261021a";
 import { mountBalance } from "./balance.js?v=20261020a";
 import { mountImport } from "./import.js?v=20261021b";
 
@@ -135,6 +136,7 @@ function render() {
   $("todayMono").textContent = today().replace(/-/g, ".");
   renderMoney();
   bal.render();
+  rp.render(); rp.run();
   mirrorCommon();
 }
 // ❤️ 공통으로 표시한 지출(원화)만 공통 저장소로
@@ -239,6 +241,9 @@ initMoney();
 const bal = mountBalance($("balPanel"), { S, backend: () => backend, toast, act, esc, won, rows, balances });
 // 📥 편한가계부 가져오기 (가계부 설정 탭)
 mountImport($("importPanel"), { S, backend: () => backend, toast, act, esc, won, render, balances, catKey, defaultCats: (k) => (MONEY_CATS[k] || []).slice() });
+// 🔁 매월 반복 (가계부 설정 탭) — 그날이 되면 기록이 저절로
+const rp = mountRepeat($("repeatPanel"), { S, backend: () => backend, toast, act, esc, won, rows, today, rid,
+  cats: (k) => { const c = (S.settings.moneyCats || {})[k]; return (c && c.length ? c : MONEY_CATS[k] || []).slice(); }, subs: subsOf });
 // 보드 첫 화면 '공통비용' 칸에서 바로 오면 (#common)
 if (location.hash === "#common") { try { localStorage.setItem("nyanya-mtab", "common"); } catch (e) { /* 무시 */ } }
 setSync();
