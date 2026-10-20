@@ -31,3 +31,6 @@
 .imp-acct { display: grid; grid-template-columns: minmax(0, 1fr) 110px 90px; gap: 6px; align-items: center; }
 .imp-acct input, .imp-acct select { min-width: 0; }
 @media (max-width: 720px) { .imp-files { grid-template-columns: 1fr; } .imp-acct { grid-template-columns: minmax(0, 1fr) 100px; } .imp-acct span { grid-column: 1 / -1; } }
+
+/* 로고 = 냐냐 캐릭터 */
+.logo-img { width: 28px; height: 28px; border-radius: 50%; flex: none; display: block; }
