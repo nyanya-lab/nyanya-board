@@ -8,7 +8,7 @@ import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261020p";
 import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances } from "./money.js?v=20261020d";
 import { mountBalance } from "./balance.js?v=20261020a";
-import { mountImport } from "./import.js?v=20261021a";
+import { mountImport } from "./import.js?v=20261021b";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";

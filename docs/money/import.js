@@ -5,8 +5,9 @@
 //   지출 → expense, 수입 → income (마이너스 금액 = 환불·취소, 그대로 마이너스로 둠)
 //   이체지출 → move (자산 → 분류에 적힌 자산). 마이너스면 방향을 바꿔서 플러스로
 //   잔액수정(분류 '잔액수정', 수입/지출 빈칸) → 기록이 아니라 그 자산의 시작 잔액(accounts.initial)에 더함
-//     엑셀엔 금액만 있고 +/−가 안 나오지만 2026-10-21 냐냐 실제 파일로 확인: 30줄 모두 '늘린 것'
-//     (닫은 통장들이 +로 볼 때만 정확히 0원으로 끝남). 넣은 합은 accounts.pkAdj에 적어 둬서 다시 눌러도 두 번 안 더해짐
+//     엑셀엔 금액만 있고 +/−가 안 나와서 일단 모두 +로 넣음. 2026-10-21 냐냐 실제 파일: 대부분 +가 맞았지만
+//     신한·키움증권(손익)·업비트(손익)은 줄인 줄이 섞여 있어서, 넣은 뒤 편한가계부 자산 화면과 비교해 🧮 실제 잔액 맞추기로 고침.
+//     넣은 합은 accounts.pkAdj에 적어 둬서 다시 눌러도 두 번 안 더해짐
 //     [🧮 잔액수정만 넣기] 버튼 = 기록은 안 건드리고 자산 시작 잔액만 (가져오기 버튼도 같이 넣음)
 //   분류에 '공통비용'이 들어가면 ❤️ common: true (고를 수 있음)
 // 같은 파일을 또 가져와도 겹치지 않게: 기록 id = 줄 내용으로 만든 값 (같은 줄 → 같은 id → 덮어씀)
@@ -193,7 +194,7 @@ export function mountImport(root, env) {
             return `<span>${esc(v.accts[id].name)} <b>+${esc(env.won(sum))}</b> <span class="muted">${!a ? "(새 자산)" : prev === sum ? "✅ 이미 넣음" : `지금 ${esc(env.won(now))} → ${esc(env.won(now - prev + sum))}`}</span></span>`;
           }).join("")}</div>
           <div class="row" style="flex:0 0 auto;align-items:center"><button class="btn ghost" type="button" data-imp="adj"${st.busy || !todo.length ? " disabled" : ""}>${todo.length ? `🧮 잔액수정만 넣기 (자산 ${todo.length}개)` : "✅ 잔액수정 다 넣었어요"}</button>
-          <span class="small muted">기록은 안 건드려요. 🧮 실제 잔액 맞추기로 이미 맞춘 자산은 넣은 뒤 다시 맞춰 주세요.</span></div></div>`;
+          <span class="small muted">기록은 안 건드려요. 엑셀엔 늘렸는지 줄였는지가 안 나와서 다 +로 넣어요 — 넣은 뒤 편한가계부 자산 화면과 다른 자산은 🧮 실제 잔액 맞추기로 맞춰 주세요.</span></div></div>`;
       }
       h += `
         <div class="imp-opts">
