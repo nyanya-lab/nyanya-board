@@ -213,7 +213,7 @@ body:not(.locked) .loading { display: none; }
   .day-more { display: none; }
   .day .dots { display: flex; gap: 3px; }
   .bottom {
-    display: grid; grid-template-columns: repeat(5, 1fr);
+    display: grid; grid-template-columns: repeat(6, 1fr);
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
     background: var(--surface); border-top: 1px solid var(--line);
     padding: 6px 0 calc(6px + env(safe-area-inset-bottom));

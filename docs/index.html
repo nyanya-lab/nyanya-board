@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="style.css?v=20261020c">
+<link rel="stylesheet" href="style.css?v=20261020d">
 </head>
 <body class="locked">
 
@@ -47,6 +47,7 @@
     <a href="#spanish" data-page="spanish"><span class="ic">📖</span><span>스페인어</span></a>
     <a href="#watch" data-page="watch"><span class="ic">🎬</span><span>왓치로그</span></a>
     <a href="#money" data-page="money"><span class="ic">💰</span><span>가계부</span></a>
+    <a href="#uri" data-page="uri"><span class="ic">🤝</span><span>우리</span></a>
     <a href="#settings" data-page="settings"><span class="ic">⚙️</span><span>설정</span><span class="sync-dot" data-sync></span></a>
   </nav>
   <p class="side-foot mono" id="todayMono"></p>
@@ -64,7 +65,7 @@
       <div class="tile t-coral"><span class="tile-k">오늘 할 일</span><b class="tile-v" id="tileTodo">0 / 0</b></div>
       <a class="tile t-sun" href="#spanish"><span class="tile-k">📖 스페인어</span><b class="tile-v">연결 전</b></a>
       <a class="tile t-grape" href="#watch"><span class="tile-k">🎬 이번 달 본 작품</span><b class="tile-v">연결 전</b></a>
-      <a class="tile t-mint" href="#money"><span class="tile-k">🤝 이번 달 공통비용</span><b class="tile-v">준비 중</b></a>
+      <a class="tile t-mint" href="#uri"><span class="tile-k">🤝 이번 달 공통비용</span><b class="tile-v" id="tileUri">…</b></a>
     </div>
 
     <div class="home-grid">
@@ -125,9 +126,15 @@
       <p><b>준비 중</b> — 욱진 보드의 가계부를 가져와서 냐냐 보드에 맞게 바꿀 거예요.</p>
       <ul class="muted">
         <li>예산 · 지출 · 자산 · 통계</li>
-        <li>🤝 공통비용은 욱진이 보드와 같이 보고 같이 적기</li>
+        <li>🤝 공통비용은 <a href="#uri">우리 탭</a>에서 욱진이와 같이 적어요</li>
       </ul>
     </div>
+  </section>
+
+  <!-- 🤝 우리 (욱진 보드와 같이 쓰는 공통 공간, 코드는 uri/uri.js) -->
+  <section class="page" id="page-uri" hidden>
+    <header class="page-head"><h2>🤝 우리</h2><p class="muted">욱진이와 같이 보는 공간</p></header>
+    <div id="uriRoot"></div>
   </section>
 
   <!-- ⚙️ 설정 -->
@@ -158,11 +165,12 @@
   <a href="#spanish" data-page="spanish"><span class="ic">📖</span><span>스페인어</span></a>
   <a href="#watch" data-page="watch"><span class="ic">🎬</span><span>왓치로그</span></a>
   <a href="#money" data-page="money"><span class="ic">💰</span><span>가계부</span></a>
+  <a href="#uri" data-page="uri"><span class="ic">🤝</span><span>우리</span></a>
   <a href="#settings" data-page="settings"><span class="ic">⚙️<span class="sync-dot" data-sync></span></span><span>설정</span></a>
 </nav>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script type="module" src="app.js?v=20261020c"></script>
+<script type="module" src="app.js?v=20261020d"></script>
 </body>
 </html>

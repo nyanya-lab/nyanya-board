@@ -24,9 +24,12 @@
 ## 파일
 
 ```
-docs/index.html          화면 마크업 (왼쪽 메뉴·아래 메뉴, 페이지 #home #spanish #watch #money)
+docs/index.html          화면 마크업 (왼쪽 메뉴·아래 메뉴, 페이지 #home #spanish #watch #money #uri #settings)
 docs/style.css           색 토큰(욱진 보드와 같음, 대표 색 --me = 코랄), 폰 ≤720px
 docs/app.js              화면 로직 (상태 S, 달력 renderCalendar, 그날 할 일 renderDay, 페이지 전환 renderPage)
+docs/firebase-config.js   냐냐 보드 Firebase 설정
+docs/uri/uri.js           🤝 우리 탭 (욱진 보드와 같이 쓰는 코드, mountUri). CSS도 이 안에서 넣음(uri- 클래스)
+docs/uri/uri-config.js    우리(공통) 저장소 Firebase 설정
 docs/manifest.webmanifest, *.png  홈 화면 앱 아이콘
 ```
 
@@ -39,10 +42,13 @@ docs/manifest.webmanifest, *.png  홈 화면 앱 아이콘
 
 ## 🤝 우리(공통) 저장소 — Firebase `uri-board` (싱가포르)
 
-- 공통비용·공통 목표·같이 할 일·공통 상 등 둘이 같이 쓰는 것. 사이트는 따로 없고 냐냐 보드·욱진 보드 안의 🤝 우리 탭(아직 안 만듦)에서 봄.
+- 공통비용·공통 목표·같이 할 일·공통 상 등 둘이 같이 쓰는 것. 사이트는 따로 없고 냐냐 보드·욱진 보드 안의 🤝 우리 탭에서 봄. 지금은 공통비용만.
+- 공통비용 `costs/{id}` = {date, title, amount, cat(`URI_CATS`), payer nyanya|ukjin|joint(공동 통장), memo, by(적은 사람), at, updBy, updAt}. 정산 = (냐냐 낸 돈 − 욱진 낸 돈) / 2, 공동 통장은 합계에만 (`settleOf`). `_backup/{prev,daily}` 자동 백업(되돌리기 화면은 아직 없음).
+- 공통 비밀번호는 이 기기 `localStorage["uri-board-pw"]`. 두 보드가 같은 주소(nyanya-lab.github.io)라서 같은 브라우저면 한쪽에서 열면 다른 보드도 열림.
+- **uri.js를 고치면 욱진 보드에도 바로 적용됨** → 욱진 보드 화면에서도 확인하기. 욱진 보드는 10분 단위 `?v=`로 불러와서 고친 뒤 최대 10분+GitHub Pages 반영 시간 뒤에 바뀜.
 - 저장 위치 `uri/{SHA-256("uri-board:"+공통 비밀번호)}` (공통 비밀번호는 둘이 정함, 아직 안 정함). 규칙: 저장소 맨 위 `uri.rules.json` (게시 완료, 2026-10-20 읽기·쓰기·목록 막힘 확인).
 - 연결 설정 `docs/uri/uri-config.js` (`uriConfig`). 우리 탭 코드도 `docs/uri/` 아래에 두고, 욱진 보드는 `https://nyanya-lab.github.io/nyanya-board/uri/…`에서 불러와 쓸 계획 → 한 곳만 고치면 두 보드 다 적용.
-  한 페이지에서 Firebase 앱 두 개를 쓰므로 `initializeApp(uriConfig, "uri")`처럼 **이름을 붙여** 초기화하기.
+  한 페이지에서 Firebase 앱 두 개를 쓰므로 `initializeApp(uriConfig, "uri")`처럼 **이름을 붙여** 초기화함.
 - 모음(`COLS`): `tasks` = {title, date, done, at}. 그 외 `settings`(createdAt), `_backup/{prev,daily,undo}`(1시간·하루 자동 백업, 설정에서 되돌리기).
 - 항목·칸 단위로 따로 저장 (`flattenPaths`로 경로별 update) → 폰·PC가 서로 덮어쓰지 않음. 저장 상태 점: 초록 저장됨 · 노랑 저장 중 · 코랄 연결 끊김.
 - 뼈대 때 브라우저에만 저장하던 `localStorage["nyanya-board-v1"]` 할 일은 보드를 열면 서버로 한 번 옮기고 지움 (`moveOldLocal`).

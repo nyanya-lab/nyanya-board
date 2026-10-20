@@ -2,14 +2,15 @@
 // 저장: 욱진 보드와 같은 방식. Firebase Realtime Database(ukjin-207a3)의 nyanya/{SHA-256("nyanya-board:"+비밀번호)} 아래.
 // 로그인 없음, 비밀번호 = 저장 위치. 항목마다 따로 저장해서 폰·PC가 서로 덮어쓰지 않음.
 
-import { firebaseConfig } from "./firebase-config.js?v=20261020c";
+import { firebaseConfig } from "./firebase-config.js?v=20261020d";
+import { mountUri } from "./uri/uri.js?v=20261020d";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
 const LS_PW = "nyanya-board-pw";
 const OLD_LOCAL = "nyanya-board-v1";   // 뼈대 때 이 브라우저에만 저장하던 할 일 → 보드를 열면 서버로 한 번 옮김
 const COLS = ["tasks"];
-const PAGES = ["home", "spanish", "watch", "money", "settings"];
+const PAGES = ["home", "spanish", "watch", "money", "uri", "settings"];
 const DAY_ITEMS = 3; // PC 달력 칸에 보이는 할 일 수 (넘치면 +N)
 
 const $ = (s) => document.querySelector(s);
@@ -363,6 +364,12 @@ function renderToday() {
 }
 window.addEventListener("hashchange", renderPage);
 renderToday();
+// 🤝 우리 탭: 욱진 보드와 같은 코드(uri/uri.js), 공통 저장소(uri-board)에 따로 연결
+mountUri($("#uriRoot"), {
+  who: "nyanya",
+  toast,
+  onSummary: ({ total, connected }) => { $("#tileUri").textContent = connected ? total.toLocaleString("ko-KR") + "원" : "열기 전"; }
+});
 renderPage();
 render();
 setSync();
