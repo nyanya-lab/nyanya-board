@@ -59,3 +59,9 @@
 /* 2026-10-21 냐냐 요청: 왼쪽 메뉴 줄이기 · 내 자산 칸 늘리기 (넓은 화면만, 폰은 그대로) */
 @media (min-width: 861px) { .side { width: 184px; } body { padding-left: 184px; } }
 @media (min-width: 1101px) { .as-grid { grid-template-columns: minmax(340px, 460px) minmax(0, 1fr); } }
+/* 2026-10-21 냐냐 요청: 탭마다 위에 있던 '💰 가계부' 제목·설명 줄 없애기 (예산 탭 달 넘기기는 그대로) */
+#moneyPage .page-head > div:first-child { display: none; }
+#moneyPage .page-head { justify-content: flex-end; }
+/* 🧾 내역 기간: 달 이름을 누르면 기간 고르기 창 (range.js) */
+.tx-pick { font: inherit; font-family: var(--f-mono); font-weight: 600; min-width: 64px; padding: 4px 8px; border: 1px solid transparent; border-radius: 8px; background: none; color: inherit; cursor: pointer; white-space: nowrap; }
+.tx-pick:hover { border-color: var(--line); }

@@ -6,7 +6,7 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261020p";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf } from "./money.js?v=20261021a";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf } from "./money.js?v=20261021b";
 import { mountRepeat } from "./repeat.js?v=20261021b";
 import { mountBalance } from "./balance.js?v=20261020a";
 import { mountImport } from "./import.js?v=20261021b";

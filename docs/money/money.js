@@ -1,8 +1,10 @@
+import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?v=20261021a";   // 냐냐 쪽에서 더함 (내역 기간 고르기)
 // 💰 돈 관리 (가계부) — ⚠️ 욱진 보드 docs/money.js를 가져온 짝 코드 (냐냐 보드 docs/money/money.js).
 //   고칠 때 욱진 보드에도 필요한 고침인지 생각하고, 그렇다면 "욱진 보드도 같이 고칠까?" 물어보기 (CLAUDE.md).
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
 //   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌,
-//   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — 통계 원형에 env.statPieFull이면 씀.
+//   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — 통계 원형에 env.statPieFull이면 씀,
+//   🧾 내역 기간 고르기(ui.txRange, ./range.js 창 — 달 이름·[이번 달]을 누르면 열림, txPick·txShift).
 // (원래 설명) 보드(index.html)와 가계부 모드(money.html → index.html?app=money)가 같이 쓰는 코드
 // 한 달 예산 · 지출 기록 · 자산(통장·카드·현금, 카드 결제일) · 분류·색·원형 그래프 · 줄 돈 15일 자동 · 카드값 할 일 · 연습 데이터
 // 화면 마크업은 index.html의 #moneyPage(⚙ 설정 탭 #catEditor·#curEditor 포함) · #acctDlg · #mDrawer · #bulkDlg. 보드 쪽 공통 함수·상태는 시작할 때 bindMoney(env)로 받음
@@ -323,10 +325,10 @@ export function renderPlan(m, r) {
   $("planCatList").innerHTML = moneyCats("expense").filter((c) => !planned.has(c)).map((c) => `<option value="${esc(c)}">`).join("");
 }
 
-export function monthTotals(m) {
+export function monthTotals(m, range) {   // range = {from, to} 이면 그 기간 (내역 기간 고르기)
   const r = { inc: 0, out: 0, exp: 0, byCat: {}, items: [] };
   S.money.forEach((x, id) => {
-    if (!x.date || x.date.slice(0, 7) !== m) return;
+    if (!x.date || (range ? x.date < range.from || x.date > range.to : x.date.slice(0, 7) !== m)) return;
     const a = isWon(x) ? Number(x.amount) || 0 : 0;   // 다른 화폐는 목록엔 보이고 합계엔 안 들어감
     r.items.push({ id, ...x });
     if (x.kind === "income") r.inc += a;
@@ -437,7 +439,7 @@ export function renderMoney() {
 
   renderMoneyForm();
 
-  renderTx(m, r);
+  renderTx(m, ui.txRange ? monthTotals(null, ui.txRange) : r);
   if (mTab() === "stats" && !moneyAdminView()) renderStats();
   if (mTab() === "cal" && !moneyAdminView()) renderMCal(m, r);
 }
@@ -586,7 +588,8 @@ function renderTx(m, r) {
   const f = TX_KINDS.some(([k]) => k === ui.txKind) ? ui.txKind : "all", cnt = { all: r.items.length, income: 0, expense: 0, transfer: 0 };
   r.items.forEach((x) => { const k = x.kind || "expense"; if (k in cnt && k !== "all") cnt[k]++; });
   const sums = { all: r.inc - r.exp - r.out, income: r.inc, expense: r.exp, transfer: r.out };
-  $("txMonth").textContent = monthLabel(m);
+  const lab = ui.txRange ? rangeLabel(ui.txRange.from, ui.txRange.to) : monthLabel(m);
+  $("txMonth").textContent = lab;
   $("txSum").innerHTML = TX_KINDS.map(([k, l]) => `<button type="button" class="tx-k k-${k}" role="tab" data-act="txKind" data-k="${k}" aria-selected="${f === k}"><span>${l} (${cnt[k]})</span><b class="won${k === "all" ? (sums.all < 0 ? " minus" : " plus") : ""}"><span class="tx-l">${k === "all" && sums.all < 0 ? "-" : ""}${won(Math.abs(sums[k]))}</span><span class="tx-short">${k === "all" && sums.all < 0 ? "-" : ""}${moneyShort(Math.abs(sums[k]))}</span></b></button>`).join("");
   const items = r.items.filter((x) => f === "all" || (x.kind || "expense") === f).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
   [...txSel].forEach((id) => { if (!items.some((x) => x.id === id)) txSel.delete(id); });
@@ -594,7 +597,7 @@ function renderTx(m, r) {
   $("txSel").innerHTML = txSel.size ? `<span><b>${txSel.size}개</b> 골랐어요</span><button class="btn small danger-txt ghost" type="button" data-act="txDel">선택 삭제</button><button class="btn small ghost" type="button" data-act="txSelNone">고르기 취소</button>` : "";
   const all = items.length && items.every((x) => txSel.has(x.id));
   $("txList").innerHTML = !S.loaded ? '<p class="muted small">불러오는 중…</p>'
-    : !items.length ? `<p class="muted small" style="margin:8px 0">${monthLabel(m)} ${f === "all" ? "" : TX_KINDS.find(([k]) => k === f)[1] + " "}기록이 없어요. 오른쪽 아래 ＋로 기록해요.</p>`
+    : !items.length ? `<p class="muted small" style="margin:8px 0">${lab} ${f === "all" ? "" : TX_KINDS.find(([k]) => k === f)[1] + " "}기록이 없어요. 오른쪽 아래 ＋로 기록해요.</p>`
     : `<div class="tx-row tx-th"><label class="tx-ck"><input type="checkbox" data-txall ${all ? "checked" : ""} aria-label="모두 고르기"></label><span>날짜</span><span>자산</span><span>분류</span><span>소분류</span><span class="tx-amt">금액</span><span>내용</span><span>메모</span></div>` +
       items.map((x) => txRow(x, true)).join("");
 }
@@ -1184,6 +1187,18 @@ export function moneyAction(a, el, id, t) {
   if (a === "bulkSave") { bulkSave(); return true; }
   if (a === "bulkDel") { const tr = el.closest("tr"); tr.replaceWith(Object.assign(document.createElement("tbody"), { innerHTML: bulkRowHtml({ acct: lastAcct("expense") }) }).firstElementChild); bulkNumber(); return true; }
   if (a === "monthNow") { ui.month = today().slice(0, 7); renderMoney(); return true; }
+  // 🧾 내역 기간: 달 이름·[이번 달] → 기간 고르기 창, ‹ › → 한 달이면 한 달씩, 아니면 같은 날 수만큼
+  if (a === "txPick") {
+    const cur = ui.txRange || { from: ui.month + "-01", to: `${ui.month}-${String(new Date(+ui.month.slice(0, 4), +ui.month.slice(5, 7), 0).getDate()).padStart(2, "0")}` };
+    let first = t; S.money.forEach((x) => { if (x && x.date && x.date < first) first = x.date; });
+    openRangePicker(el.closest(".tx-head") || el, { from: cur.from, to: cur.to, first, today: t }, ({ from, to }) => { const wm = wholeMonth(from, to); if (wm) { ui.month = wm; ui.txRange = null; } else ui.txRange = { from, to }; renderMoney(); });
+    return true;
+  }
+  if (a === "txShift") {
+    if (ui.txRange) { const r = shiftRange(ui.txRange.from, ui.txRange.to, +el.dataset.d), wm = wholeMonth(r.from, r.to); if (wm) { ui.month = wm; ui.txRange = null; } else ui.txRange = r; }
+    else ui.month = shiftMonth(ui.month, +el.dataset.d);
+    renderMoney(); return true;
+  }
   if (a === "txSelNone") { txSel.clear(); renderMoney(); return true; }
   if (a === "txDel") {
     if (!ready() || !txSel.size) return true;
