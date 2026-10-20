@@ -43,6 +43,7 @@ export function settleOf(list) {
 
 export function mountUri(root, opts = {}) {
   const who = opts.who === "ukjin" ? "ukjin" : "nyanya";
+  const partner = who === "nyanya" ? "욱진이" : "냐냐";   // 상대 이름 (문구용)
   const toast = typeof opts.toast === "function" ? opts.toast : () => {};
   injectStyle();
   root.classList.add("uri");
@@ -146,14 +147,14 @@ export function mountUri(root, opts = {}) {
   function lockHtml() {
     return `<div class="uri-card uri-lock">
       <h3>🤝 우리 공간 열기</h3>
-      <p class="uri-muted">욱진이와 같이 정한 <b>공통 비밀번호</b>를 넣어 주세요. 둘이 같은 비밀번호를 써야 같은 공통비용이 보여요.
+      <p class="uri-muted">${partner}와 같이 정한 <b>공통 비밀번호</b>를 넣어 주세요. 둘이 같은 비밀번호를 써야 같은 공통비용이 보여요.
         이 보드 비밀번호와는 따로예요.</p>
       <form class="uri-row" data-uri="login" autocomplete="on">
         <input type="text" name="username" value="uri-board" autocomplete="username" hidden>
         <input class="uri-input" type="password" name="pw" placeholder="공통 비밀번호" aria-label="공통 비밀번호" autocomplete="current-password" required>
         <button class="uri-btn" type="submit">열기</button>
       </form>
-      ${st.askNew ? `<div class="uri-note"><span>이 비밀번호로 만든 공통 공간이 아직 없어요. 오타가 아니라면 새로 만들까요? 만든 뒤 ${who === "nyanya" ? "욱진이" : "냐냐"}에게도 같은 비밀번호를 알려 주세요.</span>
+      ${st.askNew ? `<div class="uri-note"><span>이 비밀번호로 만든 공통 공간이 아직 없어요. 오타가 아니라면 새로 만들까요? 만든 뒤 ${partner}에게도 같은 비밀번호를 알려 주세요.</span>
         <span class="uri-row"><button class="uri-btn" type="button" data-uri="newYes">새로 만들기</button><button class="uri-btn ghost" type="button" data-uri="newNo">다시 입력</button></span></div>` : ""}
       ${st.msg ? `<p class="uri-err">${esc(st.msg)}</p>` : ""}
     </div>`;
@@ -326,7 +327,7 @@ export function mountUri(root, opts = {}) {
     else if (a === "cancel") { st.edit = null; render(true); }
     else if (a === "del" && st.costs[id]) {
       const c = st.costs[id];
-      if (!confirm(`'${c.title}' ${won(c.amount)} 기록을 지울까요? ${who === "nyanya" ? "욱진이" : "냐냐"} 보드에서도 지워져요.`)) return;
+      if (!confirm(`'${c.title}' ${won(c.amount)} 기록을 지울까요? ${partner} 보드에서도 지워져요.`)) return;
       if (st.edit === id) st.edit = null;
       save(rt.remove(path(room, "costs", id)), "지웠어요.").catch(() => {});
     } else if (a === "lock") {
