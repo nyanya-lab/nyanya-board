@@ -6,7 +6,8 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261020o";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey } from "./money.js?v=20261020c";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances } from "./money.js?v=20261020d";
+import { mountBalance } from "./balance.js?v=20261020a";
 import { mountImport } from "./import.js?v=20261020a";
 
 const FB_VER = "10.12.2";
@@ -133,6 +134,7 @@ function render() {
   if (!backend) return;
   $("todayMono").textContent = today().replace(/-/g, ".");
   renderMoney();
+  bal.render();
   mirrorCommon();
 }
 // ❤️ 공통으로 표시한 지출(원화)만 공통 저장소로
@@ -233,6 +235,8 @@ bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum,
   give: false,   // 💝 줄 돈(욱진 보드 전용)은 안 씀
   get backend() { return backend; }, get testMode() { return false; } });
 initMoney();
+// 🧮 실제 잔액 맞추기 · 🙈 숨기기 (자산 탭)
+const bal = mountBalance($("balPanel"), { S, backend: () => backend, toast, act, esc, won, rows, balances });
 // 📥 편한가계부 가져오기 (가계부 설정 탭)
 mountImport($("importPanel"), { S, backend: () => backend, toast, act, esc, won, render, catKey, defaultCats: (k) => (MONEY_CATS[k] || []).slice() });
 // 보드 첫 화면 '공통비용' 칸에서 바로 오면 (#common)

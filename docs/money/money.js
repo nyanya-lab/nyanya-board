@@ -1,7 +1,7 @@
 // 💰 돈 관리 (가계부) — ⚠️ 욱진 보드 docs/money.js를 가져온 짝 코드 (냐냐 보드 docs/money/money.js).
 //   고칠 때 욱진 보드에도 필요한 고침인지 생각하고, 그렇다면 "욱진 보드도 같이 고칠까?" 물어보기 (CLAUDE.md).
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
-//   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common.
+//   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌.
 // (원래 설명) 보드(index.html)와 가계부 모드(money.html → index.html?app=money)가 같이 쓰는 코드
 // 한 달 예산 · 지출 기록 · 자산(통장·카드·현금, 카드 결제일) · 분류·색·원형 그래프 · 줄 돈 15일 자동 · 카드값 할 일 · 연습 데이터
 // 화면 마크업은 index.html의 #moneyPage(⚙ 설정 탭 #catEditor·#curEditor 포함) · #acctDlg · #mDrawer · #bulkDlg. 보드 쪽 공통 함수·상태는 시작할 때 bindMoney(env)로 받음
@@ -350,7 +350,7 @@ export function balances(upTo) {
   return b;
 }
 export const acctName = (id) => !id ? "자산 미지정" : S.accounts.has(id) ? S.accounts.get(id).name : "지운 자산";
-export const sortedAccts = () => rows(S.accounts).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+export const sortedAccts = () => rows(S.accounts).filter((a) => !a.hidden).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));   // 🙈 숨긴 자산은 목록·합계·고르는 칸에서 빼기 (냐냐 쪽에서 더함, 기록은 그대로)
 export const ACCT_ICON = { bank: "🏦", card: "💳", cash: "💵", save: "🐷" };
 
 // 관리자(여자친구) 기기에선 지출·자산은 안 보이게 (예산 금액 · 수입 · 보낸 돈만). 화면에서만 숨김
