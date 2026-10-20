@@ -56,3 +56,6 @@
 .rp-form .rp-day input[type=number] { width: 64px; }
 .btn.sm { padding: 4px 10px; font-size: 13px; }
 @media (max-width: 720px) { .rp-row { grid-template-columns: minmax(0, 1fr) auto; } .rp-form > select, .rp-form > input { flex-basis: 45%; } }
+/* 2026-10-21 냐냐 요청: 왼쪽 메뉴 줄이기 · 내 자산 칸 늘리기 (넓은 화면만, 폰은 그대로) */
+@media (min-width: 861px) { .side { width: 184px; } body { padding-left: 184px; } }
+@media (min-width: 1101px) { .as-grid { grid-template-columns: minmax(340px, 460px) minmax(0, 1fr); } }
