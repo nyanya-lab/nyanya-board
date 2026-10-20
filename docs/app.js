@@ -2,9 +2,9 @@
 // 저장: 욱진 보드와 같은 방식. Firebase Realtime Database(nyanya-board)의 nyanya/{SHA-256("nyanya-board:"+비밀번호)} 아래.
 // 로그인 없음, 비밀번호 = 저장 위치. 항목마다 따로 저장해서 폰·PC가 서로 덮어쓰지 않음.
 
-import { firebaseConfig } from "./firebase-config.js?v=20261020k";
-import { mountUri } from "./uri/uri.js?v=20261020k";
-import { createLinks, vocabToday, vocabStreak, isWatching, finishDays, watchPeriods, dayActivity } from "./links.js?v=20261020k";
+import { firebaseConfig } from "./firebase-config.js?v=20261020l";
+import { mountUri } from "./uri/uri.js?v=20261020l";
+import { createLinks, vocabToday, vocabStreak, isWatching, finishDays, watchPeriods, dayActivity } from "./links.js?v=20261020l";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -124,6 +124,7 @@ async function firebaseStart() {
       remove: tracked((c, id) => rt.remove(path(room, c, id))),
       saveLinks: tracked((patch) => rt.update(path(room, "settings", "links"), patch)),
       saveView: tracked((patch) => rt.update(path(room, "settings", "view"), patch)),
+      saveUriPw: tracked((pw) => rt.update(path(room, "settings"), { uriPw: pw })),
       async backups() { return (await rt.get(path(room, "_backup"))).val() || {}; },
       restore: tracked(async (kind) => {
         const bak = (await rt.get(path(room, "_backup", kind))).val(); if (!bak) throw new Error("no backup");
@@ -155,6 +156,7 @@ async function firebaseStart() {
     unsubs.push(rt.onValue(path(room, "settings"), (snap) => {
       S.settings = snap.val() || {};
       links.setPasswords(S.settings.links);
+      if (S.settings.uriPw) uri.usePassword(S.settings.uriPw);   // 🤝 보드에 기억한 공통 비밀번호로 우리 탭 열기
       renderLinkSettings();
       renderToggles();
       renderCalendar();
@@ -611,9 +613,11 @@ function renderToday() {
 window.addEventListener("hashchange", renderPage);
 renderToday();
 // 🤝 우리 탭: 욱진 보드와 같은 코드(uri/uri.js), 공통 저장소(uri-board)에 따로 연결
-mountUri($("#uriRoot"), {
+const uri = mountUri($("#uriRoot"), {
   who: "nyanya",
   toast,
+  // 한 번 넣은 공통 비밀번호를 이 보드 설정에 기억 → 다른 기기에선 보드 비밀번호만 넣으면 우리 탭도 열림
+  savePassword: (pw) => { if (backend) act(backend.saveUriPw(pw || null)).catch(() => {}); },
   onSummary: ({ total, connected }) => { $("#tileUri").textContent = connected ? total.toLocaleString("ko-KR") + "원" : "열기 전"; }
 });
 renderPage();

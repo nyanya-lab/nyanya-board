@@ -7,6 +7,8 @@
 //   who        = 이 보드 주인 (적은 사람·기본 '낸 사람')
 //   toast(msg) = 보드의 알림 함수 (없으면 alert 안 하고 조용히)
 //   onSummary({ month, total, connected }) = 이번 달 공통비용 합계가 바뀔 때 (보드 요약 칸용, 선택)
+//   savePassword(pw | null) = 공통 비밀번호를 보드에 저장/지우기 (선택). 있으면 한 번 넣은 공통 비밀번호를 그 보드가 기억해서
+//                             다른 기기에선 다시 안 넣어도 됨 → 보드가 불러온 값을 돌려받은 함수 .usePassword(pw)로 넘겨 줌
 // 화면 색은 보드의 색 토큰(--me, --surface, --line …)을 그대로 써요. 클래스는 모두 uri- 로 시작.
 
 import { uriConfig } from "./uri-config.js?v=20261020a";
@@ -56,7 +58,9 @@ export function mountUri(root, opts = {}) {
     edit: null,                // 고치는 중인 기록 id
     form: null                 // 다시 그릴 때 입력 중이던 값 유지
   };
-  let rt = null, db = null, room = null, unsubs = [], bakTimer = null;
+  let rt = null, db = null, room = null, unsubs = [], bakTimer = null, readyDone;
+  const ready = new Promise((r) => { readyDone = r; });   // 저장소 연결 준비 끝 (usePassword가 기다림)
+  const hostSaves = typeof opts.savePassword === "function";
   const path = (...p) => rt.ref(db, [ROOT, ...p].join("/"));
 
   // ── 연결 ──
@@ -67,6 +71,7 @@ export function mountUri(root, opts = {}) {
       // 보드 자기 저장소(기본 앱)와 섞이지 않게 이름 붙인 앱으로
       const app = getApps().find((a) => a.name === "uri") || initializeApp(uriConfig, "uri");
       db = rt.getDatabase(app);
+      readyDone();
     } catch (e) {
       st.phase = "error"; st.msg = "공통 저장소에 연결하지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요."; render(); return;
     }
@@ -91,8 +96,16 @@ export function mountUri(root, opts = {}) {
     open(r);
     return true;
   }
+  // 보드에 저장된 공통 비밀번호로 열기 (보드 설정을 불러온 뒤 보드가 부름). 이미 그 공간이 열려 있으면 그대로
+  async function usePassword(pw) {
+    await ready;
+    if (!pw) return;
+    if (room && room === await roomOf(pw)) return;
+    try { if (!(await tryPassword(pw)) && st.phase !== "open") lock(""); } catch (e) { /* 직접 넣으면 됨 */ }
+  }
 
   function open(r) {
+    unsubs.forEach((u) => u()); unsubs = [];
     room = r; st.phase = "open"; st.msg = ""; st.askNew = false; st.pendingPw = null;
     unsubs.push(rt.onValue(path(room, "costs"), (snap) => {
       st.costs = snap.val() || {}; st.loaded = true; summary(); render();
@@ -148,7 +161,7 @@ export function mountUri(root, opts = {}) {
     return `<div class="uri-card uri-lock">
       <h3>🤝 우리 공간 열기</h3>
       <p class="uri-muted">${partner}와 같이 정한 <b>공통 비밀번호</b>를 넣어 주세요. 둘이 같은 비밀번호를 써야 같은 공통비용이 보여요.
-        이 보드 비밀번호와는 따로예요.</p>
+        이 보드 비밀번호와는 따로예요.${hostSaves ? " 한 번 넣으면 이 보드에 기억돼서 다른 기기에선 다시 안 넣어도 돼요." : ""}</p>
       <form class="uri-row" data-uri="login" autocomplete="on">
         <input type="text" name="username" value="uri-board" autocomplete="username" hidden>
         <input class="uri-input" type="password" name="pw" placeholder="공통 비밀번호" aria-label="공통 비밀번호" autocomplete="current-password" required>
@@ -236,7 +249,7 @@ export function mountUri(root, opts = {}) {
         </div>
       </div>
 
-      <p class="uri-foot"><button type="button" class="uri-link" data-uri="lock">🔒 이 기기에서 공통 비밀번호 지우기</button></p>`;
+      <p class="uri-foot"><button type="button" class="uri-link" data-uri="lock">🔒 ${hostSaves ? "이 보드에 기억한" : "이 기기에서"} 공통 비밀번호 지우기</button></p>`;
   }
 
   // 다시 그려도 입력 중이던 값이 날아가지 않게
@@ -269,7 +282,7 @@ export function mountUri(root, opts = {}) {
       st.msg = ""; st.askNew = false;
       if (pw.length < 6) { st.msg = "공통 비밀번호는 6자 이상으로 해 주세요."; render(); return; }
       try {
-        if (await tryPassword(pw)) return;
+        if (await tryPassword(pw)) { if (hostSaves) opts.savePassword(pw); return; }
         st.pendingPw = pw; st.askNew = true; render();
         const again = root.querySelector('input[name="pw"]'); if (again) again.value = pw;
       } catch (err) { st.msg = isDenied(err) ? "공통 저장소 규칙을 확인해 주세요." : "열지 못했어요. 인터넷 연결을 확인해 주세요."; render(); }
@@ -312,6 +325,7 @@ export function mountUri(root, opts = {}) {
         const r = await roomOf(st.pendingPw);
         await rt.set(path(r, "settings"), { createdAt: Date.now(), by: who });
         lsSet(LS_PW, st.pendingPw);
+        if (hostSaves) opts.savePassword(st.pendingPw);
         open(r); toast("🤝 우리 공간을 만들었어요. 같은 비밀번호로 열면 둘 다 같은 걸 봐요.");
       } catch (err) { st.msg = isDenied(err) ? "공통 저장소 규칙을 확인해 주세요." : "만들지 못했어요. 인터넷 연결을 확인해 주세요."; render(); }
     } else if (a === "newNo") { st.pendingPw = null; st.askNew = false; render(); }
@@ -331,14 +345,14 @@ export function mountUri(root, opts = {}) {
       if (st.edit === id) st.edit = null;
       save(rt.remove(path(room, "costs", id)), "지웠어요.").catch(() => {});
     } else if (a === "lock") {
-      if (!confirm("이 기기에서 공통 비밀번호를 지울까요? 다시 보려면 공통 비밀번호를 넣어야 해요.")) return;
-      lsSet(LS_PW, null); lock("잠갔어요.");
+      if (!confirm(hostSaves ? "이 보드에 기억한 공통 비밀번호를 지울까요? 이 보드를 쓰는 모든 기기에서 우리 탭이 잠기고, 다시 보려면 공통 비밀번호를 넣어야 해요." : "이 기기에서 공통 비밀번호를 지울까요? 다시 보려면 공통 비밀번호를 넣어야 해요.")) return;
+      lsSet(LS_PW, null); if (hostSaves) opts.savePassword(null); lock("잠갔어요.");
     }
   });
 
   render();
   start();
-  return { render };
+  return { render, usePassword };
 }
 
 let styled = false;

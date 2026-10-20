@@ -49,7 +49,7 @@ docs/manifest.webmanifest, *.png  홈 화면 앱 아이콘
 
 - 공통비용·공통 목표·같이 할 일·공통 상 등 둘이 같이 쓰는 것. 사이트는 따로 없고 냐냐 보드·욱진 보드 안의 🤝 우리 탭에서 봄. 지금은 공통비용만.
 - 공통비용 `costs/{id}` = {date, title, amount, cat(`URI_CATS`), payer nyanya|ukjin|joint(공동 통장), memo, by(적은 사람), at, updBy, updAt}. 정산 = (냐냐 낸 돈 − 욱진 낸 돈) / 2, 공동 통장은 합계에만 (`settleOf`). `_backup/{prev,daily}` 자동 백업(되돌리기 화면은 아직 없음).
-- 공통 비밀번호는 이 기기 `localStorage["uri-board-pw"]`. 두 보드가 같은 주소(nyanya-lab.github.io)라서 같은 브라우저면 한쪽에서 열면 다른 보드도 열림.
+- 공통 비밀번호는 이 기기 `localStorage["uri-board-pw"]` + 냐냐 보드 `settings.uriPw`(한 번 넣으면 보드가 기억 → 다른 기기에선 보드 비밀번호만 넣으면 우리 탭도 열림, `mountUri`의 `savePassword` / 돌려받은 `usePassword`). 욱진 보드는 아직 savePassword를 안 넘겨서 기기마다 넣어야 함 (원하면 욱진 보드 app.js에 같은 연결 추가). 두 보드가 같은 주소(nyanya-lab.github.io)라서 같은 브라우저면 한쪽에서 열면 다른 보드도 열림.
 - **uri.js를 고치면 욱진 보드에도 바로 적용됨** → 욱진 보드 화면에서도 확인하기. 욱진이가 보는 게 바뀌면 `docs/uri/changes.js`(`URI_CHANGES`) 맨 위에 쉬운 말로 한 줄 추가 → 욱진 보드 업데이트 내역·새 버전 알림에 자동으로 섞여 나옴 (욱진 보드 changes.js는 안 건드림). 욱진 보드는 10분 단위 `?v=`로 불러와서 고친 뒤 최대 10분+GitHub Pages 반영 시간 뒤에 바뀜.
 - 저장 위치 `uri/{SHA-256("uri-board:"+공통 비밀번호)}` (공통 비밀번호는 둘이 정함, 아직 안 정함). 규칙: 저장소 맨 위 `uri.rules.json` (게시 완료, 2026-10-20 읽기·쓰기·목록 막힘 확인).
 - 연결 설정 `docs/uri/uri-config.js` (`uriConfig`). 우리 탭 코드도 `docs/uri/` 아래에 두고, 욱진 보드는 `https://nyanya-lab.github.io/nyanya-board/uri/…`에서 불러와 쓸 계획 → 한 곳만 고치면 두 보드 다 적용.
