@@ -309,3 +309,20 @@ body:not(.locked) .loading { display: none; }
   .page-head { flex-wrap: wrap; }
   .day-dlg { margin: auto auto 0; width: 100%; max-width: 100%; border-radius: 16px 16px 0 0; padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
 }
+
+/* 📅 구글 일정: 캘린더 색(--gc) */
+.day-item.g { background: color-mix(in srgb, var(--gc) 16%, var(--surface)); color: var(--fg); border-left: 3px solid var(--gc); border-radius: 4px; }
+.day-item.g b { font-family: var(--f-mono); font-size: 11px; font-weight: 600; }
+.dots i.g { background: var(--gc); }
+.wbar.g { background: color-mix(in srgb, var(--gc) 22%, var(--surface)); color: var(--fg); }
+.day-g { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 6px; }
+.day-g h4 { margin: 0; font-size: 14px; font-weight: 600; color: var(--muted); }
+.g-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.g-list li { display: flex; align-items: center; gap: 8px; }
+.g-list li i, .g-cals i { width: 10px; height: 10px; border-radius: 3px; background: var(--gc); flex: none; }
+.g-list .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.g-list b { font-family: var(--f-mono); font-size: 12px; }
+.g-list a { text-decoration: none; color: var(--muted); }
+.g-cals { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.g-cals label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
+@media (max-width: 720px) { .wbar.g { background: var(--gc); opacity: 0.55; } }

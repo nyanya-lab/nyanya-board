@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="only light">
+<title>구글 캘린더 연결</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css?v=20261020j">
+<style>
+  .guide { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .guide > *, .steps > li, .code-box { min-width: 0; }
+  .guide h1 { font-family: var(--f-display); font-weight: 400; font-size: 30px; margin: 0; }
+  .steps { display: grid; gap: 14px; counter-reset: step; padding: 0; margin: 0; list-style: none; }
+  .steps > li { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); padding: 16px 18px 16px 60px; position: relative; display: grid; gap: 8px; }
+  .steps > li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 16px; top: 14px; width: 30px; height: 30px; border-radius: 8px;
+    display: grid; place-items: center; background: var(--me); color: #FFFFFF; font-family: var(--f-mono); font-weight: 600;
+  }
+  .steps h3 { font-size: 19px; }
+  .steps ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+  code { font-family: var(--f-mono); background: var(--sunk); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; font-size: 13px; }
+  .code-box { position: relative; }
+  .code-box pre { margin: 0; max-height: 260px; overflow: auto; background: var(--sunk); border: 1px solid var(--line); border-radius: 10px; padding: 12px; font-family: var(--f-mono); font-size: 12px; line-height: 1.5; }
+  .code-box .btn { position: absolute; top: 8px; right: 8px; }
+  .callout { background: var(--sun-soft); border: 1px solid var(--sun); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+  .callout ul { margin: 6px 0 0; padding-left: 18px; }
+  .fix { display: grid; gap: 10px; }
+  .fix h2 { font-size: 22px; }
+  .fix div { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .fix > div > b:first-child { display: block; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<main class="guide">
+  <a class="brand" href="./"><span class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><b>냐냐 보드</b></a>
+  <div style="display:grid;gap:6px">
+    <h1>구글 캘린더 연결</h1>
+    <p class="muted">냐냐 구글 계정에서 <b>딱 한 번</b>만 하면 돼요. 붙여넣는 코드는 <b>자동 업데이트 버전</b>이라 나중에 기능이 바뀌어도 다시 붙여넣을 필요가 없어요.
+      그 뒤로는 5분마다 알아서 맞춰요. 사이트에서 구글 로그인은 필요 없어요. PC에서 하는 걸 추천해요 (10분 정도). 욱진 보드와 같은 방식이에요.</p>
+  </div>
+
+  <div class="callout">이렇게 맞춰져요:
+    <ul>
+      <li><b>📌 할 일 / ✅ 끝낸 일</b> → <b>김윤아</b> 캘린더 (보드에서 날짜 있는 할 일)</li>
+      <li><b>📖 스페인어 12개 · 복습 끝</b> → <b>루틴관리</b> 캘린더 (공부한 날, 최근 60일. 보드 ⚙️ 설정 → 연동에 스페인어 비밀번호가 있어야 해요)</li>
+      <li>💰 돈은 <b>안 보내요</b>.</li>
+      <li>구글 캘린더 일정 → 보드 달력 (보드 ⚙️ 설정 → 구글 캘린더에서 캘린더마다 켜고 끄기)</li>
+    </ul>
+    보드가 넣은 일정만 고치고 지워요. 냐냐가 구글에서 직접 넣은 일정은 건드리지 않아요.</div>
+
+  <ol class="steps">
+    <li>
+      <h3>Apps Script 열기</h3>
+      <p><b>냐냐 구글 계정</b>으로 로그인한 상태에서 <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener">script.google.com 새 프로젝트</a>를 열어요.</p>
+      <p class="small muted">구글 계정이 여러 개면 오른쪽 위 동그라미 사진이 '김윤아'·'루틴관리' 캘린더가 있는 계정인지 꼭 확인해요.</p>
+    </li>
+    <li>
+      <h3>프로젝트 이름 바꾸기</h3>
+      <p>왼쪽 위 <b>제목 없는 프로젝트</b>를 눌러 <code>냐냐 보드 동기화</code>로 바꿔요.</p>
+    </li>
+    <li>
+      <h3>코드 붙여넣기</h3>
+      <p>가운데 편집기에 있는 <code>function myFunction() { … }</code>을 전부 지우고, 아래 코드를 <b>코드 복사</b>로 복사해서 붙여넣어요.</p>
+      <div class="code-box"><pre id="code">불러오는 중…</pre><button class="btn small" type="button" id="copyBtn">코드 복사</button></div>
+    </li>
+    <li>
+      <h3>보드 비밀번호 넣고 저장</h3>
+      <p>코드 위쪽 <code>const BOARD_PASSWORD = "";</code>의 <b>따옴표 사이</b>에 냐냐 보드 비밀번호를 넣어요. 예: <code>const BOARD_PASSWORD = "비밀번호";</code></p>
+      <p>그다음 <b>저장</b>(디스크 아이콘, 또는 <code>Ctrl + S</code>)을 눌러요.</p>
+      <p class="small muted">이 코드는 냐냐 구글 계정 안에만 있어서 다른 사람은 못 봐요.</p>
+    </li>
+    <li>
+      <h3>Google Calendar API 추가</h3>
+      <p>왼쪽 메뉴 <b>서비스</b> 옆 <b>+</b>를 누르고, 목록에서 <b>Google Calendar API</b>를 골라 <b>추가</b>를 눌러요.</p>
+    </li>
+    <li>
+      <h3>setup 실행하고 권한 허락</h3>
+      <ul>
+        <li>편집기 위쪽 함수 고르는 칸에서 <b>setup</b>을 고르고 <b>▶ 실행</b>을 눌러요.</li>
+        <li><b>권한 검토</b> → 냐냐 계정 선택.</li>
+        <li>"Google에서 확인하지 않은 앱" 화면이 나오면 <b>고급</b> → <b>냐냐 보드 동기화(으)로 이동(안전하지 않음)</b>을 눌러요. 냐냐가 직접 만든 스크립트라서 나오는 화면이에요.</li>
+        <li><b>허용</b>을 눌러요.</li>
+      </ul>
+    </li>
+    <li>
+      <h3>끝! 확인하기</h3>
+      <p>아래 <b>실행 로그</b>에 <code>설정 끝! 이제 5분마다 자동으로 맞춰요.</code>가 나오면 성공이에요.</p>
+      <p>냐냐 보드 <b>⚙️ 설정 → 📅 구글 캘린더</b>에 "자동 동기화 중"과 캘린더 목록이 보여요. 보드 달력에 보일 캘린더를 거기서 골라요.</p>
+    </li>
+  </ol>
+
+  <section class="fix">
+    <h2>문제 해결</h2>
+    <div><b>"BOARD_PASSWORD에 냐냐 보드 비밀번호를 넣고…"</b>4번에서 비밀번호를 넣고 저장했는지 확인해요.</div>
+    <div><b>"이 비밀번호로 만든 냐냐 보드가 없어요"</b>비밀번호에 오타가 있어요. 사이트에서 쓰는 비밀번호와 똑같이 넣어요.</div>
+    <div><b>"Calendar is not defined"</b>5번(서비스에 Google Calendar API 추가)이 빠졌어요.</div>
+    <div><b>보드에 "'김윤아' 캘린더를 못 찾았어요"가 떠요</b>구글 캘린더 왼쪽 목록의 이름과 똑같아야 해요. 이름을 바꿨으면 알려 주세요 (코드에서 맞춰 드릴게요). 그동안 할 일은 기본 캘린더로 들어가요.</div>
+    <div><b>보드에 "구글 동기화 멈춤"이 떠요</b>Apps Script 왼쪽 <b>트리거</b>(시계 아이콘)에 <code>sync</code>가 있는지 봐요. 없으면 <b>setup</b>을 다시 실행해요. <b>실행</b> 메뉴(목록 아이콘)에서 빨간 실패 기록을 누르면 이유가 보여요.</div>
+    <div><b>보드 비밀번호를 바꿨어요</b>4번처럼 새 비밀번호로 고치고 저장하면 다음 5분부터 새 보드로 맞춰요.</div>
+    <div><b>바뀐 기능을 지금 바로 받고 싶어요</b>함수 칸에서 <b>refresh</b>를 골라 실행해요. (그냥 두면 15분 안에 알아서 바뀌어요)</div>
+    <div><b>그만 쓰고 싶어요</b>함수 칸에서 <b>stop</b>을 골라 실행하면 자동 동기화가 멈춰요.</div>
+  </section>
+</main>
+<script>
+  (function () {
+    var pre = document.getElementById("code"), btn = document.getElementById("copyBtn");
+    fetch("apps-script/Code.gs?t=" + Date.now(), { cache: "no-store" }).then(function (r) { if (!r.ok) throw 0; return r.text(); })
+      .then(function (t) { pre.textContent = t; })
+      .catch(function () { pre.textContent = "코드를 불러오지 못했어요. 새로고침해 주세요."; });
+    btn.addEventListener("click", function () {
+      var text = pre.textContent;
+      var done = function () { btn.textContent = "복사했어요!"; setTimeout(function () { btn.textContent = "코드 복사"; }, 2000); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, select);
+      else select();
+      function select() { var r = document.createRange(); r.selectNodeContents(pre); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = "선택했어요. Ctrl+C로 복사"; }
+    });
+  })();
+</script>
+</body>
+</html>

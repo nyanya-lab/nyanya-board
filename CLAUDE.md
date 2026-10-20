@@ -32,6 +32,9 @@ docs/links.js             📖🎬 스페인어·왓치로그 읽기 (createLink
 docs/uri/uri.js           🤝 우리 탭 (욱진 보드와 같이 쓰는 코드, mountUri). CSS도 이 안에서 넣음(uri- 클래스)
 docs/uri/uri-config.js    우리(공통) 저장소 Firebase 설정
 docs/uri/changes.js       우리 탭 업데이트 내역 (욱진 보드가 읽어서 자기 업데이트 내역에 섞음)
+docs/google-sync.html     구글 캘린더 연결 안내 (Apps Script에 Code.gs 붙여넣기)
+docs/apps-script/Code.gs        냐냐 Apps Script에 넣는 짧은 로더 (한 번만 붙여넣음)
+docs/apps-script/sync-core.js   실제 구글 동기화 코드. 로더가 5분마다 받아서 실행 → 여기만 고치면 자동 적용 (CORE_VERSION 올리기)
 docs/manifest.webmanifest, *.png  홈 화면 앱 아이콘
 ```
 
@@ -55,9 +58,12 @@ docs/manifest.webmanifest, *.png  홈 화면 앱 아이콘
 - 항목·칸 단위로 따로 저장 (`flattenPaths`로 경로별 update) → 폰·PC가 서로 덮어쓰지 않음. 저장 상태 점: 초록 저장됨 · 노랑 저장 중 · 코랄 연결 끊김.
 - 뼈대 때 브라우저에만 저장하던 `localStorage["nyanya-board-v1"]` 할 일은 보드를 열면 서버로 한 번 옮기고 지움 (`moveOldLocal`).
 
-## 구글 캘린더 연동 (정하는 중, 2026-10-20)
+## 📅 구글 캘린더 연동 (2026-10-20 만듦 — 욱진 보드와 같은 Apps Script 방식)
 
-- 방식: 욱진 보드처럼 냐냐 구글 계정 Apps Script가 5분마다 동기화 (사이트에서 구글 로그인 없음). 양쪽 방향.
+- 방식: 냐냐 구글 계정 Apps Script(`Code.gs` 로더 → `sync-core.js`)가 5분마다. 사이트에서 구글 로그인 없음. 양쪽 방향.
+- 보드 → 구글: 보드가 넣은 일정엔 private 표시 `nyanyaApp=1` · `nyanyaKind`(task|vocab) · `nyanyaRef` → 그것만 고치고 지움. 냐냐가 직접 넣은 일정은 안 건드림. 할 일 `noGoogle: true`면 안 보냄(화면 버튼은 아직 없음). 캘린더는 **이름**으로 찾음(`CAL_NAME`), 못 찾으면 `gsync.missing`에 적고 할 일은 기본 캘린더로.
+- 구글 → 보드: 캘린더 전부, 지난달~석 달 뒤 → `nyanya/{방}/gcal` = {at, cals{키:{name,color,sel(구글에서 체크됨),o}}, ev{e0:{t,c,d,e(종일 끝 다음 날),tm,link}}}. 키 = 캘린더 id에서 . # $ [ ] / → _. 동기화 상태 `gsync` = {at, email, version, added, updated, deleted, missing[], vocab}.
+- 보드 화면: 하루짜리·시간 일정은 칸 안 글자(캘린더 색 `--gc`), 여러 날 종일 일정은 🎬처럼 막대(`weekBars`). 날짜 창 아래 '📅 구글 일정'. 오늘 옆 [📅 구글] 전체 켜고 끄기(`view.google`), ⚙️ 설정에서 캘린더마다(`view.gcal[키]`, 안 정했으면 구글에서 체크된 캘린더만 = 기본으로 '욱진'은 꺼짐).
 - 냐냐 구글 캘린더 목록: 김윤아(다른 사람과 **공유됨**) · Tasks · 루틴관리(지금 안 씀) · 생일 · 욱진 · 점심 · 캘린더 · 트레이딩실.
 - 정한 것:
   - 스페인어 같은 루틴 → **루틴관리** 캘린더.

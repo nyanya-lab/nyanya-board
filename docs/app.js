@@ -2,9 +2,9 @@
 // 저장: 욱진 보드와 같은 방식. Firebase Realtime Database(nyanya-board)의 nyanya/{SHA-256("nyanya-board:"+비밀번호)} 아래.
 // 로그인 없음, 비밀번호 = 저장 위치. 항목마다 따로 저장해서 폰·PC가 서로 덮어쓰지 않음.
 
-import { firebaseConfig } from "./firebase-config.js?v=20261020f";
-import { mountUri } from "./uri/uri.js?v=20261020f";
-import { createLinks, vocabToday, vocabStreak, isWatching, finishDays, watchPeriods, dayActivity } from "./links.js?v=20261020f";
+import { firebaseConfig } from "./firebase-config.js?v=20261020i";
+import { mountUri } from "./uri/uri.js?v=20261020i";
+import { createLinks, vocabToday, vocabStreak, isWatching, finishDays, watchPeriods, dayActivity } from "./links.js?v=20261020i";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -23,7 +23,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 
 // ── 상태 ──
-const S = { tasks: {}, settings: {}, loaded: false };
+const S = { tasks: {}, settings: {}, loaded: false, gcal: null, gsync: null };   // gcal·gsync = 냐냐 구글 Apps Script가 5분마다 씀 (apps-script/sync-core.js)
 const ui = { month: today().slice(0, 7), sel: today() };
 let backend = null;
 // 📖🎬 스페인어·왓치로그 (읽기만). 비밀번호는 보드 설정 settings.links 또는 그 앱이 이 브라우저에 기억한 값
@@ -87,7 +87,7 @@ async function firebaseStart() {
 
   const lockScreen = (msg) => {
     unsubs.forEach((u) => u()); unsubs = []; clearInterval(bakTimer);
-    backend = null; S.loaded = false; S.tasks = {};
+    backend = null; S.loaded = false; S.tasks = {}; S.gcal = null; S.gsync = null;
     document.body.classList.add("locked");
     $("#loadingView").hidden = true;
     $("#loginView").hidden = false;
@@ -150,12 +150,15 @@ async function firebaseStart() {
         if (S.loaded) moveOldLocal();
       }, onErr));
     });
+    unsubs.push(rt.onValue(path(room, "gcal"), (snap) => { S.gcal = snap.val(); renderCalendar(); renderDay(); renderGoogleSettings(); }, onErr));
+    unsubs.push(rt.onValue(path(room, "gsync"), (snap) => { S.gsync = snap.val(); renderGoogleSettings(); }, onErr));
     unsubs.push(rt.onValue(path(room, "settings"), (snap) => {
       S.settings = snap.val() || {};
       links.setPasswords(S.settings.links);
       renderLinkSettings();
       renderToggles();
       renderCalendar();
+      renderGoogleSettings();
     }, onErr));
     render();
     if (location.hash === "#settings") renderBackups();
@@ -265,17 +268,41 @@ const viewOn = (k) => !(S.settings.view && S.settings.view[k] === false);
 function renderToggles() {
   document.querySelectorAll('[data-act="toggleView"]').forEach((b) => b.setAttribute("aria-pressed", String(viewOn(b.dataset.k))));
 }
+// 📅 구글 캘린더: 전체 버튼(view.google) + 캘린더마다(view.gcal[키], 정하지 않았으면 구글에서 체크된 캘린더만)
+function gcalOn(k) {
+  if (!viewOn("google") || !S.gcal || !S.gcal.cals || !S.gcal.cals[k]) return false;
+  const v = S.settings.view && S.settings.view.gcal && S.settings.view.gcal[k];
+  return v === undefined ? !!S.gcal.cals[k].sel : v === true;
+}
+const gcolor = (k) => (S.gcal && S.gcal.cals && S.gcal.cals[k] && S.gcal.cals[k].color) || "#8A94A6";
+// 구글 일정: 하루짜리(시간 있는 일정 포함)는 칸 안 글자, 여러 날 종일 일정은 막대
+const gMulti = (e) => !!(e.e && e.e > addDay(e.d, 1));
+function gEventsOn(day) {
+  if (!S.gcal || !S.gcal.ev) return [];
+  return Object.values(S.gcal.ev).filter((e) => e && e.d && gcalOn(e.c) && (e.d === day || (e.e && e.d <= day && day < e.e)))
+    .sort((a, b) => (a.tm ? 1 : 0) - (b.tm ? 1 : 0) || String(a.tm || "").localeCompare(String(b.tm || "")));
+}
+function addDay(s, n) { const d = new Date(s + "T00:00:00"); d.setDate(d.getDate() + n); return ymd(d); }
+
 // 🎬 이번 주(일~토)에 걸친 작품 막대: 주 밖은 잘라서, 겹치면 아래 줄로 [{a, b, lane, x, s, e, open}] (a·b = 0~6 칸)
 function weekBars(weekStart, weekEnd) {
-  if (!viewOn("watch")) return [];
   const segs = [];
-  for (const x of Object.values(links.st.watch.items || {})) {
-    for (const p of watchPeriods(x, today())) {
-      if (p.e < weekStart || p.s > weekEnd) continue;
-      const s = p.s < weekStart ? weekStart : p.s, e = p.e > weekEnd ? weekEnd : p.e;
-      const a = Math.round((new Date(s + "T00:00:00") - new Date(weekStart + "T00:00:00")) / 86400000);
-      const b = Math.round((new Date(e + "T00:00:00") - new Date(weekStart + "T00:00:00")) / 86400000);
-      segs.push({ a, b, x, head: p.s >= weekStart, tail: p.e <= weekEnd && !p.open, open: p.open && p.e <= weekEnd, from: p.s, to: p.open ? "" : p.e });
+  const add = (p, extra) => {
+    if (p.e < weekStart || p.s > weekEnd) return;
+    const s = p.s < weekStart ? weekStart : p.s, e = p.e > weekEnd ? weekEnd : p.e;
+    const a = Math.round((new Date(s + "T00:00:00") - new Date(weekStart + "T00:00:00")) / 86400000);
+    const b = Math.round((new Date(e + "T00:00:00") - new Date(weekStart + "T00:00:00")) / 86400000);
+    segs.push({ a, b, head: p.s >= weekStart, tail: p.e <= weekEnd && !p.open, open: p.open && p.e <= weekEnd, from: p.s, to: p.open ? "" : p.e, ...extra });
+  };
+  if (viewOn("watch")) {
+    for (const x of Object.values(links.st.watch.items || {})) {
+      for (const p of watchPeriods(x, today())) add(p, { label: `🎬 ${x.title || ""}${x.season ? ` ${x.season}` : ""}`, tip: `${x.title || ""} ${md(p.s)}~${p.open ? " 보는 중" : md(p.e)}` });
+    }
+  }
+  if (S.gcal && S.gcal.ev) {
+    for (const ev of Object.values(S.gcal.ev)) {
+      if (!ev || !ev.d || !gMulti(ev) || !gcalOn(ev.c)) continue;
+      add({ s: ev.d, e: addDay(ev.e, -1), open: false }, { label: ev.t, tip: `${ev.t} ${md(ev.d)}~${md(addDay(ev.e, -1))}`, color: gcolor(ev.c) });
     }
   }
   segs.sort((p, q) => p.a - q.a || (q.b - q.a) - (p.b - p.a));
@@ -315,14 +342,17 @@ function renderCalendar() {
       key === ui.sel && "sel",
       d.getDay() === 0 && "sun",
       d.getDay() === 6 && "sat"].filter(Boolean).join(" ");
-    const items = list.slice(0, DAY_ITEMS)
-      .map(([, x]) => `<span class="day-item${x.done ? " done" : ""}">${esc(x.title)}</span>`).join("");
-    const more = list.length > DAY_ITEMS ? `<span class="day-more">+${list.length - DAY_ITEMS}</span>` : "";
-    const dots = list.length ? `<span class="dots">${list.slice(0, 3).map(([, x]) => `<i${x.done ? ' class="done"' : ""}></i>`).join("")}</span>` : "";
+    const gs = gEventsOn(key).filter((e) => !gMulti(e));   // 여러 날 일정은 막대로
+    const all = list.map(([, x]) => `<span class="day-item${x.done ? " done" : ""}">${esc(x.title)}</span>`)
+      .concat(gs.map((e) => `<span class="day-item g" style="--gc:${esc(gcolor(e.c))}">${e.tm ? `<b>${esc(e.tm)}</b> ` : ""}${esc(e.t)}</span>`));
+    const items = all.slice(0, DAY_ITEMS + 1).join("");
+    const more = all.length > DAY_ITEMS + 1 ? `<span class="day-more">+${all.length - DAY_ITEMS - 1}</span>` : "";
+    const gdots = gs.slice(0, 3).map((e) => `<i class="g" style="--gc:${esc(gcolor(e.c))}"></i>`).join("");
+    const dots = list.length || gdots ? `<span class="dots">${list.slice(0, 3).map(([, x]) => `<i${x.done ? ' class="done"' : ""}></i>`).join("")}${gdots}</span>` : "";
     const studied = dayActivity(diary[key]);
     const marks = studied ? `<span class="day-ext"><i title="스페인어 ${studied}개 학습">📖</i></span>` : "";
     html += `<button type="button" class="${cls}" data-date="${key}" aria-label="${d.getMonth() + 1}월 ${d.getDate()}일, 할 일 ${list.length}개"><span class="day-top"><span class="num">${d.getDate()}</span>${marks}</span><span class="day-gap"></span>${items}${more}${dots}</button>`;
-    if (i % 7 === 0) weekHtml = bars.map((g) => `<span class="wbar${g.head ? " s" : ""}${g.tail ? " e" : ""}${g.open ? " open" : ""}" style="grid-column:${g.a + 1} / ${g.b + 2};grid-row:${g.lane + 1}" title="${esc(g.x.title || "")} ${md(g.from)}~${g.to ? md(g.to) : " 보는 중"}">${g.head || g.a === 0 ? `🎬 ${esc(g.x.title || "")}${g.x.season ? ` ${esc(g.x.season)}` : ""}` : ""}</span>`).join("");
+    if (i % 7 === 0) weekHtml = bars.map((g) => `<span class="wbar${g.head ? " s" : ""}${g.tail ? " e" : ""}${g.open ? " open" : ""}${g.color ? " g" : ""}" style="grid-column:${g.a + 1} / ${g.b + 2};grid-row:${g.lane + 1}${g.color ? `;--gc:${esc(g.color)}` : ""}" title="${esc(g.tip)}">${g.head || g.a === 0 ? esc(g.label) : ""}</span>`).join("");
     if (i % 7 === 6) html += `<div class="wk-bars" aria-hidden="true">${weekHtml}</div></div>`;
   }
   $("#calGrid").innerHTML = html;
@@ -341,6 +371,28 @@ function renderDay() {
         <span class="t">${esc(t.title)}</span>
         <button type="button" class="del" data-del="${id}" aria-label="지우기">×</button></li>`).join("")
       : `<li class="empty">할 일이 없어요.</li>`;
+  const gs = gEventsOn(ui.sel);
+  $("#dayG").hidden = !gs.length;
+  $("#dayGList").innerHTML = gs.map((e) => `<li><i style="--gc:${esc(gcolor(e.c))}"></i><span class="t">${e.tm ? `<b>${esc(e.tm)}</b> ` : ""}${esc(e.t)}<small class="muted"> · ${esc((S.gcal.cals[e.c] || {}).name || "")}</small></span>${/^https:\/\/www\.google\.com\//.test(e.link || "") ? `<a href="${esc(e.link)}" target="_blank" rel="noopener" aria-label="구글 캘린더에서 열기">↗</a>` : ""}</li>`).join("");
+}
+
+// ⚙️ 설정 → 구글 캘린더: 동기화 상태 + 캘린더마다 보드에 보이기
+function renderGoogleSettings() {
+  const g = S.gsync, box = $("#gStatus");
+  if (!g || !g.at) box.innerHTML = `<span class="sync-dot"></span><span>아직 연결 안 됨 · <a href="google-sync.html" target="_blank" rel="noopener">설정 방법 보기 ↗</a></span>`;
+  else {
+    const min = Math.round((Date.now() - g.at) / 60000), late = min > 20;
+    const when = min < 1 ? "방금" : min < 60 ? `${min}분 전` : `${Math.round(min / 60)}시간 전`;
+    box.innerHTML = `<span class="sync-dot" data-state="${late ? "off" : "ok"}"></span><span>${late ? "구글 동기화 멈춤" : "자동 동기화 중"} · 마지막 ${when}${g.email ? ` · ${esc(g.email)}` : ""}</span>`;
+  }
+  const notes = [];
+  if (g && g.missing && g.missing.length) notes.push(`구글에서 '${g.missing.join("', '")}' 캘린더를 못 찾았어요${g.missing.includes("김윤아") ? " (할 일은 기본 캘린더로 보냈어요)" : ""}.`);
+  if (g && g.vocab) notes.push(`📖 ${g.vocab}`);
+  $("#gNote").textContent = notes.join(" ");
+  $("#gNote").hidden = !notes.length;
+  const cals = (S.gcal && S.gcal.cals) || {};
+  const keys = Object.keys(cals).sort((a, b) => (cals[a].o || 0) - (cals[b].o || 0));
+  $("#gCals").innerHTML = keys.length ? keys.map((k) => `<li><label><input type="checkbox" data-gcal="${esc(k)}" ${gcalOn(k) || (!viewOn("google") && (S.settings.view?.gcal?.[k] ?? cals[k].sel)) ? "checked" : ""}><i style="--gc:${esc(cals[k].color)}"></i>${esc(cals[k].name)}</label></li>`).join("") : `<li class="muted">동기화가 한 번 돌면 캘린더 목록이 여기 나와요.</li>`;
 }
 
 // 📖 스페인어 · 🎬 왓치로그 탭 + 첫 화면 '보는 중'
@@ -466,6 +518,7 @@ document.addEventListener("click", (e) => {
     else if (a === "nextMonth") shiftMonth(1);
     else if (a === "goToday") { ui.sel = today(); ui.month = ui.sel.slice(0, 7); render(); }
     else if (a === "closeDay") $("#dayDlg").close();
+    else if (a === "toggleView" && act_.dataset.k === "google" && !(S.gsync && S.gsync.at)) { location.hash = "#settings"; toast("먼저 구글 캘린더를 연결해 주세요."); }
     else if (a === "toggleView") {
       if (!backend) return;
       const k = act_.dataset.k;
@@ -504,6 +557,13 @@ document.addEventListener("change", (e) => {
 
 // 창 바깥(어두운 곳)을 누르면 닫기
 $("#dayDlg").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+
+// 캘린더마다 보드에 보이기
+document.addEventListener("change", (e) => {
+  const k = e.target.dataset && e.target.dataset.gcal;
+  if (!k || !backend) return;
+  act(backend.saveView({ ["gcal/" + k]: e.target.checked })).catch(() => { e.target.checked = !e.target.checked; });
+});
 
 $("#linkForm").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -552,6 +612,7 @@ render();
 renderLinkPages();
 renderLinkSettings();
 renderToggles();
+renderGoogleSettings();
 setSync();
 firebaseStart().catch(() => {
   document.body.classList.add("locked");
