@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="only light">
+<title>냐냐 보드</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="냐냐 보드">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css?v=20261020a">
+</head>
+<body>
+
+<aside class="side">
+  <a class="brand" href="#home"><span class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><b>냐냐 보드</b></a>
+  <nav class="nav" aria-label="메뉴">
+    <a href="#home" data-page="home"><span class="ic">🗓️</span><span>달력</span></a>
+    <a href="#spanish" data-page="spanish"><span class="ic">📖</span><span>스페인어</span></a>
+    <a href="#watch" data-page="watch"><span class="ic">🎬</span><span>왓치로그</span></a>
+    <a href="#money" data-page="money"><span class="ic">💰</span><span>가계부</span></a>
+  </nav>
+  <p class="side-foot mono" id="todayMono"></p>
+</aside>
+
+<main class="main">
+  <!-- 🗓️ 달력 (첫 화면) -->
+  <section class="page" id="page-home">
+    <header class="page-head">
+      <h2>오늘</h2>
+      <p class="muted" id="todayLabel"></p>
+    </header>
+
+    <div class="tiles">
+      <div class="tile t-coral"><span class="tile-k">오늘 할 일</span><b class="tile-v" id="tileTodo">0 / 0</b></div>
+      <a class="tile t-sun" href="#spanish"><span class="tile-k">📖 스페인어</span><b class="tile-v">연결 전</b></a>
+      <a class="tile t-grape" href="#watch"><span class="tile-k">🎬 이번 달 본 작품</span><b class="tile-v">연결 전</b></a>
+      <a class="tile t-mint" href="#money"><span class="tile-k">🤝 이번 달 공통비용</span><b class="tile-v">준비 중</b></a>
+    </div>
+
+    <div class="home-grid">
+      <div class="card cal-card">
+        <div class="cal-head">
+          <button class="icon-btn" type="button" data-act="prevMonth" aria-label="지난달">‹</button>
+          <h3 id="calTitle"></h3>
+          <button class="icon-btn" type="button" data-act="nextMonth" aria-label="다음 달">›</button>
+          <button class="chip" type="button" data-act="goToday">오늘</button>
+        </div>
+        <div class="cal-dow"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+        <div class="cal-grid" id="calGrid"></div>
+      </div>
+
+      <div class="card day-card">
+        <h3 id="dayTitle"></h3>
+        <ul class="todo-list" id="todoList"></ul>
+        <form class="todo-add" id="todoForm" autocomplete="off">
+          <input type="text" id="todoInput" placeholder="할 일 적기" maxlength="80" aria-label="새 할 일">
+          <button class="btn" type="submit">추가</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- 📖 스페인어 -->
+  <section class="page" id="page-spanish" hidden>
+    <header class="page-head"><h2>📖 스페인어</h2></header>
+    <div class="card soon">
+      <p><b>연결 예정</b> — 스페인어 공부방(nyanya-spanish) 기록을 여기서 볼 수 있게 할 거예요.</p>
+      <ul class="muted">
+        <li>오늘 복습할 단어 수</li>
+        <li>연속 공부한 날</li>
+        <li>이번 주 퀴즈·첨삭 기록</li>
+      </ul>
+      <a class="btn" href="https://nyanya-lab.github.io/nyanya-spanish/" target="_blank" rel="noopener">스페인어 공부방 열기 ↗</a>
+    </div>
+  </section>
+
+  <!-- 🎬 왓치로그 -->
+  <section class="page" id="page-watch" hidden>
+    <header class="page-head"><h2>🎬 왓치로그</h2></header>
+    <div class="card soon">
+      <p><b>연결 예정</b> — Watch LOG 기록을 여기서 볼 수 있게 할 거예요.</p>
+      <ul class="muted">
+        <li>지금 보는 중인 작품</li>
+        <li>이번 달 본 작품 수</li>
+        <li>달력에 본 날 표시</li>
+      </ul>
+      <a class="btn" href="https://nyanya-lab.github.io/watch-log/" target="_blank" rel="noopener">Watch LOG 열기 ↗</a>
+    </div>
+  </section>
+
+  <!-- 💰 가계부 -->
+  <section class="page" id="page-money" hidden>
+    <header class="page-head"><h2>💰 가계부</h2></header>
+    <div class="card soon">
+      <p><b>준비 중</b> — 욱진 보드의 가계부를 가져와서 냐냐 보드에 맞게 바꿀 거예요.</p>
+      <ul class="muted">
+        <li>예산 · 지출 · 자산 · 통계</li>
+        <li>🤝 공통비용은 욱진이 보드와 같이 보고 같이 적기</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<nav class="bottom" aria-label="메뉴">
+  <a href="#home" data-page="home"><span class="ic">🗓️</span><span>달력</span></a>
+  <a href="#spanish" data-page="spanish"><span class="ic">📖</span><span>스페인어</span></a>
+  <a href="#watch" data-page="watch"><span class="ic">🎬</span><span>왓치로그</span></a>
+  <a href="#money" data-page="money"><span class="ic">💰</span><span>가계부</span></a>
+</nav>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script type="module" src="app.js?v=20261020a"></script>
+</body>
+</html>
