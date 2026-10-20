@@ -14,9 +14,14 @@
 - 비밀번호·API 키 같은 비밀값은 저장소(공개)에 절대 넣지 않기.
 - `gh`(GitHub CLI)는 `C:\Program Files\GitHub CLI\gh.exe`, nyanya-lab 계정으로 로그인돼 있음.
 
-## 가계부 코드는 욱진 보드와 짝
+## 💰 가계부 (`docs/money/`) — 욱진 보드 가계부와 짝 (2026-10-20 만듦)
 
-- 냐냐 보드 가계부는 욱진 보드 `docs/money.js`를 가져와서 쓸 예정. 두 프로젝트 모두 이 컴퓨터에 있음.
+- 따로 페이지: https://nyanya-lab.github.io/nyanya-board/money/ (보드 메뉴 💰 → 여기). 냐냐 보드 비밀번호로 열리고 **같은 저장 자리** `nyanya/{해시}`의 `money`·`accounts`·`pics`·`settings`(budgets·moneyCats·catColors·moneySubs·currencies·budget)에 저장.
+- `docs/money/money.js` = 욱진 보드 `docs/money.js` **복사본**(짝 코드). 냐냐 쪽에서 바꾼 곳은 파일 맨 위에 적어 둠: localStorage 키 `ukjin-`→`nyanya-`, 💝 줄 돈은 `env.give === false`면 안 보임, ❤️ `common` 체크(`#mCommonWrap`이 있을 때만), 탭에 `common` 허용.
+- `docs/money/style.css` = 욱진 보드 `style.css` **그대로**, 냐냐 고침은 `nyanya.css`. `docs/money/index.html` = 욱진 보드 가계부 화면 조각(#moneyPage·dialog들·#mBottom)을 가져와서 만든 것. `docs/money/app.js` = 얇은 연결 코드(로그인·Firebase·도우미·bindMoney).
+- 욱진 보드 가계부를 고치면(또는 여기를 고치면) 짝도 같이 고칠지 생각하기. 복사본이라 저절로 안 따라감.
+- ❤️ 공통비용: 지출 기록 칸의 **❤️ 공통비용** 체크 → `money.common = true` → `app.js mirrorCommon` → `uri.setMirror` → 공통 저장소 `costs/nyanya-{가계부 id}`(src "money", by·payer "nyanya")에 저절로 복사(고치면 고쳐지고, ❤️ 빼거나 지우면 지워짐, 원화만). '❤️ 공통' 탭(가계부 안)에서 둘 다 보기 + 반반 정산. 우리 탭(`mirror: true`)은 보기만, 직접 적는 칸 없음.
+- (원래 계획) 냐냐 보드 가계부는 욱진 보드 `docs/money.js`를 가져와서 쓸 예정. 두 프로젝트 모두 이 컴퓨터에 있음.
 - 가계부를 고칠 때 **욱진 보드에도 필요한 고침인지** 먼저 생각하고, 그렇다면 "욱진 보드도 같이 고칠까?" 물어보기.
   냐냐 보드에만 필요한 것은 여기서만, 욱진이 것에만 필요한 것은 욱진 보드 방에서.
 - 🤝 공통비용은 두 보드가 공통 저장소를 같이 읽고 써서 공유 (아직 안 만듦). 지금 냐냐는 '편한가계부' 앱을 쓰는 중 — 계속 쓸지 보드로 옮길지는 공통비용 단계에서 정하기로 함.
@@ -50,6 +55,8 @@ docs/manifest.webmanifest, *.png  홈 화면 앱 아이콘
 - 공통비용·공통 목표·같이 할 일·공통 상 등 둘이 같이 쓰는 것. 사이트는 따로 없고 냐냐 보드·욱진 보드 안의 🤝 우리 탭에서 봄. 지금은 공통비용만.
 - 공통비용 `costs/{id}` = {date, title, amount, cat(`URI_CATS`), payer nyanya|ukjin|joint(공동 통장), memo, by(적은 사람), at, updBy, updAt}. 정산 = (냐냐 낸 돈 − 욱진 낸 돈) / 2, 공동 통장은 합계에만 (`settleOf`). `_backup/{prev,daily}` 자동 백업(되돌리기 화면은 아직 없음).
 - 공통 비밀번호는 이 기기 `localStorage["uri-board-pw"]` + 냐냐 보드 `settings.uriPw`(한 번 넣으면 보드가 기억 → 다른 기기에선 보드 비밀번호만 넣으면 우리 탭도 열림, `mountUri`의 `savePassword` / 돌려받은 `usePassword`). 욱진 보드는 아직 savePassword를 안 넘겨서 기기마다 넣어야 함 (원하면 욱진 보드 app.js에 같은 연결 추가). 두 보드가 같은 주소(nyanya-lab.github.io)라서 같은 브라우저면 한쪽에서 열면 다른 보드도 열림.
+- ⏸ **욱진 보드엔 아직 비공개** (냐냐 요청: 다 만든 뒤 한꺼번에): `uri.js` `HOLD_UKJIN = true` → 욱진 보드 우리 탭은 '준비 중'만, `uri/changes.js`도 비워 둠.
+  공개할 때 할 일: ① 욱진 보드 money.js에 ❤️ 체크 + 기록 칸 `#mCommonWrap` + `mirrorCommon`(who "ukjin") + '❤️ 공통' 탭(여기 money/app.js 참고) — 욱진 보드 PR ② `HOLD_UKJIN = false` ③ `uri/changes.js`에 그날 소개 줄 ④ 욱진 보드도 `savePassword` 연결(공통 비밀번호 기억).
 - **uri.js를 고치면 욱진 보드에도 바로 적용됨** → 욱진 보드 화면에서도 확인하기. 욱진이가 보는 게 바뀌면 `docs/uri/changes.js`(`URI_CHANGES`) 맨 위에 쉬운 말로 한 줄 추가 → 욱진 보드 업데이트 내역·새 버전 알림에 자동으로 섞여 나옴 (욱진 보드 changes.js는 안 건드림). 욱진 보드는 10분 단위 `?v=`로 불러와서 고친 뒤 최대 10분+GitHub Pages 반영 시간 뒤에 바뀜.
 - 저장 위치 `uri/{SHA-256("uri-board:"+공통 비밀번호)}` (공통 비밀번호는 둘이 정함, 아직 안 정함). 규칙: 저장소 맨 위 `uri.rules.json` (게시 완료, 2026-10-20 읽기·쓰기·목록 막힘 확인).
 - 연결 설정 `docs/uri/uri-config.js` (`uriConfig`). 우리 탭 코드도 `docs/uri/` 아래에 두고, 욱진 보드는 `https://nyanya-lab.github.io/nyanya-board/uri/…`에서 불러와 쓸 계획 → 한 곳만 고치면 두 보드 다 적용.

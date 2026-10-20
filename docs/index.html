@@ -46,7 +46,7 @@
     <a href="#home" data-page="home"><span class="ic">🗓️</span><span>달력</span></a>
     <a href="#spanish" data-page="spanish"><span class="ic">📖</span><span>스페인어</span></a>
     <a href="#watch" data-page="watch"><span class="ic">🎬</span><span>왓치로그</span></a>
-    <a href="#money" data-page="money"><span class="ic">💰</span><span>가계부</span></a>
+    <a href="money/" data-page="money"><span class="ic">💰</span><span>가계부</span></a>
     <a href="#uri" data-page="uri"><span class="ic">🤝</span><span>우리</span></a>
     <a href="#settings" data-page="settings"><span class="ic">⚙️</span><span>설정</span><span class="sync-dot" data-sync></span></a>
   </nav>
@@ -70,7 +70,7 @@
       <div class="tile t-coral"><span class="tile-k">오늘 할 일</span><b class="tile-v" id="tileTodo">0 / 0</b></div>
       <a class="tile t-sun" href="#spanish"><span class="tile-k">📖 스페인어 <small id="tileVocabSub"></small></span><b class="tile-v" id="tileVocab">연결 전</b></a>
       <a class="tile t-grape" href="#watch"><span class="tile-k">🎬 이번 달 본 작품</span><b class="tile-v" id="tileWatch">연결 전</b></a>
-      <a class="tile t-mint" href="#uri"><span class="tile-k">🤝 이번 달 공통비용</span><b class="tile-v" id="tileUri">…</b></a>
+      <a class="tile t-mint" href="money/#common"><span class="tile-k">🤝 이번 달 공통비용</span><b class="tile-v" id="tileUri">…</b></a>
     </div>
 
     <div class="home-grid">
@@ -135,7 +135,7 @@
 
   <!-- 🤝 우리 (욱진 보드와 같이 쓰는 공통 공간, 코드는 uri/uri.js) -->
   <section class="page" id="page-uri" hidden>
-    <header class="page-head"><h2>🤝 우리</h2><p class="muted">욱진이와 같이 보는 공간</p></header>
+    <header class="page-head"><h2>🤝 우리</h2><p class="muted">욱진이와 같이 보는 공간 · 공통비용은 <a href="money/#common">💰 가계부 → ❤️ 공통</a>에서도 봐요</p></header>
     <div id="uriRoot"></div>
   </section>
 
@@ -183,13 +183,13 @@
   <a href="#home" data-page="home"><span class="ic">🗓️</span><span>달력</span></a>
   <a href="#spanish" data-page="spanish"><span class="ic">📖</span><span>스페인어</span></a>
   <a href="#watch" data-page="watch"><span class="ic">🎬</span><span>왓치로그</span></a>
-  <a href="#money" data-page="money"><span class="ic">💰</span><span>가계부</span></a>
+  <a href="money/" data-page="money"><span class="ic">💰</span><span>가계부</span></a>
   <a href="#uri" data-page="uri"><span class="ic">🤝</span><span>우리</span></a>
   <a href="#settings" data-page="settings"><span class="ic">⚙️<span class="sync-dot" data-sync></span></span><span>설정</span></a>
 </nav>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script type="module" src="app.js?v=20261020l"></script>
+<script type="module" src="app.js?v=20261020n"></script>
 </body>
 </html>

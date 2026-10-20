@@ -1,0 +1,22 @@
+/* 냐냐 가계부만의 고침 — style.css(욱진 보드 것 그대로) 위에 얹음. 대표 색은 냐냐 보드처럼 코랄 */
+:root { --me: var(--coral); --me-soft: var(--coral-soft); --ink: var(--coral); }
+
+/* ❤️ 공통비용 체크 (기록 칸, 지출만) */
+.m-common { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--coral-soft); cursor: pointer; font-size: 14px; }
+.m-common input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--coral); flex: none; }
+.m-common-mark { font-size: 12px; }
+
+/* ❤️ 공통 탭 (../uri/uri.js가 그림) */
+.m-common-view { display: block; }
+
+/* 옆 메뉴 아래 저장 상태 */
+.side-sync { display: flex; align-items: center; gap: 8px; cursor: default; }
+.topbar a.icon-round { position: relative; }
+.topbar a.icon-round .sync-dot { position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; }
+
+/* 폰 아래 메뉴: ❤️ 공통이 하나 더 있어서 7칸 (욱진 보드는 6칸), 고른 칸은 코랄 */
+@media (max-width: 720px) {
+  .app-money .m-bottom { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .app-money .m-bottom button { font-size: 10.5px; }
+  .app-money .m-bottom button[aria-pressed="true"] { color: var(--coral); background: var(--coral-soft); }
+}

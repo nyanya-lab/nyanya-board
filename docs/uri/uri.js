@@ -7,6 +7,8 @@
 //   who        = 이 보드 주인 (적은 사람·기본 '낸 사람')
 //   toast(msg) = 보드의 알림 함수 (없으면 alert 안 하고 조용히)
 //   onSummary({ month, total, connected }) = 이번 달 공통비용 합계가 바뀔 때 (보드 요약 칸용, 선택)
+//   mirror: true = ❤️ 가계부 방식: 여기선 적지 않고 보기만. 각자 가계부에서 ❤️ 공통으로 표시한 지출이 저절로 들어옴
+//            (돌려받은 .setMirror({가계부 기록 id: {date, amount, cat, memo}})로 내 것을 넘기면 공통 저장소를 거기에 맞춤)
 //   savePassword(pw | null) = 공통 비밀번호를 보드에 저장/지우기 (선택). 있으면 한 번 넣은 공통 비밀번호를 그 보드가 기억해서
 //                             다른 기기에선 다시 안 넣어도 됨 → 보드가 불러온 값을 돌려받은 함수 .usePassword(pw)로 넘겨 줌
 // 화면 색은 보드의 색 토큰(--me, --surface, --line …)을 그대로 써요. 클래스는 모두 uri- 로 시작.
@@ -53,7 +55,7 @@ export function mountUri(root, opts = {}) {
   root.classList.add("uri");
   if (who === "ukjin" && HOLD_UKJIN) {
     root.innerHTML = `<div class="uri-card"><h3>🤝 준비 중이에요</h3><p class="uri-muted">냐냐와 같이 쓰는 공간을 만들고 있어요. 곧 열려요!</p></div>`;
-    return { render() {}, usePassword() {} };
+    return { render() {}, usePassword() {}, setMirror() {} };
   }
 
   const st = {
@@ -67,6 +69,8 @@ export function mountUri(root, opts = {}) {
   let rt = null, db = null, room = null, unsubs = [], bakTimer = null, readyDone;
   const ready = new Promise((r) => { readyDone = r; });   // 저장소 연결 준비 끝 (usePassword가 기다림)
   const hostSaves = typeof opts.savePassword === "function";
+  const mirrorMode = !!opts.mirror;
+  let mirror = null, mirroring = false;   // 이 사람 가계부의 ❤️ 공통 지출 (setMirror로 받음)
   const path = (...p) => rt.ref(db, [ROOT, ...p].join("/"));
 
   // ── 연결 ──
@@ -114,10 +118,32 @@ export function mountUri(root, opts = {}) {
     unsubs.forEach((u) => u()); unsubs = [];
     room = r; st.phase = "open"; st.msg = ""; st.askNew = false; st.pendingPw = null;
     unsubs.push(rt.onValue(path(room, "costs"), (snap) => {
-      st.costs = snap.val() || {}; st.loaded = true; summary(); render();
+      st.costs = snap.val() || {}; st.loaded = true; summary(); render(); reconcile();
     }, (e) => { toast(isDenied(e) ? "공통 저장소 규칙을 확인해 주세요." : "공통비용을 불러오지 못했어요."); }));
     rotateBackups(); clearInterval(bakTimer); bakTimer = setInterval(rotateBackups, 10 * 60 * 1000);
     render();
+  }
+
+  // ❤️ 내 가계부의 공통 지출 → 공통 저장소 costs/{who}-{가계부 id} (src "money"). 바뀐 것만 한 번에 고치고, 가계부에서 지웠거나 ❤️를 뺀 건 지움
+  function setMirror(docs) { mirror = docs || {}; reconcile(); }
+  async function reconcile() {
+    if (!mirror || !room || !st.loaded || mirroring) return;
+    const want = {};
+    for (const [id, d] of Object.entries(mirror)) {
+      if (!d || !d.date || !(Number(d.amount) > 0)) continue;
+      want[`${who}-${id}`] = { date: d.date, title: d.memo || d.cat || "공통비용", amount: Number(d.amount), cat: d.cat || "기타", payer: who, by: who, src: "money", memo: null };
+    }
+    const patch = {};
+    for (const [k, v] of Object.entries(want)) {
+      const cur = st.costs[k];
+      if (!cur) patch[k] = { ...v, at: Date.now() };
+      else for (const f of ["date", "title", "amount", "cat", "payer"]) if (cur[f] !== v[f]) patch[`${k}/${f}`] = v[f];
+    }
+    for (const [k, c] of Object.entries(st.costs)) if (c && c.src === "money" && c.by === who && !want[k]) patch[k] = null;
+    if (!Object.keys(patch).length) return;
+    mirroring = true;
+    try { await rt.update(path(room, "costs"), patch); } catch (e) { toast("공통비용을 맞추지 못했어요. 잠시 뒤 다시 해요."); }
+    mirroring = false;
   }
 
   // 서버 백업: 1시간짜리 prev, 하루짜리 daily (보드와 같은 방식). 되돌리기는 아직 화면 없음
@@ -204,8 +230,9 @@ export function mountUri(root, opts = {}) {
         <span class="uri-payer p-${esc(c.payer)}">${esc(PAYER[c.payer] || "?")}</span>
         <b class="uri-amt">${won(c.amount)}</b>
         <span class="uri-acts">
+          ${c.src === "money" ? `<span class="uri-src" title="${esc(NAME[c.by] || "")} 가계부에서 ❤️로 표시한 지출 — 고치기·지우기는 가계부에서">${c.by === who ? "내 가계부" : `${esc(NAME[c.by] || "")} 가계부`}</span>` : mirrorMode ? "" : `
           <button type="button" class="uri-icon" data-uri="edit" data-id="${esc(c.id)}" aria-label="고치기" title="고치기 (적은 사람: ${esc(NAME[c.by] || "?")})">✎</button>
-          <button type="button" class="uri-icon" data-uri="del" data-id="${esc(c.id)}" aria-label="지우기" title="지우기">×</button>
+          <button type="button" class="uri-icon" data-uri="del" data-id="${esc(c.id)}" aria-label="지우기" title="지우기">×</button>`}
         </span></li>`;
     }
 
@@ -226,7 +253,8 @@ export function mountUri(root, opts = {}) {
       </div>
       ${s.paid.joint ? `<p class="uri-muted uri-small">공동 통장으로 낸 ${won(s.paid.joint)}은 합계에만 넣고 정산에서는 빼요.</p>` : ""}
 
-      <div class="uri-grid">
+      <div class="uri-grid${mirrorMode ? " uri-mirror" : ""}">
+        ${mirrorMode ? `<div class="uri-card uri-how"><h4>❤️ 이렇게 들어와요</h4><p class="uri-muted uri-small">가계부에서 지출을 적을 때 <b>❤️ 공통비용</b>을 체크하면 여기에 저절로 들어와요. ${partner}가 자기 가계부에서 ❤️로 적은 것도 같이 보여요. 고치기·지우기는 각자 가계부에서 하면 여기도 같이 바뀌어요.</p></div>` : `
         <form class="uri-card uri-form" data-uri="cost" autocomplete="off">
           <h4>${editing ? "✎ 기록 고치기" : "＋ 공통비용 적기"}</h4>
           <label class="uri-f"><span>날짜</span><input class="uri-input" type="date" name="date" value="${esc(f.date)}" required></label>
@@ -241,7 +269,7 @@ export function mountUri(root, opts = {}) {
             <button class="uri-btn" type="submit">${editing ? "저장" : "추가"}</button>
             ${editing ? `<button class="uri-btn ghost" type="button" data-uri="cancel">취소</button>` : ""}
           </div>
-        </form>
+        </form>`}
 
         <div class="uri-side">
           <div class="uri-card">
@@ -358,7 +386,7 @@ export function mountUri(root, opts = {}) {
 
   render();
   start();
-  return { render, usePassword };
+  return { render, usePassword, setMirror };
 }
 
 let styled = false;
@@ -412,7 +440,9 @@ function injectStyle() {
 .uri-payer { font-size: 12px; font-weight: 600; white-space: nowrap; }
 .uri-payer.p-nyanya { color: var(--coral); } .uri-payer.p-ukjin { color: var(--blue); } .uri-payer.p-joint { color: var(--mint); }
 .uri-amt { font-family: var(--f-mono); font-size: 14px; white-space: nowrap; }
-.uri-acts { display: flex; gap: 2px; }
+.uri-acts { display: flex; gap: 2px; align-items: center; }
+.uri-src { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.uri-grid.uri-mirror { grid-template-columns: 260px minmax(0, 1fr); }
 .uri-icon { font: inherit; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 2px 5px; border-radius: 6px; }
 .uri-icon:hover { color: var(--fg); background: var(--surface); }
 .uri-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -421,7 +451,7 @@ function injectStyle() {
 .uri-bars b { font-family: var(--f-mono); font-weight: 500; white-space: nowrap; }
 .uri-foot { margin: 0; }
 .uri-link { font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
-@media (max-width: 1000px) { .uri-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) { .uri-grid, .uri-grid.uri-mirror { grid-template-columns: 1fr; } }
 @media (max-width: 720px) {
   .uri-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .uri-tile b { font-size: 18px; }

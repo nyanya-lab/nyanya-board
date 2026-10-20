@@ -3,7 +3,7 @@
 // 로그인 없음, 비밀번호 = 저장 위치. 항목마다 따로 저장해서 폰·PC가 서로 덮어쓰지 않음.
 
 import { firebaseConfig } from "./firebase-config.js?v=20261020l";
-import { mountUri } from "./uri/uri.js?v=20261020m";
+import { mountUri } from "./uri/uri.js?v=20261020n";
 import { createLinks, vocabToday, vocabStreak, isWatching, finishDays, watchPeriods, dayActivity } from "./links.js?v=20261020l";
 
 const FB_VER = "10.12.2";
@@ -616,6 +616,7 @@ renderToday();
 const uri = mountUri($("#uriRoot"), {
   who: "nyanya",
   toast,
+  mirror: true,   // 공통비용은 가계부에서 ❤️로 적음 (여기선 보기만)
   // 한 번 넣은 공통 비밀번호를 이 보드 설정에 기억 → 다른 기기에선 보드 비밀번호만 넣으면 우리 탭도 열림
   savePassword: (pw) => { if (backend) act(backend.saveUriPw(pw || null)).catch(() => {}); },
   onSummary: ({ total, connected }) => { $("#tileUri").textContent = connected ? total.toLocaleString("ko-KR") + "원" : "열기 전"; }
