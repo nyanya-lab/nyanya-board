@@ -20,6 +20,8 @@ const NAME = { nyanya: "냐냐", ukjin: "욱진" };
 const PAYER = { nyanya: "냐냐", ukjin: "욱진", joint: "공동 통장" };
 export const URI_CATS = ["식비", "카페·간식", "장보기", "생활용품", "주거·공과금", "데이트", "여행", "선물", "기타"];
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
+// ⏸ 욱진 보드에선 잠깐 '준비 중'만 (냐냐 요청 2026-10-20: 가계부 ❤️ 공통까지 다 만든 뒤 한꺼번에 공개). 공개할 때 false로
+const HOLD_UKJIN = true;
 
 const pad = (n) => String(n).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -49,6 +51,10 @@ export function mountUri(root, opts = {}) {
   const toast = typeof opts.toast === "function" ? opts.toast : () => {};
   injectStyle();
   root.classList.add("uri");
+  if (who === "ukjin" && HOLD_UKJIN) {
+    root.innerHTML = `<div class="uri-card"><h3>🤝 준비 중이에요</h3><p class="uri-muted">냐냐와 같이 쓰는 공간을 만들고 있어요. 곧 열려요!</p></div>`;
+    return { render() {}, usePassword() {} };
+  }
 
   const st = {
     phase: "start",            // start → locked | open | error
