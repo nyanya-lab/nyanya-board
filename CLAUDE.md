@@ -35,7 +35,14 @@ docs/manifest.webmanifest, *.png  홈 화면 앱 아이콘
 - 로그인 없음. **비밀번호 = 저장 위치**: `nyanya/{SHA-256("nyanya-board:"+비밀번호)}` 아래 (`docs/firebase-config.js`).
   비밀번호는 이 기기 `localStorage["nyanya-board-pw"]`에만 기억, ⚙️ 설정 → 잠그기로 지움. 처음 넣는 비밀번호면 "새 보드 만들기" 한 번 더 확인.
 - 규칙: 저장소 맨 위 `database.rules.json` (`nyanya/$room` = 64자 해시만 읽기/쓰기). 고치면 Firebase 콘솔(nyanya-board) → Realtime Database → 규칙에 다시 게시해야 적용.
-- 욱진 보드(`ukjin-207a3`)와는 **저장소가 따로**. 나중에 공통비용·공통 목표 같은 🤝 우리 탭은 **공통 저장소(새 Firebase 프로젝트)**를 하나 더 만들어 두 보드가 같이 연결하기로 함 (공통 비밀번호, 사이트는 두 개 그대로).
+- 욱진 보드(`ukjin-207a3`)와는 **저장소가 따로**.
+
+## 🤝 우리(공통) 저장소 — Firebase `uri-board` (싱가포르)
+
+- 공통비용·공통 목표·같이 할 일·공통 상 등 둘이 같이 쓰는 것. 사이트는 따로 없고 냐냐 보드·욱진 보드 안의 🤝 우리 탭(아직 안 만듦)에서 봄.
+- 저장 위치 `uri/{SHA-256("uri-board:"+공통 비밀번호)}` (공통 비밀번호는 둘이 정함, 아직 안 정함). 규칙: 저장소 맨 위 `uri.rules.json` (게시 완료, 2026-10-20 읽기·쓰기·목록 막힘 확인).
+- 연결 설정 `docs/uri/uri-config.js` (`uriConfig`). 우리 탭 코드도 `docs/uri/` 아래에 두고, 욱진 보드는 `https://nyanya-lab.github.io/nyanya-board/uri/…`에서 불러와 쓸 계획 → 한 곳만 고치면 두 보드 다 적용.
+  한 페이지에서 Firebase 앱 두 개를 쓰므로 `initializeApp(uriConfig, "uri")`처럼 **이름을 붙여** 초기화하기.
 - 모음(`COLS`): `tasks` = {title, date, done, at}. 그 외 `settings`(createdAt), `_backup/{prev,daily,undo}`(1시간·하루 자동 백업, 설정에서 되돌리기).
 - 항목·칸 단위로 따로 저장 (`flattenPaths`로 경로별 update) → 폰·PC가 서로 덮어쓰지 않음. 저장 상태 점: 초록 저장됨 · 노랑 저장 중 · 코랄 연결 끊김.
 - 뼈대 때 브라우저에만 저장하던 `localStorage["nyanya-board-v1"]` 할 일은 보드를 열면 서버로 한 번 옮기고 지움 (`moveOldLocal`).

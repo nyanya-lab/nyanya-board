@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "uri": {
+      "$room": {
+        ".read": "$room.length === 64",
+        ".write": "$room.length === 64"
+      }
+    }
+  }
+}
