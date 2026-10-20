@@ -28,6 +28,7 @@ docs/index.html          화면 마크업 (왼쪽 메뉴·아래 메뉴, 페이�
 docs/style.css           색 토큰(욱진 보드와 같음, 대표 색 --me = 코랄), 폰 ≤720px
 docs/app.js              화면 로직 (상태 S, 달력 renderCalendar, 그날 할 일 renderDay, 페이지 전환 renderPage)
 docs/firebase-config.js   냐냐 보드 Firebase 설정
+docs/links.js             📖🎬 스페인어·왓치로그 읽기 (createLinks, 스페인어 연속·오늘 복습 계산, 왓치로그 보는 중·다 본 날)
 docs/uri/uri.js           🤝 우리 탭 (욱진 보드와 같이 쓰는 코드, mountUri). CSS도 이 안에서 넣음(uri- 클래스)
 docs/uri/uri-config.js    우리(공통) 저장소 Firebase 설정
 docs/uri/changes.js       우리 탭 업데이트 내역 (욱진 보드가 읽어서 자기 업데이트 내역에 섞음)
@@ -50,11 +51,28 @@ docs/manifest.webmanifest, *.png  홈 화면 앱 아이콘
 - 저장 위치 `uri/{SHA-256("uri-board:"+공통 비밀번호)}` (공통 비밀번호는 둘이 정함, 아직 안 정함). 규칙: 저장소 맨 위 `uri.rules.json` (게시 완료, 2026-10-20 읽기·쓰기·목록 막힘 확인).
 - 연결 설정 `docs/uri/uri-config.js` (`uriConfig`). 우리 탭 코드도 `docs/uri/` 아래에 두고, 욱진 보드는 `https://nyanya-lab.github.io/nyanya-board/uri/…`에서 불러와 쓸 계획 → 한 곳만 고치면 두 보드 다 적용.
   한 페이지에서 Firebase 앱 두 개를 쓰므로 `initializeApp(uriConfig, "uri")`처럼 **이름을 붙여** 초기화함.
-- 모음(`COLS`): `tasks` = {title, date, done, at}. 그 외 `settings`(createdAt), `_backup/{prev,daily,undo}`(1시간·하루 자동 백업, 설정에서 되돌리기).
+- 모음(`COLS`): `tasks` = {title, date, done, at}. 그 외 `settings`(createdAt, `links`{vocab, watch} = 연동 비밀번호 — 보드 비밀번호로 지켜지고 모든 기기 공유), `_backup/{prev,daily,undo}`(1시간·하루 자동 백업, 설정에서 되돌리기).
 - 항목·칸 단위로 따로 저장 (`flattenPaths`로 경로별 update) → 폰·PC가 서로 덮어쓰지 않음. 저장 상태 점: 초록 저장됨 · 노랑 저장 중 · 코랄 연결 끊김.
 - 뼈대 때 브라우저에만 저장하던 `localStorage["nyanya-board-v1"]` 할 일은 보드를 열면 서버로 한 번 옮기고 지움 (`moveOldLocal`).
 
-## 연동 예정
+## 구글 캘린더 연동 (정하는 중, 2026-10-20)
 
-- 🇪🇸 스페인어 공부방 `../nyanya-spanish` — Firebase `nyanya-vocab` (https://nyanya-lab.github.io/nyanya-spanish/)
-- 🎬 Watch LOG `../watch-log` — Firebase `nyanya-watchlog` (https://nyanya-lab.github.io/watch-log/)
+- 방식: 욱진 보드처럼 냐냐 구글 계정 Apps Script가 5분마다 동기화 (사이트에서 구글 로그인 없음). 양쪽 방향.
+- 냐냐 구글 캘린더 목록: 김윤아(다른 사람과 **공유됨**) · Tasks · 루틴관리(지금 안 씀) · 생일 · 욱진 · 점심 · 캘린더 · 트레이딩실.
+- 정한 것:
+  - 스페인어 같은 루틴 → **루틴관리** 캘린더.
+  - 💰 돈(월급·예산 등)은 구글에 **안 보냄** (김윤아가 공유 캘린더라). 냐냐 보드 달력에선 돈 표시를 **보이기/숨기기** 토글로만 (욱진 보드처럼 늘 보이게 하지 않기).
+  - 📌 날짜 있는 할 일 · 🎯 큰 목표 D-day → **김윤아** 캘린더 (공유돼도 괜찮다고 함). 날짜 없는 할 일은 안 보냄.
+  - 🤝 우리 일정 → 새 **'우리'** 캘린더 (냐냐 계정에 만들어 욱진이 구글 계정과 공유). 보드에선 우리 탭에 '우리 일정' 추가 예정.
+  - 구글 → 보드: 냐냐의 캘린더 **전부** 가져오고, 보드에서 캘린더마다 켜고 끄기.
+- **나중에 정하기:** 🎬 왓치로그 다 본 작품을 구글에 보낼지 (지금은 안 보냄, 보드 달력에만).
+
+## 📖🎬 스페인어·왓치로그 연동 (읽기만, `docs/links.js`)
+
+- 그쪽 데이터는 **절대 쓰지 않기** (읽기만). 각 앱 동기화 비밀번호 = 서버 자리.
+  - 📖 스페인어 공부방 `../nyanya-spanish` — Firebase `nyanya-vocab`, `vocab/{비번}__v3/diary/{날짜}` (없으면 옛 `vocab/{비번}/nyanyaDiary`). 이 브라우저 키 `nyanya_sync_password`.
+  - 🎬 Watch LOG `../watch-log` — Firebase `nyanya-watchlog`, `watchlog/{비번}__v3/items/{id}`. 이 브라우저 키 `watchlog_sync_password`.
+- 비밀번호: 보드 `settings.links` 먼저, 없으면 같은 주소(nyanya-lab.github.io)의 그 앱이 이 브라우저에 기억한 값. (아이폰 홈 화면 앱은 저장 공간이 따로라 설정에 넣어야 함)
+- 보여 주는 것: 첫 화면 요약 칸(스페인어 오늘 복습·🔥 연속 / 이번 달 다 본 작품 수) · 달력 📖(공부한 날)·🎬(다 본 날) · 그날 칸 아래 기록 · 첫 화면 '보는 중' 포스터 · 📖/🎬 탭.
+- 계산 규칙은 각 앱과 같게: 스페인어 연속 = core.js `calcStreak`(10/9부터 복습 다 한 날만) · 학습 개수 = `dayActivity` · 오늘 복습 = 그날 일지 `reviewDone`/`reviewLeft`(앱이 마지막으로 저장한 때 기준). 왓치로그 보는 중 = 시작했는데 끝난 날 없음(다시 보기 포함), 다 본 날 = endDate·lastWatchEnd. **앱 쪽 규칙이 바뀌면 여기도 같이.**
+- 정확한 '오늘 복습할 단어 수'는 단어장 전체(약 1MB)를 받아야 해서 안 함 (냐냐와 정함).

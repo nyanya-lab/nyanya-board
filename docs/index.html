@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="style.css?v=20261020d">
+<link rel="stylesheet" href="style.css?v=20261020e">
 </head>
 <body class="locked">
 
@@ -63,8 +63,8 @@
 
     <div class="tiles">
       <div class="tile t-coral"><span class="tile-k">오늘 할 일</span><b class="tile-v" id="tileTodo">0 / 0</b></div>
-      <a class="tile t-sun" href="#spanish"><span class="tile-k">📖 스페인어</span><b class="tile-v">연결 전</b></a>
-      <a class="tile t-grape" href="#watch"><span class="tile-k">🎬 이번 달 본 작품</span><b class="tile-v">연결 전</b></a>
+      <a class="tile t-sun" href="#spanish"><span class="tile-k">📖 스페인어 <small id="tileVocabSub"></small></span><b class="tile-v" id="tileVocab">연결 전</b></a>
+      <a class="tile t-grape" href="#watch"><span class="tile-k">🎬 이번 달 본 작품</span><b class="tile-v" id="tileWatch">연결 전</b></a>
       <a class="tile t-mint" href="#uri"><span class="tile-k">🤝 이번 달 공통비용</span><b class="tile-v" id="tileUri">…</b></a>
     </div>
 
@@ -80,6 +80,7 @@
         <div class="cal-grid" id="calGrid"></div>
       </div>
 
+      <div class="home-side">
       <div class="card day-card">
         <h3 id="dayTitle"></h3>
         <ul class="todo-list" id="todoList"></ul>
@@ -87,36 +88,26 @@
           <input type="text" id="todoInput" placeholder="할 일 적기" maxlength="80" aria-label="새 할 일">
           <button class="btn" type="submit">추가</button>
         </form>
+        <ul class="day-ext-list" id="dayExt" hidden></ul>
+      </div>
+      <a class="card home-watching" id="homeWatching" href="#watch" hidden>
+        <h3>🎬 보는 중</h3>
+        <ul class="posters" id="homeWatchingList"></ul>
+      </a>
       </div>
     </div>
   </section>
 
   <!-- 📖 스페인어 -->
   <section class="page" id="page-spanish" hidden>
-    <header class="page-head"><h2>📖 스페인어</h2></header>
-    <div class="card soon">
-      <p><b>연결 예정</b> — 스페인어 공부방(nyanya-spanish) 기록을 여기서 볼 수 있게 할 거예요.</p>
-      <ul class="muted">
-        <li>오늘 복습할 단어 수</li>
-        <li>연속 공부한 날</li>
-        <li>이번 주 퀴즈·첨삭 기록</li>
-      </ul>
-      <a class="btn" href="https://nyanya-lab.github.io/nyanya-spanish/" target="_blank" rel="noopener">스페인어 공부방 열기 ↗</a>
-    </div>
+    <header class="page-head"><h2>📖 스페인어</h2><a class="btn ghost small" href="https://nyanya-lab.github.io/nyanya-spanish/" target="_blank" rel="noopener">공부방 열기 ↗</a></header>
+    <div class="link-view" id="vocabView"></div>
   </section>
 
   <!-- 🎬 왓치로그 -->
   <section class="page" id="page-watch" hidden>
-    <header class="page-head"><h2>🎬 왓치로그</h2></header>
-    <div class="card soon">
-      <p><b>연결 예정</b> — Watch LOG 기록을 여기서 볼 수 있게 할 거예요.</p>
-      <ul class="muted">
-        <li>지금 보는 중인 작품</li>
-        <li>이번 달 본 작품 수</li>
-        <li>달력에 본 날 표시</li>
-      </ul>
-      <a class="btn" href="https://nyanya-lab.github.io/watch-log/" target="_blank" rel="noopener">Watch LOG 열기 ↗</a>
-    </div>
+    <header class="page-head"><h2>🎬 왓치로그</h2><a class="btn ghost small" href="https://nyanya-lab.github.io/watch-log/" target="_blank" rel="noopener">Watch LOG 열기 ↗</a></header>
+    <div class="link-view" id="watchView"></div>
   </section>
 
   <!-- 💰 가계부 -->
@@ -151,6 +142,16 @@
         <p class="muted small">보드를 열어 둔 동안 1시간·하루마다 서버에 자동으로 백업해요. 실수로 지웠을 때 되돌릴 수 있어요.</p>
         <ul class="bak-list" id="bakList"><li class="muted">불러오는 중…</li></ul>
       </div>
+      <form class="card link-form" id="linkForm" autocomplete="off">
+        <h3>연동 (스페인어 · 왓치로그)</h3>
+        <p class="muted small">각 앱의 <b>동기화 비밀번호</b>를 넣으면 그 기록을 냐냐 보드에서 볼 수 있어요 (읽기만 해요). 보드에 저장돼서 폰·PC 어디서든 한 번만 넣으면 돼요.
+          비워 두면 이 브라우저의 그 앱에 넣어 둔 비밀번호를 써요.</p>
+        <label class="link-row"><span>📖 스페인어</span><input type="password" id="link-vocab" autocomplete="off"><button class="btn ghost small" type="button" id="link-vocab-clear" data-link-clear="vocab" hidden>지우기</button></label>
+        <p class="muted small link-st" id="link-vocab-st"></p>
+        <label class="link-row"><span>🎬 왓치로그</span><input type="password" id="link-watch" autocomplete="off"><button class="btn ghost small" type="button" id="link-watch-clear" data-link-clear="watch" hidden>지우기</button></label>
+        <p class="muted small link-st" id="link-watch-st"></p>
+        <div><button class="btn" type="submit">저장</button></div>
+      </form>
       <div class="card">
         <h3>이 기기 잠그기</h3>
         <p class="muted small">이 기기에 기억한 비밀번호를 지워요. 다시 열려면 비밀번호를 넣어야 해요.</p>
@@ -171,6 +172,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script type="module" src="app.js?v=20261020d"></script>
+<script type="module" src="app.js?v=20261020e"></script>
 </body>
 </html>

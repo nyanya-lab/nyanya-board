@@ -1,9 +1,10 @@
 // 냐냐 보드 — 화면 로직
-// 저장: 욱진 보드와 같은 방식. Firebase Realtime Database(ukjin-207a3)의 nyanya/{SHA-256("nyanya-board:"+비밀번호)} 아래.
+// 저장: 욱진 보드와 같은 방식. Firebase Realtime Database(nyanya-board)의 nyanya/{SHA-256("nyanya-board:"+비밀번호)} 아래.
 // 로그인 없음, 비밀번호 = 저장 위치. 항목마다 따로 저장해서 폰·PC가 서로 덮어쓰지 않음.
 
-import { firebaseConfig } from "./firebase-config.js?v=20261020d";
-import { mountUri } from "./uri/uri.js?v=20261020d";
+import { firebaseConfig } from "./firebase-config.js?v=20261020e";
+import { mountUri } from "./uri/uri.js?v=20261020e";
+import { createLinks, vocabToday, vocabStreak, isWatching, finishDays, dayActivity } from "./links.js?v=20261020e";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -24,6 +25,8 @@ const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 const S = { tasks: {}, settings: {}, loaded: false };
 const ui = { month: today().slice(0, 7), sel: today() };
 let backend = null;
+// 📖🎬 스페인어·왓치로그 (읽기만). 비밀번호는 보드 설정 settings.links 또는 그 앱이 이 브라우저에 기억한 값
+const links = createLinks({ onChange: () => { renderTiles(); renderCalendar(); renderDay(); renderLinkPages(); renderLinkSettings(); } });
 
 const tasksOn = (date) => Object.entries(S.tasks)
   .filter(([, t]) => t && t.date === date)
@@ -118,6 +121,7 @@ async function firebaseStart() {
       add: tracked(async (c, obj) => { const r = rt.push(path(room, c)); await rt.set(r, obj); return r.key; }),
       update: tracked((c, id, patch) => rt.update(path(room, c, id), flattenPaths(patch))),
       remove: tracked((c, id) => rt.remove(path(room, c, id))),
+      saveLinks: tracked((patch) => rt.update(path(room, "settings", "links"), patch)),
       async backups() { return (await rt.get(path(room, "_backup"))).val() || {}; },
       restore: tracked(async (kind) => {
         const bak = (await rt.get(path(room, "_backup", kind))).val(); if (!bak) throw new Error("no backup");
@@ -144,7 +148,11 @@ async function firebaseStart() {
         if (S.loaded) moveOldLocal();
       }, onErr));
     });
-    unsubs.push(rt.onValue(path(room, "settings"), (snap) => { S.settings = snap.val() || {}; }, onErr));
+    unsubs.push(rt.onValue(path(room, "settings"), (snap) => {
+      S.settings = snap.val() || {};
+      links.setPasswords(S.settings.links);
+      renderLinkSettings();
+    }, onErr));
     render();
     if (location.hash === "#settings") renderBackups();
   }
@@ -223,6 +231,38 @@ function render() {
 function renderTiles() {
   const list = tasksOn(today());
   $("#tileTodo").textContent = `${list.filter(([, t]) => t.done).length} / ${list.length}`;
+  const v = links.st.vocab, w = links.st.watch;
+  let vt = "연결 전", vs = "";
+  if (v.state === "loading") vt = "…";
+  else if (v.state === "ok" || v.state === "empty") {
+    const t = vocabToday(v.diary, today()), n = vocabStreak(v.diary);
+    vt = t.kind === "done" ? "복습 끝 ✅" : t.kind === "left" ? `남은 복습 ${t.left}` : "아직 안 함";
+    vs = n ? `🔥 ${n}일` : "";
+  } else if (v.state === "error") vt = "연결 안 됨";
+  $("#tileVocab").textContent = vt;
+  $("#tileVocabSub").textContent = vs;
+  let wt = "연결 전";
+  if (w.state === "loading") wt = "…";
+  else if (w.state === "ok" || w.state === "empty") wt = `${watchedIn(today().slice(0, 7)).length}편`;
+  else if (w.state === "error") wt = "연결 안 됨";
+  $("#tileWatch").textContent = wt;
+}
+
+// 🎬 그 기간(YYYY-MM 또는 YYYY)에 다 본 작품 [{x, day}] (다시 본 것도 끝낸 날로)
+function watchedIn(prefix) {
+  const out = [];
+  for (const x of Object.values(links.st.watch.items || {})) {
+    for (const d of finishDays(x)) if (d.startsWith(prefix)) out.push({ x, day: d });
+  }
+  return out.sort((a, b) => b.day.localeCompare(a.day));
+}
+// 날짜별 스페인어 학습 개수·다 본 작품 (달력 그릴 때 한 번)
+function extByDay() {
+  const m = {};
+  const at = (d) => (m[d] = m[d] || { watch: [], vocab: 0 });
+  for (const x of Object.values(links.st.watch.items || {})) for (const d of finishDays(x)) at(d).watch.push(x);
+  for (const [d, e] of Object.entries(links.st.vocab.diary || {})) { const n = dayActivity(e); if (n > 0) at(d).vocab = n; }
+  return m;
 }
 
 function renderCalendar() {
@@ -232,6 +272,7 @@ function renderCalendar() {
   const start = new Date(y, m - 1, 1 - first.getDay());
   const weeks = Math.ceil((first.getDay() + new Date(y, m, 0).getDate()) / 7);
   const t = today();
+  const ext = extByDay();
   let html = "";
   for (let i = 0; i < weeks * 7; i++) {
     const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
@@ -247,7 +288,9 @@ function renderCalendar() {
       .map(([, x]) => `<span class="day-item${x.done ? " done" : ""}">${esc(x.title)}</span>`).join("");
     const more = list.length > DAY_ITEMS ? `<span class="day-more">+${list.length - DAY_ITEMS}</span>` : "";
     const dots = list.length ? `<span class="dots">${list.slice(0, 3).map(([, x]) => `<i${x.done ? ' class="done"' : ""}></i>`).join("")}</span>` : "";
-    html += `<button type="button" class="${cls}" data-date="${key}" aria-label="${d.getMonth() + 1}월 ${d.getDate()}일, 할 일 ${list.length}개"><span class="num">${d.getDate()}</span>${items}${more}${dots}</button>`;
+    const e = ext[key];
+    const marks = e ? `<span class="day-ext">${e.vocab ? `<i title="스페인어 ${e.vocab}개 학습">📖</i>` : ""}${e.watch.length ? `<i title="${esc(e.watch.map((x) => x.title || "").join(", "))}">🎬</i>` : ""}</span>` : "";
+    html += `<button type="button" class="${cls}" data-date="${key}" aria-label="${d.getMonth() + 1}월 ${d.getDate()}일, 할 일 ${list.length}개"><span class="day-top"><span class="num">${d.getDate()}</span>${marks}</span>${items}${more}${dots}</button>`;
   }
   $("#calGrid").innerHTML = html;
 }
@@ -265,6 +308,85 @@ function renderDay() {
         <span class="t">${esc(t.title)}</span>
         <button type="button" class="del" data-del="${id}" aria-label="지우기">×</button></li>`).join("")
       : `<li class="empty">할 일이 없어요.</li>`;
+  // 그날 스페인어·왓치로그 기록
+  const v = links.st.vocab.diary && links.st.vocab.diary[ui.sel];
+  const w = Object.values(links.st.watch.items || {}).filter((x) => finishDays(x).includes(ui.sel));
+  const rows = [];
+  if (v && dayActivity(v) > 0) rows.push(`<li>📖 스페인어 ${dayActivity(v)}개 학습${v.reviewDone === true ? " · 복습 다 함 ✅" : typeof v.reviewLeft === "number" ? ` · 복습 ${v.reviewLeft}개 남김` : ""}</li>`);
+  w.forEach((x) => rows.push(`<li>🎬 ${esc(x.title || "")}${x.season ? ` ${esc(x.season)}` : ""} 다 봄${x.rating != null ? ` · ⭐ ${esc(x.rating)}` : ""}</li>`));
+  $("#dayExt").innerHTML = rows.join("");
+  $("#dayExt").hidden = !rows.length;
+}
+
+// 📖 스페인어 · 🎬 왓치로그 탭 + 첫 화면 '보는 중'
+function linkMsg(s, name) {
+  if (s.state === "nopw") return `<p class="muted">${name} 비밀번호가 아직 없어요. <a href="#settings">⚙️ 설정 → 연동</a>에서 넣어 주세요.</p>`;
+  if (s.state === "loading" || s.state === "off") return `<p class="muted">불러오는 중…</p>`;
+  if (s.state === "error") return `<p class="muted">${name}에 ${s.err || "연결하지 못했어요"}. 비밀번호와 인터넷 연결을 확인해 주세요.</p>`;
+  if (s.state === "empty") return `<p class="muted">이 비밀번호 자리에 기록이 없어요. 비밀번호가 맞는지 확인해 주세요.</p>`;
+  return "";
+}
+function poster(x, cls) {
+  return x.poster ? `<img class="${cls}" src="${esc(String(x.poster).replace("/w500/", "/w185/"))}" alt="" loading="lazy">` : `<span class="${cls} no-poster">🎬</span>`;
+}
+const md = (s) => String(s || "").slice(5, 10).replace("-", "/");
+function renderLinkPages() {
+  const v = links.st.vocab, w = links.st.watch, t = today();
+  // 📖 스페인어
+  let vh = linkMsg(v, "스페인어");
+  if (!vh) {
+    const td = vocabToday(v.diary, t), n = vocabStreak(v.diary), m = t.slice(0, 7);
+    const days = Object.entries(v.diary).filter(([d, e]) => d.startsWith(m) && dayActivity(e) > 0);
+    const by = td.kind === "left" && td.by ? `단어 ${td.by[0]} · 관용구 ${td.by[1]} · 문법 ${td.by[2]}` : td.act ? `오늘 ${td.act}개 학습` : "";
+    const status = td.kind === "done" ? "복습 다 했어요 ✅" : td.kind === "left" ? `남은 복습 ${td.left}개` : td.kind === "open" ? "열어 봤어요" : "아직 안 했어요";
+    const recent = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const k = ymd(d), e = v.diary[k], a = dayActivity(e);
+      recent.push(`<li class="${a ? (e.reviewDone === true ? "on" : "part") : ""}" title="${k} · ${a}개"><b>${d.getDate()}</b><span>${a || "·"}</span></li>`);
+    }
+    vh = `<div class="link-tiles">
+        <div class="tile t-sun"><span class="tile-k">오늘</span><b class="tile-v small">${esc(status)}</b>${by ? `<span class="tile-note">${esc(by)}</span>` : ""}</div>
+        <div class="tile t-coral"><span class="tile-k">🔥 연속 공부</span><b class="tile-v">${n}일</b></div>
+        <div class="tile t-mint"><span class="tile-k">이번 달 공부한 날</span><b class="tile-v">${days.length}일</b></div>
+      </div>
+      <div class="card"><h3>최근 2주</h3><ul class="recent">${recent.join("")}</ul>
+      <p class="muted small">숫자 = 그날 학습한 개수. 초록 = 복습까지 다 한 날 (🔥 연속에 들어가요). 스페인어 앱에서 마지막으로 저장한 때 기준이에요.</p></div>`;
+  }
+  $("#vocabView").innerHTML = vh;
+  // 🎬 왓치로그
+  let wh = linkMsg(w, "왓치로그");
+  let watching = [];
+  if (!wh) {
+    watching = Object.values(w.items).filter(isWatching)
+      .sort((a, b) => String(b.lastWatchStart || b.startDate).localeCompare(String(a.lastWatchStart || a.startDate)));
+    const month = watchedIn(t.slice(0, 7)), year = new Set(watchedIn(t.slice(0, 4)).map((r) => r.x.id || r.x.title)).size;
+    const watchingHtml = watching.map((x) => `<li>${poster(x, "pst")}<span>${esc(x.title || "")}${x.season ? ` ${esc(x.season)}` : ""}</span><small class="muted">${md(x.lastWatchStart || x.startDate)}~</small></li>`).join("");
+    const monthHtml = month.map(({ x, day }) => `<li>${poster(x, "pst-s")}<span class="grow"><b>${esc(x.title || "")}${x.season ? ` ${esc(x.season)}` : ""}</b><small class="muted">${md(day)} · ${esc(x.type || "")}${x.ott ? ` · ${esc(x.ott)}` : ""}</small></span>${x.rating != null ? `<b class="rate">⭐ ${esc(x.rating)}</b>` : ""}</li>`).join("");
+    wh = `<div class="link-tiles">
+        <div class="tile t-grape"><span class="tile-k">지금 보는 중</span><b class="tile-v">${watching.length}편</b></div>
+        <div class="tile t-coral"><span class="tile-k">이번 달 다 본 작품</span><b class="tile-v">${month.length}편</b></div>
+        <div class="tile t-mint"><span class="tile-k">올해 다 본 작품</span><b class="tile-v">${year}편</b></div>
+      </div>
+      ${watching.length ? `<div class="card"><h3>보는 중</h3><ul class="posters">${watchingHtml}</ul></div>` : ""}
+      <div class="card"><h3>이번 달 다 본 작품</h3>${month.length ? `<ul class="watched">${monthHtml}</ul>` : `<p class="muted">이번 달은 아직 다 본 작품이 없어요.</p>`}</div>`;
+  }
+  $("#watchView").innerHTML = wh;
+  // 첫 화면 '보는 중'
+  $("#homeWatching").hidden = !watching.length;
+  $("#homeWatchingList").innerHTML = watching.slice(0, 6).map((x) => `<li>${poster(x, "pst")}<span>${esc(x.title || "")}</span></li>`).join("");
+}
+
+// ⚙️ 설정 → 연동: 비밀번호는 보드 설정에 저장 (보드 비밀번호로 지켜지고 모든 기기에서 같이 씀)
+function renderLinkSettings() {
+  const L = S.settings.links || {};
+  for (const [kind, name] of [["vocab", "스페인어"], ["watch", "왓치로그"]]) {
+    const s = links.st[kind];
+    const txt = s.state === "ok" ? "✅ 연결됨" : s.state === "loading" ? "불러오는 중…" : s.state === "empty" ? "⚠️ 이 비밀번호 자리에 기록이 없어요" : s.state === "error" ? "⚠️ 연결 안 됨" : "아직 비밀번호 없음";
+    $(`#link-${kind}-st`).textContent = txt + (s.from === "app" ? ` · 이 브라우저의 ${name} 앱 비밀번호 사용 중` : s.from === "board" ? " · 보드에 저장한 비밀번호" : "");
+    $(`#link-${kind}`).placeholder = L[kind] ? "•••••• (보드에 저장됨)" : `${name} 동기화 비밀번호`;
+    $(`#link-${kind}-clear`).hidden = !L[kind];
+  }
 }
 
 const BAK_LABEL = { prev: "1시간 백업", daily: "하루 백업", undo: "되돌리기 직전" };
@@ -346,6 +468,24 @@ document.addEventListener("change", (e) => {
   act(backend.update("tasks", id, { done: e.target.checked })).catch(() => { e.target.checked = !e.target.checked; });
 });
 
+$("#linkForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (!backend) return;
+  const patch = {};
+  for (const kind of ["vocab", "watch"]) { const v = $(`#link-${kind}`).value.trim(); if (v) patch[kind] = v; }
+  if (!Object.keys(patch).length) { toast("넣은 비밀번호가 없어요."); return; }
+  act(backend.saveLinks(patch), "연동 비밀번호를 저장했어요. 다른 기기에서도 같이 써요.").then(() => {
+    for (const kind of Object.keys(patch)) $(`#link-${kind}`).value = "";
+  }).catch(() => {});
+});
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-link-clear]");
+  if (!b || !backend) return;
+  const kind = b.dataset.linkClear;
+  if (!confirm("보드에 저장한 이 비밀번호를 지울까요? (그 앱의 데이터는 그대로예요)")) return;
+  act(backend.saveLinks({ [kind]: null }), "지웠어요.").catch(() => {});
+});
+
 $("#todoForm").addEventListener("submit", (e) => {
   e.preventDefault();
   if (!backend || !S.loaded) { toast("아직 불러오는 중이에요."); return; }
@@ -372,6 +512,8 @@ mountUri($("#uriRoot"), {
 });
 renderPage();
 render();
+renderLinkPages();
+renderLinkSettings();
 setSync();
 firebaseStart().catch(() => {
   document.body.classList.add("locked");
