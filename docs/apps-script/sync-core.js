@@ -8,7 +8,7 @@
  *   · 구글 캘린더 전부(지난달~석 달 뒤) → 보드 달력 (nyanya/{방}/gcal, 캘린더마다 보드에서 켜고 끄기)
  * 보드가 넣은 일정엔 nyanyaApp=1 · nyanyaKind(task|vocab) · nyanyaRef 표시 → 그것만 고치고 지움. 냐냐가 직접 넣은 일정은 안 건드림.
  */
-const CORE_VERSION = "2026-10-20a";
+const CORE_VERSION = "2026-10-20b";
 const DB_URL = "https://nyanya-board-default-rtdb.asia-southeast1.firebasedatabase.app";
 const VOCAB_URL = "https://nyanya-vocab-default-rtdb.firebaseio.com";
 const TZ = "Asia/Seoul";
@@ -26,9 +26,8 @@ function nyanyaSync(BOARD_PASSWORD) {
   const byName = function (n) { return cals.filter(function (c) { return c.name === n; })[0]; };
   const res = { added: 0, updated: 0, deleted: 0 }, missing = [];
 
-  // 📌 할 일 → 김윤아 (없으면 기본 캘린더)
+  // 📌 할 일 → 김윤아. 김윤아는 냐냐 기본(primary) 캘린더라 API에선 이름이 이메일로 나옴 → 이름으로 못 찾으면 기본 캘린더 (calendars_에서 이름도 김윤아로 붙임)
   const taskCal = byName(CAL_NAME.task) || cals.filter(function (c) { return c.primary; })[0];
-  if (!byName(CAL_NAME.task)) missing.push(CAL_NAME.task);
   const taskItems = {};
   Object.keys(tasks).forEach(function (id) {
     const t = tasks[id];
@@ -148,6 +147,8 @@ function calendars_() {
       out.push({ id: c.id, key: String(c.id).replace(/[.#$\[\]\/]/g, "_"), name: c.summaryOverride || c.summary || c.id,
         color: c.backgroundColor || "#8A94A6", selected: !!c.selected, primary: !!c.primary });
     });
+    // 기본 캘린더는 구글 화면에선 냐냐 이름(김윤아)으로 보이지만 API 이름은 이메일 → 같은 이름이 따로 없으면 김윤아로
+    if (!out.some(function (c) { return c.name === CAL_NAME.task; })) out.forEach(function (c) { if (c.primary) c.name = CAL_NAME.task; });
     pageToken = r.nextPageToken;
   } while (pageToken);
   return out;
