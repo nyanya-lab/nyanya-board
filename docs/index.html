@@ -15,9 +15,30 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="style.css?v=20261020a">
+<link rel="stylesheet" href="style.css?v=20261020b">
 </head>
-<body>
+<body class="locked">
+
+<!-- 🔒 비밀번호 화면: 비밀번호 = 저장 위치 (욱진 보드 방식) -->
+<section class="login" id="loginView" hidden>
+  <a class="brand" href="./"><span class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><b>냐냐 보드</b></a>
+  <div class="card">
+    <h3>비밀번호를 넣어 주세요</h3>
+    <p class="muted">한 번 열면 이 기기에서는 잠그기 전까지 바로 열려요.</p>
+    <form class="login-form" id="loginForm" autocomplete="on">
+      <input type="text" name="username" value="nyanya-board" autocomplete="username" hidden>
+      <input type="password" id="loginPw" autocomplete="current-password" placeholder="비밀번호" aria-label="비밀번호" required>
+      <button class="btn" type="submit">열기</button>
+    </form>
+    <div class="note" id="newBoard" hidden>
+      <span>이 비밀번호로 만든 보드가 아직 없어요. 오타가 아니라면 이 비밀번호로 새 보드를 만들까요?</span>
+      <span class="row"><button class="btn" type="button" id="newBoardYes">새 보드 만들기</button><button class="btn ghost" type="button" id="newBoardNo">다시 입력</button></span>
+    </div>
+    <p class="login-msg" id="loginMsg"></p>
+  </div>
+</section>
+
+<p class="loading muted" id="loadingView">불러오는 중…</p>
 
 <aside class="side">
   <a class="brand" href="#home"><span class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><b>냐냐 보드</b></a>
@@ -26,6 +47,7 @@
     <a href="#spanish" data-page="spanish"><span class="ic">📖</span><span>스페인어</span></a>
     <a href="#watch" data-page="watch"><span class="ic">🎬</span><span>왓치로그</span></a>
     <a href="#money" data-page="money"><span class="ic">💰</span><span>가계부</span></a>
+    <a href="#settings" data-page="settings"><span class="ic">⚙️</span><span>설정</span><span class="sync-dot" data-sync></span></a>
   </nav>
   <p class="side-foot mono" id="todayMono"></p>
 </aside>
@@ -107,6 +129,28 @@
       </ul>
     </div>
   </section>
+
+  <!-- ⚙️ 설정 -->
+  <section class="page" id="page-settings" hidden>
+    <header class="page-head"><h2>⚙️ 설정</h2></header>
+    <div class="settings">
+      <div class="card">
+        <h3>저장 상태</h3>
+        <p class="sync-line"><span class="sync-dot" data-sync></span><span id="syncText"></span></p>
+        <p class="muted small">폰·PC 어디서든 같은 비밀번호로 열면 같은 보드가 보여요.</p>
+      </div>
+      <div class="card">
+        <h3>백업</h3>
+        <p class="muted small">보드를 열어 둔 동안 1시간·하루마다 서버에 자동으로 백업해요. 실수로 지웠을 때 되돌릴 수 있어요.</p>
+        <ul class="bak-list" id="bakList"><li class="muted">불러오는 중…</li></ul>
+      </div>
+      <div class="card">
+        <h3>이 기기 잠그기</h3>
+        <p class="muted small">이 기기에 기억한 비밀번호를 지워요. 다시 열려면 비밀번호를 넣어야 해요.</p>
+        <div><button class="btn ghost" type="button" data-act="lock">🔒 잠그기</button></div>
+      </div>
+    </div>
+  </section>
 </main>
 
 <nav class="bottom" aria-label="메뉴">
@@ -114,10 +158,11 @@
   <a href="#spanish" data-page="spanish"><span class="ic">📖</span><span>스페인어</span></a>
   <a href="#watch" data-page="watch"><span class="ic">🎬</span><span>왓치로그</span></a>
   <a href="#money" data-page="money"><span class="ic">💰</span><span>가계부</span></a>
+  <a href="#settings" data-page="settings"><span class="ic">⚙️<span class="sync-dot" data-sync></span></span><span>설정</span></a>
 </nav>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script type="module" src="app.js?v=20261020a"></script>
+<script type="module" src="app.js?v=20261020b"></script>
 </body>
 </html>
