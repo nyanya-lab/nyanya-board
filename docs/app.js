@@ -2,7 +2,7 @@
 // 저장: 욱진 보드와 같은 방식. Firebase Realtime Database(ukjin-207a3)의 nyanya/{SHA-256("nyanya-board:"+비밀번호)} 아래.
 // 로그인 없음, 비밀번호 = 저장 위치. 항목마다 따로 저장해서 폰·PC가 서로 덮어쓰지 않음.
 
-import { firebaseConfig } from "./firebase-config.js?v=20261020b";
+import { firebaseConfig } from "./firebase-config.js?v=20261020c";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -266,7 +266,7 @@ function renderDay() {
       : `<li class="empty">할 일이 없어요.</li>`;
 }
 
-const BAK_LABEL = { prev: "1시간 전쯤", daily: "하루 전쯤", undo: "되돌리기 직전" };
+const BAK_LABEL = { prev: "1시간 백업", daily: "하루 백업", undo: "되돌리기 직전" };
 async function renderBackups() {
   const box = $("#bakList");
   if (!backend) { box.innerHTML = ""; return; }
