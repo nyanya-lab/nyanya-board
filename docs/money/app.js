@@ -6,7 +6,7 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261020p";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf } from "./money.js?v=20261020d";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf } from "./money.js?v=20261021a";
 import { mountRepeat } from "./repeat.js?v=20261021a";
 import { mountBalance } from "./balance.js?v=20261020a";
 import { mountImport } from "./import.js?v=20261021b";
@@ -235,6 +235,7 @@ const uri = mountUri($("uriRoot"), {
 });
 bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum, deepMerge, esc, isAdminDevice, moneyShort, monthLabel, openDlg, pad, partner, quietly, ready, render, rid, rows, shiftMonth, shortDate, shrinkPic, statTile, toast, today, ui, viewPic, won,
   give: false,   // 💝 줄 돈(욱진 보드 전용)은 안 씀
+  statPieFull: true,   // 📊 통계 원형은 가운데 구멍 없이 꽉 찬 원형 (냐냐 요청)
   get backend() { return backend; }, get testMode() { return false; } });
 initMoney();
 // 🧮 실제 잔액 맞추기 · 🙈 숨기기 (자산 탭)

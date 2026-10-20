@@ -1,7 +1,8 @@
 // 💰 돈 관리 (가계부) — ⚠️ 욱진 보드 docs/money.js를 가져온 짝 코드 (냐냐 보드 docs/money/money.js).
 //   고칠 때 욱진 보드에도 필요한 고침인지 생각하고, 그렇다면 "욱진 보드도 같이 고칠까?" 물어보기 (CLAUDE.md).
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
-//   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌.
+//   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌,
+//   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — 통계 원형에 env.statPieFull이면 씀.
 // (원래 설명) 보드(index.html)와 가계부 모드(money.html → index.html?app=money)가 같이 쓰는 코드
 // 한 달 예산 · 지출 기록 · 자산(통장·카드·현금, 카드 결제일) · 분류·색·원형 그래프 · 줄 돈 15일 자동 · 카드값 할 일 · 연습 데이터
 // 화면 마크업은 index.html의 #moneyPage(⚙ 설정 탭 #catEditor·#curEditor 포함) · #acctDlg · #mDrawer · #bulkDlg. 보드 쪽 공통 함수·상태는 시작할 때 bindMoney(env)로 받음
@@ -57,7 +58,7 @@ export function setCatMap(cats) {
 export const catVar = (kind, cat) => `var(--c${catIdx(kind, cat)})`;
 export const catDot = (kind, cat) => `<span class="cdot" style="--c:${catVar(kind, cat)}" aria-hidden="true"></span>`;
 // 🥧 원형(도넛): 바깥에 이름·% (선으로 이어서), 가운데 제목, 마우스 올리면(폰은 누르면) 그 조각만 진하게 + 이름·%·금액 상자
-// list = [{cat, amt}], o = { legend(아래 목록, 기본 켬), color(x → 색), center(가운데 글자 색), amount(가운데 금액, 기본 켬) }. 10개 넘으면 작은 것들은 '그 밖'
+// list = [{cat, amt}], o = { legend(아래 목록, 기본 켬), color(x → 색), center(가운데 글자 색), amount(가운데 금액, 기본 켬), full(구멍 없는 꽉 찬 원형, 가운데 글자 없음) }. 10개 넘으면 작은 것들은 '그 밖'
 export const PIE_WARM = ["#FF5A3C", "#FF8A4C", "#F5A623", "#F7C948", "#A8D84E", "#4CC38A", "#3BB3C3", "#8E7CF0"];
 export const PIE_COOL = ["#2F6FEB", "#3DD6C4", "#5BC0EB", "#8E7CF0", "#A8D84E", "#F7C948", "#FF8A4C", "#D9488F"];
 export function pieHtml(kind, list, label, o = {}) {
@@ -66,10 +67,10 @@ export function pieHtml(kind, list, label, o = {}) {
   if (!total) return "";
   if (xs.length > 10) xs = xs.slice(0, 9).concat([{ cat: "그 밖", amt: xs.slice(9).reduce((t, x) => t + x.amt, 0), other: true }]);
   const col = (x) => x.other ? `var(--c${CAT_N})` : o.color ? o.color(x) : catVar(kind, x.cat), pctS = (x) => (x.amt / total * 100).toFixed(1).replace(/\.0$/, "");
-  const W = 460, H = 280, cx = W / 2, cy = H / 2, R = 92, r0 = 58, f = (v) => v.toFixed(1);
+  const W = 460, H = 280, cx = W / 2, cy = H / 2, R = 92, r0 = o.full ? 0 : 58, f = (v) => v.toFixed(1);
   const pt = (a, rr) => `${f(cx + rr * Math.cos(a))} ${f(cy + rr * Math.sin(a))}`;
   const arc = (a1, a2, ro, ri) => {
-    if (a2 - a1 > Math.PI * 2 - 0.01) { const h = a1 + Math.PI; return `M${pt(a1, ro)}A${ro} ${ro} 0 1 1 ${pt(h, ro)}A${ro} ${ro} 0 1 1 ${pt(a1, ro)}ZM${pt(a1, ri)}A${ri} ${ri} 0 1 0 ${pt(h, ri)}A${ri} ${ri} 0 1 0 ${pt(a1, ri)}Z`; }   // 한 조각 = 고리 전체
+    if (a2 - a1 > Math.PI * 2 - 0.01) { const h = a1 + Math.PI; return `M${pt(a1, ro)}A${ro} ${ro} 0 1 1 ${pt(h, ro)}A${ro} ${ro} 0 1 1 ${pt(a1, ro)}Z` + (ri ? `M${pt(a1, ri)}A${ri} ${ri} 0 1 0 ${pt(h, ri)}A${ri} ${ri} 0 1 0 ${pt(a1, ri)}Z` : ""); }   // 한 조각 = 고리 전체
     const lg = a2 - a1 > Math.PI ? 1 : 0; return `M${pt(a1, ro)}A${ro} ${ro} 0 ${lg} 1 ${pt(a2, ro)}L${pt(a2, ri)}A${ri} ${ri} 0 ${lg} 0 ${pt(a1, ri)}Z`;
   };
   let a = -Math.PI / 2;
@@ -89,7 +90,7 @@ export function pieHtml(kind, list, label, o = {}) {
       `<text class="pl-n" x="${f(ex + (p.right ? 4 : -4))}" y="${f(p.ly - 1)}" text-anchor="${p.right ? "start" : "end"}">${esc(name)}</text>` +
       `<text class="pl-p" x="${f(ex + (p.right ? 4 : -4))}" y="${f(p.ly + 13)}" text-anchor="${p.right ? "start" : "end"}">${pctS(p.x)} %</text><title>${esc(p.x.cat)} ${won(p.x.amt)} (${pctS(p.x)}%)</title></g>`;
   }).join("");
-  const mid = `<text class="pc-l" x="${cx}" y="${o.amount === false ? cy + 6 : cy - 2}" fill="${o.center || "var(--fg)"}">${esc(label)}</text>` + (o.amount === false ? "" : `<text class="pc-v" x="${cx}" y="${cy + 17}">${moneyShort(total)}</text>`);
+  const mid = o.full ? "" : `<text class="pc-l" x="${cx}" y="${o.amount === false ? cy + 6 : cy - 2}" fill="${o.center || "var(--fg)"}">${esc(label)}</text>` + (o.amount === false ? "" : `<text class="pc-v" x="${cx}" y="${cy + 17}">${moneyShort(total)}</text>`);
   return `<div class="pie2"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)} ${won(total)} 원형">${g}${mid}</svg><div class="pie-tip" hidden></div>` +
     (o.legend === false ? "" : `<ul class="pie-legend">${xs.map((x) => `<li><i style="background:${col(x)}"></i><span>${esc(x.cat)}</span><b>${won(x.amt)}</b><small>${pctS(x)}%</small></li>`).join("")}</ul>`) + "</div>";
 }
@@ -674,7 +675,7 @@ function renderStats() {
   const byCat = {}; recs.forEach((x) => { const c = x.cat || "기타"; byCat[c] = (byCat[c] || 0) + (Number(x.amount) || 0); });
   const total = recs.reduce((t, x) => t + (Number(x.amount) || 0), 0), cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
   const sel = ui.stCat && byCat[ui.stCat] != null ? ui.stCat : null, pct = (v) => total ? Math.round(v / total * 100) : 0;
-  $("stPie").innerHTML = pieHtml(kind, cats.map(([cat, amt]) => ({ cat, amt })), label, { legend: false }) || `<p class="muted small" style="margin:0">${esc(cur.name)} ${label} 기록이 없어요.</p>`;
+  $("stPie").innerHTML = pieHtml(kind, cats.map(([cat, amt]) => ({ cat, amt })), label, { legend: false, full: E.statPieFull }) || `<p class="muted small" style="margin:0">${esc(cur.name)} ${label} 기록이 없어요.</p>`;
   $("stCats").innerHTML = `<button type="button" class="st-cat all${sel ? "" : " on"}" data-act="stCat" data-k=""><span>${label} 전체 <small>${recs.length}</small></span><b class="won">${won(total)}</b></button>` +
     cats.map(([c, v]) => `<button type="button" class="st-cat${sel === c ? " on" : ""}" data-act="stCat" data-k="${esc(c)}"><i class="st-pct" style="--c:${catVar(kind, c)}">${pct(v)}%</i><span>${catDot(kind, c)}${esc(c)}</span><b class="won">${won(v)}</b></button>`).join("");
   // 오른쪽: 합계 · 흐름 그래프 (그 칸 포함 앞 12칸, 기간이면 그 안의 달) · 내역
