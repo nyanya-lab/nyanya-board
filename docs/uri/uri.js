@@ -131,12 +131,13 @@ export function mountUri(root, opts = {}) {
     const want = {};
     for (const [id, d] of Object.entries(mirror)) {
       if (!d || !d.date || !(Number(d.amount) > 0)) continue;
-      want[`${who}-${id}`] = { date: d.date, title: d.memo || d.cat || "공통비용", amount: Number(d.amount), cat: d.cat || "기타", payer: who, by: who, src: "money", memo: null };
+      want[`${who}-${id}`] = { date: d.date, title: d.memo || d.cat || "공통비용", amount: Number(d.amount), cat: d.cat || "기타", payer: who, by: who, src: "money", memo: null, _settled: !!d.settled };
     }
     const patch = {};
     for (const [k, v] of Object.entries(want)) {
       const cur = st.costs[k];
-      if (!cur) patch[k] = { ...v, at: Date.now() };
+      const { _settled, ...base } = v;
+      if (!cur) patch[k] = { ...base, at: Date.now(), settled: _settled ? "가져오기" : null };
       else for (const f of ["date", "title", "amount", "cat", "payer"]) if (cur[f] !== v[f]) patch[`${k}/${f}`] = v[f];
     }
     for (const [k, c] of Object.entries(st.costs)) if (c && c.src === "money" && c.by === who && !want[k]) patch[k] = null;
@@ -209,7 +210,11 @@ export function mountUri(root, opts = {}) {
     const list = monthList();
     const s = settleOf(list);
     const [y, m] = st.month.split("-").map(Number);
-    const settleText = !s.diff ? "딱 반반이에요" : s.diff > 0 ? `욱진 → 냐냐 ${won(s.diff)}` : `냐냐 → 욱진 ${won(-s.diff)}`;
+    const dirText = (diff) => !diff ? "딱 반반이에요" : diff > 0 ? `욱진 → 냐냐 ${won(diff)}` : `냐냐 → 욱진 ${won(-diff)}`;
+    // ✅ 정산: 공통비용마다 settled(정산한 날, 가져오기면 "가져오기"). 아직 정산 안 된 것 전체로 '받을 돈·줄 돈'
+    const open = Object.entries(st.costs).map(([id, c]) => ({ id, ...c })).filter((c) => c && c.date && !c.settled);
+    const os = settleOf(open), openMonths = [...new Set(open.map((c) => c.date.slice(0, 7)))].sort();
+    const mOpen = list.filter((c) => !c.settled), mSettled = list.length - mOpen.length;
     const cats = {};
     list.forEach((c) => { cats[c.cat || "기타"] = (cats[c.cat || "기타"] || 0) + (Number(c.amount) || 0); });
     const catRows = Object.entries(cats).sort((a, b) => b[1] - a[1]);
@@ -224,11 +229,11 @@ export function mountUri(root, opts = {}) {
         rows += `<li class="uri-day">${d.getMonth() + 1}월 ${d.getDate()}일 (${DOW[d.getDay()]})</li>`;
         lastDate = c.date;
       }
-      rows += `<li class="uri-item${st.edit === c.id ? " on" : ""}">
+      rows += `<li class="uri-item${st.edit === c.id ? " on" : ""}${c.settled ? " settled" : ""}">
         <span class="uri-cat">${esc(c.cat || "기타")}</span>
         <span class="uri-title">${esc(c.title || "")}${c.memo ? `<small>${esc(c.memo)}</small>` : ""}</span>
         <span class="uri-payer p-${esc(c.payer)}">${esc(PAYER[c.payer] || "?")}</span>
-        <b class="uri-amt">${won(c.amount)}</b>
+        <b class="uri-amt">${c.settled ? '<span class="uri-ok" title="정산 완료">✅</span> ' : ""}${won(c.amount)}</b>
         <span class="uri-acts">
           ${c.src === "money" ? `<span class="uri-src" title="${esc(NAME[c.by] || "")} 가계부에서 ❤️로 표시한 지출 — 고치기·지우기는 가계부에서">${c.by === who ? "내 가계부" : `${esc(NAME[c.by] || "")} 가계부`}</span>` : mirrorMode ? "" : `
           <button type="button" class="uri-icon" data-uri="edit" data-id="${esc(c.id)}" aria-label="고치기" title="고치기 (적은 사람: ${esc(NAME[c.by] || "?")})">✎</button>
@@ -245,12 +250,20 @@ export function mountUri(root, opts = {}) {
         ${st.month !== today().slice(0, 7) ? `<button type="button" class="uri-chip" data-uri="thisMonth">이번 달</button>` : ""}
       </div>
 
+      <div class="uri-owe${os.diff ? "" : " zero"}">
+        <span>💸 아직 정산 안 된 돈 (전체)</span>
+        <b>${dirText(os.diff)}</b>
+        <small>${open.length ? `미정산 ${open.length}건 · ${won(os.total)}${openMonths.length ? ` · ${openMonths[0].replace("-", ".")}${openMonths.length > 1 ? `~${openMonths[openMonths.length - 1].replace("-", ".")}` : ""}` : ""}` : "다 정산했어요 🎉"}</small>
+      </div>
       <div class="uri-tiles">
         <div class="uri-tile t-me"><span>이번 달 합계</span><b>${won(s.total)}</b></div>
         <div class="uri-tile"><span>냐냐가 낸 돈</span><b>${won(s.paid.nyanya)}</b></div>
         <div class="uri-tile"><span>욱진이 낸 돈</span><b>${won(s.paid.ukjin)}</b></div>
-        <div class="uri-tile t-settle"><span>반반 정산</span><b>${settleText}</b></div>
+        <div class="uri-tile t-settle"><span>이 달 반반</span><b>${dirText(s.diff)}</b><small>${list.length ? (mOpen.length ? `미정산 ${mOpen.length}건${mSettled ? ` · 정산 ${mSettled}건` : ""}` : "✅ 다 정산했어요") : ""}</small></div>
       </div>
+      ${list.length ? `<div class="uri-row uri-settle-row">${mOpen.length
+        ? `<button type="button" class="uri-btn" data-uri="settleMonth">✅ ${m}월 정산 완료로 (${mOpen.length}건)</button><span class="uri-muted uri-small">돈을 주고받았으면 눌러요. 이 달 공통비용이 전부 정산됨으로 바뀌어요.</span>`
+        : `<button type="button" class="uri-btn ghost" data-uri="unsettleMonth">↩ ${m}월 정산 취소</button>`}</div>` : ""}
       ${s.paid.joint ? `<p class="uri-muted uri-small">공동 통장으로 낸 ${won(s.paid.joint)}은 합계에만 넣고 정산에서는 빼요.</p>` : ""}
 
       <div class="uri-grid${mirrorMode ? " uri-mirror" : ""}">
@@ -373,6 +386,14 @@ export function mountUri(root, opts = {}) {
       st.edit = null; render(true);
     } else if (a === "edit" && st.costs[id]) { st.edit = id; render(true); root.querySelector('form[data-uri="cost"]').scrollIntoView({ block: "nearest", behavior: "smooth" }); }
     else if (a === "cancel") { st.edit = null; render(true); }
+    else if (a === "settleMonth" || a === "unsettleMonth") {
+      const on = a === "settleMonth", items = monthList().filter((c) => !!c.settled !== on);
+      if (!items.length) return;
+      const [, mm] = st.month.split("-").map(Number);
+      if (!confirm(on ? `${mm}월 공통비용 ${items.length}건을 정산 완료로 바꿀까요? ${partner} 보드에서도 같이 바뀌어요.` : `${mm}월 정산 표시를 지울까요? 다시 미정산으로 돌아가요.`)) return;
+      const patch = {}; items.forEach((c) => { patch[`${c.id}/settled`] = on ? today() : null; });
+      save(rt.update(path(room, "costs"), patch), on ? `✅ ${mm}월 정산 완료!` : "정산 표시를 지웠어요.").catch(() => {});
+    }
     else if (a === "del" && st.costs[id]) {
       const c = st.costs[id];
       if (!confirm(`'${c.title}' ${won(c.amount)} 기록을 지울까요? ${partner} 보드에서도 지워져요.`)) return;
@@ -419,6 +440,15 @@ function injectStyle() {
 .uri-tile b { font-family: var(--f-display); font-weight: 400; font-size: 21px; overflow-wrap: anywhere; }
 .uri-tile.t-me { background: var(--me-soft); } .uri-tile.t-me b { color: var(--me); }
 .uri-tile.t-settle { background: var(--mint-soft); } .uri-tile.t-settle b { color: var(--mint); font-size: 18px; }
+.uri-tile small { font-size: 12px; color: var(--muted); }
+.uri-owe { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border-radius: var(--r, 14px); background: var(--coral-soft); border: 1px solid color-mix(in srgb, var(--coral) 30%, transparent); }
+.uri-owe span { font-size: 13px; font-weight: 600; color: var(--coral); }
+.uri-owe b { font-family: var(--f-display); font-weight: 400; font-size: 26px; color: var(--fg); }
+.uri-owe small { font-size: 13px; color: var(--muted); }
+.uri-owe.zero { background: var(--mint-soft); border-color: transparent; } .uri-owe.zero span { color: var(--mint); }
+.uri-settle-row { gap: 10px; }
+.uri-item.settled { opacity: 0.6; }
+.uri-ok { font-size: 12px; }
 .uri-grid { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 14px; align-items: start; }
 .uri-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .uri-f { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 500; color: var(--muted); }

@@ -20,3 +20,14 @@
   .app-money .m-bottom button { font-size: 10.5px; }
   .app-money .m-bottom button[aria-pressed="true"] { color: var(--coral); background: var(--coral-soft); }
 }
+
+/* 📥 편한가계부 가져오기 */
+.imp-files { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.imp-sum { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 12px; border-radius: 10px; background: var(--sunk); font-size: 14px; }
+.imp-opts { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; }
+.imp-opts label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.imp-h { margin: 4px 0 0; font-size: 15px; }
+.imp-accts { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 6px; max-height: 360px; overflow: auto; }
+.imp-acct { display: grid; grid-template-columns: minmax(0, 1fr) 110px 90px; gap: 6px; align-items: center; }
+.imp-acct input, .imp-acct select { min-width: 0; }
+@media (max-width: 720px) { .imp-files { grid-template-columns: 1fr; } .imp-acct { grid-template-columns: minmax(0, 1fr) 100px; } .imp-acct span { grid-column: 1 / -1; } }

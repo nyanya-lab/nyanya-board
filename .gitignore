@@ -1,1 +1,5 @@
 .claude/settings.local.json
+
+# 로컬 시험용 임시 파일 (실제 가계부 엑셀 — 절대 올리지 않기)
+docs/money/_tmp_import/
+*.xlsx

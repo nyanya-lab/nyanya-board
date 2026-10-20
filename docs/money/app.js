@@ -5,8 +5,9 @@
 // ❤️ 공통: 지출에 common: true → ../uri/uri.js setMirror로 공통 저장소(uri-board)에 저절로 복사, '❤️ 공통' 탭에서 둘 다 보기 + 반반 정산.
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
-import { mountUri } from "../uri/uri.js?v=20261020n";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon } from "./money.js?v=20261020a";
+import { mountUri } from "../uri/uri.js?v=20261020o";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey } from "./money.js?v=20261020c";
+import { mountImport } from "./import.js?v=20261020a";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -138,7 +139,7 @@ function render() {
 function mirrorCommon() {
   if (!S.loaded) return;
   const docs = {};
-  S.money.forEach((x, id) => { if (x && x.common && (x.kind === "expense" || !x.kind) && isWon(x)) docs[id] = { date: x.date, amount: x.amount, cat: x.cat, memo: x.memo }; });
+  S.money.forEach((x, id) => { if (x && x.common && (x.kind === "expense" || !x.kind) && isWon(x)) docs[id] = { date: x.date, amount: x.amount, cat: /공통/.test(x.cat || "") && x.sub ? x.sub : x.cat, memo: x.memo, settled: !!x.settled }; });   // 분류가 '공통비용'이면 소분류(식비(외식) 등)로
   uri.setMirror(docs);
 }
 
@@ -162,7 +163,8 @@ async function firebaseStart() {
       saveSettingsDeep: tracked((patch) => rt.update(path(room, "settings"), flattenPaths(patch))),
       putPic: tracked((id, obj) => rt.set(path(room, "pics", id), obj)),
       async getPic(id, part) { return (await rt.get(path(room, "pics", id, part))).val(); },
-      saveUriPw: tracked((pw) => rt.update(path(room, "settings"), { uriPw: pw }))
+      saveUriPw: tracked((pw) => rt.update(path(room, "settings"), { uriPw: pw })),
+      rootUpdate: tracked((patch) => rt.update(path(room), patch))   // 📥 가져오기: 여러 칸을 한 번에
     };
     $("loginView").hidden = true; $("mainView").hidden = false;
     setSync();
@@ -231,6 +233,8 @@ bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum,
   give: false,   // 💝 줄 돈(욱진 보드 전용)은 안 씀
   get backend() { return backend; }, get testMode() { return false; } });
 initMoney();
+// 📥 편한가계부 가져오기 (가계부 설정 탭)
+mountImport($("importPanel"), { S, backend: () => backend, toast, act, esc, won, render, catKey, defaultCats: (k) => (MONEY_CATS[k] || []).slice() });
 // 보드 첫 화면 '공통비용' 칸에서 바로 오면 (#common)
 if (location.hash === "#common") { try { localStorage.setItem("nyanya-mtab", "common"); } catch (e) { /* 무시 */ } }
 setSync();
