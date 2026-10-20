@@ -30,10 +30,14 @@ docs/app.js              화면 로직 (상태 S, 달력 renderCalendar, 그날 
 docs/manifest.webmanifest, *.png  홈 화면 앱 아이콘
 ```
 
-## 데이터 (지금)
+## 데이터 (Firebase Realtime Database `ukjin-207a3` — 욱진 보드와 같은 DB)
 
-- 뼈대 단계: 이 브라우저 `localStorage["nyanya-board-v1"]` = `{ tasks: { id: {title, date, done, at} } }`. 기기끼리 안 이어짐.
-- 다음 단계: 욱진 보드처럼 Firebase Realtime Database에 **비밀번호 = 저장 위치** 방식으로 옮기기.
+- 로그인 없음. **비밀번호 = 저장 위치**: `nyanya/{SHA-256("nyanya-board:"+비밀번호)}` 아래 (`docs/firebase-config.js`).
+  비밀번호는 이 기기 `localStorage["nyanya-board-pw"]`에만 기억, ⚙️ 설정 → 잠그기로 지움. 처음 넣는 비밀번호면 "새 보드 만들기" 한 번 더 확인.
+- 규칙은 **욱진 보드 `database.rules.json` 한 곳**에서 관리 (`nyanya/$room` = 64자 해시만 읽기/쓰기). 콘솔에 게시해야 적용.
+- 모음(`COLS`): `tasks` = {title, date, done, at}. 그 외 `settings`(createdAt), `_backup/{prev,daily,undo}`(1시간·하루 자동 백업, 설정에서 되돌리기).
+- 항목·칸 단위로 따로 저장 (`flattenPaths`로 경로별 update) → 폰·PC가 서로 덮어쓰지 않음. 저장 상태 점: 초록 저장됨 · 노랑 저장 중 · 코랄 연결 끊김.
+- 뼈대 때 브라우저에만 저장하던 `localStorage["nyanya-board-v1"]` 할 일은 보드를 열면 서버로 한 번 옮기고 지움 (`moveOldLocal`).
 
 ## 연동 예정
 
