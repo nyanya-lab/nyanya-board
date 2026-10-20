@@ -8,7 +8,7 @@ import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261020p";
 import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances } from "./money.js?v=20261020d";
 import { mountBalance } from "./balance.js?v=20261020a";
-import { mountImport } from "./import.js?v=20261020a";
+import { mountImport } from "./import.js?v=20261021a";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -238,7 +238,7 @@ initMoney();
 // 🧮 실제 잔액 맞추기 · 🙈 숨기기 (자산 탭)
 const bal = mountBalance($("balPanel"), { S, backend: () => backend, toast, act, esc, won, rows, balances });
 // 📥 편한가계부 가져오기 (가계부 설정 탭)
-mountImport($("importPanel"), { S, backend: () => backend, toast, act, esc, won, render, catKey, defaultCats: (k) => (MONEY_CATS[k] || []).slice() });
+mountImport($("importPanel"), { S, backend: () => backend, toast, act, esc, won, render, balances, catKey, defaultCats: (k) => (MONEY_CATS[k] || []).slice() });
 // 보드 첫 화면 '공통비용' 칸에서 바로 오면 (#common)
 if (location.hash === "#common") { try { localStorage.setItem("nyanya-mtab", "common"); } catch (e) { /* 무시 */ } }
 setSync();

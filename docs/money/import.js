@@ -4,7 +4,10 @@
 // 바꾸는 규칙:
 //   지출 → expense, 수입 → income (마이너스 금액 = 환불·취소, 그대로 마이너스로 둠)
 //   이체지출 → move (자산 → 분류에 적힌 자산). 마이너스면 방향을 바꿔서 플러스로
-//   잔액수정 → 방향을 알 수 없어서 건너뜀 (가져온 뒤 자산의 '지금 잔액'으로 맞추기)
+//   잔액수정(분류 '잔액수정', 수입/지출 빈칸) → 기록이 아니라 그 자산의 시작 잔액(accounts.initial)에 더함
+//     엑셀엔 금액만 있고 +/−가 안 나오지만 2026-10-21 냐냐 실제 파일로 확인: 30줄 모두 '늘린 것'
+//     (닫은 통장들이 +로 볼 때만 정확히 0원으로 끝남). 넣은 합은 accounts.pkAdj에 적어 둬서 다시 눌러도 두 번 안 더해짐
+//     [🧮 잔액수정만 넣기] 버튼 = 기록은 안 건드리고 자산 시작 잔액만 (가져오기 버튼도 같이 넣음)
 //   분류에 '공통비용'이 들어가면 ❤️ common: true (고를 수 있음)
 // 같은 파일을 또 가져와도 겹치지 않게: 기록 id = 줄 내용으로 만든 값 (같은 줄 → 같은 id → 덮어씀)
 // 파일은 이 브라우저에서만 읽고, 저장은 지금 열린 보드에만 해요.
@@ -81,7 +84,7 @@ export async function readFile(file) {
 export function convert(parsed, opts) {
   const { C, rows } = parsed;
   const nameOf = (raw) => (opts.names && opts.names[raw]) || (opts.strip ? cleanName(raw) : String(raw));
-  const out = { money: {}, accts: {}, cats: { expense: new Set(), income: new Set() }, subs: { expense: {}, income: {} }, skipped: 0, count: { expense: 0, income: 0, move: 0, common: 0, settled: 0 }, from: null, to: null, curSkip: 0 };
+  const out = { money: {}, accts: {}, adj: {}, cats: { expense: new Set(), income: new Set() }, subs: { expense: {}, income: {} }, skipped: 0, count: { expense: 0, income: 0, move: 0, common: 0, settled: 0, adj: 0 }, from: null, to: null, curSkip: 0 };
   // 미정산 파일이 있으면 공통비용 줄마다 정산여부 찾기:
   //   ① 날짜·자산·금액이 같은 줄 → ② 날짜·자산이 같은 줄(나중에 금액을 고친 것) → ③ 못 찾으면 그 달 상태
   //   (그 달이 파일에서 다 '완료'면 정산됨, 하나라도 미정산이면 미정산, 파일 마지막 달보다 늦으면 미정산, 파일보다 앞이면 정산됨)
@@ -114,7 +117,13 @@ export function convert(parsed, opts) {
   };
   for (const r of rows) {
     const kindRaw = String(r[C.kind] || "").trim(), kind = KIND[kindRaw];
-    if (!kind) { out.skipped++; continue; }   // 잔액수정 등
+    if (!kind && !kindRaw && String(r[C.cat] || "").trim() === "잔액수정") {   // 잔액수정 → 그 자산 시작 잔액에 + (위 설명)
+      const amt = Math.round(Number(String(r[C.amt]).replace(/[^\d.-]/g, "")) || 0), acctRaw = String(r[C.acct] || "").trim();
+      if (!amt || !acctRaw || (C.cur >= 0 && r[C.cur] && String(r[C.cur]).trim() !== "KRW")) { out.skipped++; continue; }
+      const id = acctId(acctRaw); out.adj[id] = (out.adj[id] || 0) + amt; out.count.adj++;
+      continue;
+    }
+    if (!kind) { out.skipped++; continue; }
     if (C.cur >= 0 && r[C.cur] && String(r[C.cur]).trim() !== "KRW") { out.curSkip++; continue; }
     const date = serialDate(r[C.date]); if (!date) { out.skipped++; continue; }
     let amount = Math.round(Number(String(r[C.amt]).replace(/[^\d.-]/g, "")) || 0); if (!amount) { out.skipped++; continue; }
@@ -171,8 +180,22 @@ export function mountImport(root, env) {
           <span>📅 ${esc(v.from)} ~ ${esc(v.to)}</span>
           <span>지출 <b>${v.count.expense.toLocaleString()}</b></span><span>수입 <b>${v.count.income.toLocaleString()}</b></span><span>이체 <b>${v.count.move.toLocaleString()}</b></span>
           <span>❤️ 공통 <b>${v.count.common.toLocaleString()}</b>${st.settle ? ` (정산됨 ${v.count.settled.toLocaleString()} · 미정산 ${(v.count.common - v.count.settled).toLocaleString()})` : ""}</span>
-          <span class="muted">건너뜀 ${v.skipped}${v.curSkip ? ` · 원화 아닌 것 ${v.curSkip}` : ""} (잔액수정은 방향을 몰라서 빼요)</span>
-        </div>
+          <span>🧮 잔액수정 <b>${v.count.adj.toLocaleString()}</b></span>
+          ${v.skipped || v.curSkip ? `<span class="muted">건너뜀 ${v.skipped}${v.curSkip ? ` · 원화 아닌 것 ${v.curSkip}` : ""}</span>` : ""}
+        </div>`;
+      const adjList = Object.entries(v.adj);
+      if (adjList.length) {
+        const bal = env.balances ? env.balances() : {};
+        const todo = adjList.filter(([id, sum]) => !env.S.accounts.has(id) || (Number(env.S.accounts.get(id).pkAdj) || 0) !== sum);
+        h += `<div class="imp-adj"><b>🧮 잔액수정 (자산 ${adjList.length}개)</b> <span class="small muted">— 기록이 아니라 그 자산의 시작 잔액에 더해요. 편한가계부에서 잔액을 고친 만큼이에요.</span>
+          <div class="small" style="display:grid;gap:2px;margin:6px 0">${adjList.sort((a, b) => v.accts[a[0]].name.localeCompare(v.accts[b[0]].name)).map(([id, sum]) => {
+            const a = env.S.accounts.get(id), prev = a ? Number(a.pkAdj) || 0 : 0, now = bal[id] || 0;
+            return `<span>${esc(v.accts[id].name)} <b>+${esc(env.won(sum))}</b> <span class="muted">${!a ? "(새 자산)" : prev === sum ? "✅ 이미 넣음" : `지금 ${esc(env.won(now))} → ${esc(env.won(now - prev + sum))}`}</span></span>`;
+          }).join("")}</div>
+          <div class="row" style="flex:0 0 auto;align-items:center"><button class="btn ghost" type="button" data-imp="adj"${st.busy || !todo.length ? " disabled" : ""}>${todo.length ? `🧮 잔액수정만 넣기 (자산 ${todo.length}개)` : "✅ 잔액수정 다 넣었어요"}</button>
+          <span class="small muted">기록은 안 건드려요. 🧮 실제 잔액 맞추기로 이미 맞춘 자산은 넣은 뒤 다시 맞춰 주세요.</span></div></div>`;
+      }
+      h += `
         <div class="imp-opts">
           <label><input type="checkbox" data-imp="strip"${st.strip ? " checked" : ""}> 자산 이름에서 계좌번호 떼기</label>
           <label><input type="checkbox" data-imp="common"${st.common ? " checked" : ""}> 💙 공통비용 → ❤️ 공통 (욱진이와 같이 보기)</label>
@@ -184,7 +207,7 @@ export function mountImport(root, env) {
             <select data-imp-type="${esc(a.raw)}">${Object.entries(TYPE_LABEL).map(([k, l]) => `<option value="${k}"${k === a.type ? " selected" : ""}>${l}</option>`).join("")}</select>
             <span class="small muted">${useCount[id] || 0}건${have ? " · 이미 있음" : ""}</span></div>`;
         }).join("")}</div>
-        <p class="small muted" style="margin:0">가져온 뒤엔 자산 탭에서 <b>지금 잔액</b>(시작 잔액)을 맞추고, 카드는 결제일을 정해 주세요. 같은 파일을 다시 가져와도 같은 줄은 덮어써서 두 번 생기지 않아요.</p>
+        <p class="small muted" style="margin:0">잔액수정도 같이 넣어요. 그래도 실제와 다른 자산은 자산 탭 🧮 실제 잔액 맞추기로 맞추고, 카드는 결제일을 정해 주세요. 같은 파일을 다시 가져와도 같은 줄은 덮어써서 두 번 생기지 않아요.</p>
         <div class="row" style="flex:0 0 auto;align-items:center"><button class="btn" type="button" data-imp="go"${st.busy ? " disabled" : ""}>${st.busy ? "가져오는 중…" : `가져오기 (${(v.count.expense + v.count.income + v.count.move).toLocaleString()}건)`}</button></div>`;
     }
     root.innerHTML = h;
@@ -202,7 +225,31 @@ export function mountImport(root, env) {
     } catch (err) { env.toast(err.message || "엑셀을 읽지 못했어요."); return; }
     render();
   });
+  // 잔액수정 → 자산 시작 잔액: 지난번에 넣은 합(pkAdj)은 빼고 새 합을 더함 → 몇 번 눌러도 한 번만 더한 셈
+  //   없는 자산은 새로 만듦 (시작 잔액 = 잔액수정 합)
+  function adjPatch(v, patch, order) {
+    let n = 0;
+    for (const [id, sum] of Object.entries(v.adj)) {
+      const a = env.S.accounts.get(id);
+      if (!a) { const x = v.accts[id]; patch[`accounts/${id}`] = { name: x.name, type: x.type, initial: sum, pkAdj: sum, createdAt: order.n++, src: "편한가계부" }; n++; continue; }
+      const prev = Number(a.pkAdj) || 0; if (prev === sum) continue;
+      patch[`accounts/${id}/initial`] = (Number(a.initial) || 0) - prev + sum;
+      patch[`accounts/${id}/pkAdj`] = sum; n++;
+    }
+    return n;
+  }
   root.addEventListener("click", async (e) => {
+    if (e.target.closest('[data-imp="adj"]') && !st.busy) {
+      const be = env.backend(), v = view(); if (!be || !v) return;
+      const patch = {}, n = adjPatch(v, patch, { n: Date.now() });
+      if (!n) { env.toast("잔액수정은 이미 다 넣었어요."); return; }
+      if (!confirm(`잔액수정 ${v.count.adj}줄을 자산 ${n}개의 시작 잔액에 더할까요? (기록은 안 건드려요)`)) return;
+      st.busy = true; render();
+      try { await be.rootUpdate(patch); env.toast(`🧮 자산 ${n}개에 잔액수정을 넣었어요.`); }
+      catch (err) { env.toast("저장하지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요."); }
+      st.busy = false; render(); env.render();
+      return;
+    }
     if (!e.target.closest('[data-imp="go"]') || st.busy) return;
     const be = env.backend(), v = view(); if (!be || !v) return;
     const n = v.count.expense + v.count.income + v.count.move;
@@ -211,8 +258,9 @@ export function mountImport(root, env) {
     try {
       const S = env.S, patch = {};
       // 자산: 없는 것만 새로 (이미 있는 건 이름·잔액을 건드리지 않음)
-      let order = Date.now();
-      for (const [id, a] of Object.entries(v.accts)) if (!S.accounts.has(id)) patch[`accounts/${id}`] = { name: a.name, type: a.type, initial: 0, createdAt: order++, src: "편한가계부" };
+      const order = { n: Date.now() };
+      adjPatch(v, patch, order);   // 잔액수정 있는 자산 먼저 (새 자산이면 시작 잔액 = 잔액수정 합)
+      for (const [id, a] of Object.entries(v.accts)) if (!S.accounts.has(id) && !patch[`accounts/${id}`]) patch[`accounts/${id}`] = { name: a.name, type: a.type, initial: 0, createdAt: order.n++, src: "편한가계부" };
       // 분류·소분류: 지금 목록 뒤에 없는 것만 더함
       const cats = S.settings.moneyCats || {};
       for (const kind of ["expense", "income"]) {
