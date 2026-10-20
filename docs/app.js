@@ -2,9 +2,9 @@
 // 저장: 욱진 보드와 같은 방식. Firebase Realtime Database(nyanya-board)의 nyanya/{SHA-256("nyanya-board:"+비밀번호)} 아래.
 // 로그인 없음, 비밀번호 = 저장 위치. 항목마다 따로 저장해서 폰·PC가 서로 덮어쓰지 않음.
 
-import { firebaseConfig } from "./firebase-config.js?v=20261020i";
-import { mountUri } from "./uri/uri.js?v=20261020i";
-import { createLinks, vocabToday, vocabStreak, isWatching, finishDays, watchPeriods, dayActivity } from "./links.js?v=20261020i";
+import { firebaseConfig } from "./firebase-config.js?v=20261020k";
+import { mountUri } from "./uri/uri.js?v=20261020k";
+import { createLinks, vocabToday, vocabStreak, isWatching, finishDays, watchPeriods, dayActivity } from "./links.js?v=20261020k";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -460,10 +460,12 @@ function renderLinkSettings() {
   for (const [kind, name] of [["vocab", "스페인어"], ["watch", "왓치로그"]]) {
     const s = links.st[kind];
     const txt = s.state === "ok" ? "✅ 연결됨" : s.state === "loading" ? "불러오는 중…" : s.state === "empty" ? "⚠️ 이 비밀번호 자리에 기록이 없어요" : s.state === "error" ? "⚠️ 연결 안 됨" : "아직 비밀번호 없음";
-    $(`#link-${kind}-st`).textContent = txt + (s.from === "app" ? ` · 이 브라우저의 ${name} 앱 비밀번호 사용 중` : s.from === "board" ? " · 보드에 저장한 비밀번호" : "");
+    $(`#link-${kind}-st`).textContent = txt;
     $(`#link-${kind}`).placeholder = L[kind] ? "•••••• (보드에 저장됨)" : `${name} 동기화 비밀번호`;
     $(`#link-${kind}-clear`).hidden = !L[kind];
   }
+  // 이 브라우저의 스페인어·왓치로그 앱에 비밀번호가 있고 보드엔 아직 없으면 [가져오기]
+  $("#linkImport").hidden = !backend || !["vocab", "watch"].some((k) => !L[k] && links.appPassword(k));
 }
 
 const BAK_LABEL = { prev: "1시간 백업", daily: "하루 백업", undo: "되돌리기 직전" };
@@ -574,6 +576,13 @@ $("#linkForm").addEventListener("submit", (e) => {
   act(backend.saveLinks(patch), "연동 비밀번호를 저장했어요. 다른 기기에서도 같이 써요.").then(() => {
     for (const kind of Object.keys(patch)) $(`#link-${kind}`).value = "";
   }).catch(() => {});
+});
+$("#linkImport").addEventListener("click", () => {
+  if (!backend) return;
+  const L = S.settings.links || {}, patch = {};
+  for (const k of ["vocab", "watch"]) { const pw = links.appPassword(k); if (pw && !L[k]) patch[k] = pw; }
+  if (!Object.keys(patch).length) { toast("가져올 비밀번호가 없어요."); return; }
+  act(backend.saveLinks(patch), "이 브라우저 앱의 비밀번호를 이 보드에 저장했어요.").catch(() => {});
 });
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-link-clear]");

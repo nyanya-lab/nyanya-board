@@ -2,7 +2,8 @@
 // 두 앱 다 "동기화 비밀번호 = 서버 자리" 방식이라, 비밀번호만 알면 읽을 수 있어요.
 //   스페인어: Firebase nyanya-vocab  vocab/{비번}__v3/diary/{날짜}  (없으면 옛 통째 저장 vocab/{비번}/nyanyaDiary)
 //   왓치로그: Firebase nyanya-watchlog  watchlog/{비번}__v3/items/{id}
-// 비밀번호 찾는 순서: 보드 설정(settings.links — 보드 비밀번호로 지켜짐, 모든 기기 공유) → 같은 주소(nyanya-lab.github.io)의 그 앱이 이 브라우저에 기억한 값.
+// 비밀번호는 **그 보드에 저장한 것만** 씀 (settings.links — 보드 비밀번호로 지켜짐, 모든 기기 공유).
+//   냐냐 요청(2026-10-20): 냐냐 보드에서만 보이게 — 이 브라우저 앱 비밀번호로 저절로 대신 쓰지 않음 (설정의 [가져오기] 버튼으로만 옮김).
 // 계산 규칙은 각 앱과 같게 맞춤 — 앱 쪽 규칙이 바뀌면 여기도 같이 고치기 (스페인어 core.js calcStreak·dayActivity, 왓치로그 CLAUDE.md 데이터 모델).
 
 const FB = "https://www.gstatic.com/firebasejs/10.12.2/";
@@ -131,14 +132,15 @@ export function createLinks({ onChange }) {
     }
   }
 
-  // 보드 설정에 적은 비밀번호가 먼저, 없으면 이 브라우저의 그 앱이 기억한 값
+  // 지금 열린 보드에 저장한 비밀번호로만 (없으면 연결 안 함)
   function setPasswords(links) {
     for (const kind of ["vocab", "watch"]) {
       const saved = ((links && links[kind]) || "").trim();
-      const local = lsGet(APP_KEYS[kind]);
-      connect(kind, saved || local, saved ? "board" : local ? "app" : "");
+      connect(kind, saved, saved ? "board" : "");
     }
   }
 
-  return { st, setPasswords, today: () => ymd(new Date()) };
+  // ⚙️ 설정 [가져오기]용: 이 브라우저의 그 앱이 기억한 비밀번호 (같은 주소 nyanya-lab.github.io일 때만 있음)
+  const appPassword = (kind) => lsGet(APP_KEYS[kind]);
+  return { st, setPasswords, appPassword, today: () => ymd(new Date()) };
 }
