@@ -4,6 +4,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
 //   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌,
 //   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — env.pieFull이면 분류 원형(통계·내역 지출·예산)에 씀 (자산 구성 원형은 그대로),
+//   🏷 공통 분류(E.commonCats, ccOn·ccOf: ❤️ 체크하면 분류 칸이 공통 대분류·소분류 → 기록 ccat·csub, 내 분류는 '💙 공통비용'),
 //   💑 내 몫으로 보기(cntAmt·mineOn: 공통비용 절반·욱진입금 빼고, 기본 꺼짐),
 //   달력 칸 합계(수입−지출) 줄은 수입·지출 하나만 있어도 보임,
 //   분류 색 = 원형마다 금액 큰 8개가 서로 다른 색(늘 쓰는 색 먼저), 9번째부터 '그 밖' (E.catRank, setCatView),
@@ -47,6 +48,18 @@ export function cntAmt(x) {
   if (isSettleIn(x)) return 0;
   if ((x.kind === "expense" || !x.kind) && (x.common || /공통비용/.test(x.cat || ""))) return a / 2;
   return a;
+}
+// 🏷 공통 분류 (냐냐 쪽에서 더함, E.commonCats = 공통 저장소의 [{n 대분류, s [소분류]}]): ❤️ 공통비용을 체크하면 분류·소분류 칸이 공통 분류로.
+//   기록엔 cat = 내 '💙 공통비용' 분류(내 통계·예산엔 한 덩어리), ccat·csub = 공통 대분류·소분류 (공통 저장소엔 이걸로)
+export const commonCatName = () => moneyCats("expense").find((c) => /공통비용/.test(c)) || "💙 공통비용";
+const ccList = () => (E && typeof E.commonCats === "function" && E.commonCats()) || null;
+export const ccOn = () => ui.kind === "expense" && !!$("mCommon") && $("mCommon").checked && !!ccList();
+// 예전 방식 기록(분류 '공통비용' + 소분류 '식비(외식)')에서 공통 대분류·소분류 읽기
+export function ccOf(x) {
+  if (x.ccat) return { c: x.ccat, s: x.csub || null };
+  const m = /^(.+?)\((.+)\)$/.exec(x.sub || "");
+  if (m) return { c: m[1], s: m[2] === "쇼핑" && m[1] === "식비" ? "장보기" : m[2] };
+  return { c: x.sub || "기타", s: null };
 }
 export const amtText = (x) => (Number(x.amount) < 0 ? "-" : "") + (isWon(x) ? won(x.amount) : `${commaNum(Math.abs(Number(x.amount) || 0))} ${x.cur}`);   // 냐냐: 직접 -로 적은 금액만 - (won은 부호 없이)
 // 분류는 설정에서 바꿀 수 있음 (없으면 기본)
@@ -668,7 +681,7 @@ function txRow(x, ck, o = {}) {   // o.d = 이 자산 쪽에서 본 +/− (자�
         const cat = kind === "move" ? '<span class="muted">이체</span>' : `${x.cat ? esc(x.cat) : esc(KIND_LABEL[kind])}${kind === "transfer" ? ' <span class="muted small">💝</span>' : ""}${x.common ? ' <span class="m-common-mark" title="공통비용">❤️</span>' : ""}`;   // 표·목록 줄엔 색 동그라미 없이 (색은 원형·그 옆 목록·예산·설정에만)
         return `<div class="tx-row k-${kind}${ck ? "" : " no-ck"}${ui.mEdit === x.id ? " cur" : ""}${ck && txSel.has(x.id) ? " sel" : ""}" data-act="editMoney" data-id="${esc(x.id)}" role="button" tabindex="0">` +
           (ck ? `<label class="tx-ck" data-noedit><input type="checkbox" data-txck="${esc(x.id)}" ${txSel.has(x.id) ? "checked" : ""} aria-label="고르기"></label>` : "") +
-          `<span class="tx-d mono">${shortDate(x.date)}</span><span class="tx-a">${where}</span><span class="tx-c">${cat}</span><span class="tx-s">${esc(x.sub || "")}</span>` +
+          `<span class="tx-d mono">${shortDate(x.date)}</span><span class="tx-a">${where}</span><span class="tx-c">${cat}</span><span class="tx-s">${x.common && E.commonCats ? (() => { const o = ccOf(x); return esc(o.c + (o.s ? " · " + o.s : "")); })() : esc(x.sub || "")}</span>` +
           (o.d != null ? `<span class="tx-amt won ${o.d > 0 ? "plus" : "minus"}">${Number(x.amount) < 0 ? "-" : ""}${won(Math.abs(o.d))}${o.bal ? `<small class="tx-bal">${o.bal}</small>` : ""}</span>`
             : (() => {   // 마이너스 금액(환불·취소)은 부호를 뒤집어 보여 줌 (냐냐 쪽에서 더함 — 편한가계부 가져온 환불 줄)
               const neg = Number(x.amount) < 0, plus = kind === "income" ? !neg : kind === "move" ? null : neg;
@@ -956,21 +969,32 @@ export function renderMoneyForm(fill) {
   const keepAcct = fill ? fill.account : ($("mAcct").value || lastAcct(k));
   acctOptions($("mAcct"), keepAcct, k);
   if (k === "move") acctOptions($("mTo"), fill ? fill.toAccount : ($("mTo").value || lastAcct("moveTo")), k);
-  const mc = $("mCat"), want = fill ? fill.cat : mc.value, list = moneyCats(k === "move" ? "expense" : k);
-  if (want && !list.includes(want)) list.push(want);
-  mc.innerHTML = list.map((c) => `<option>${esc(c)}</option>`).join("");
-  if (want && list.includes(want)) mc.value = want;
+  const mc = $("mCat");
+  if (fill && $("mCommon")) $("mCommon").checked = k === "expense" && !!fill.common;
+  if (ccOn()) {   // 🏷 ❤️ 공통비용이면 공통 분류 (냐냐)
+    const cc = ccList(), f0 = fill ? ccOf(fill) : null, want = f0 ? f0.c : mc.dataset.cc === "1" ? mc.value : "";
+    const names = cc.map((c) => c.n); if (want && !names.includes(want)) names.push(want);
+    mc.innerHTML = names.map((c) => `<option>${esc(c)}</option>`).join(""); if (want) mc.value = want;
+    mc.dataset.cc = "1";
+  } else {
+    const want = fill ? fill.cat : mc.dataset.cc === "1" ? "" : mc.value, list = moneyCats(k === "move" ? "expense" : k);
+    if (want && !list.includes(want)) list.push(want);
+    mc.innerHTML = list.map((c) => `<option>${esc(c)}</option>`).join("");
+    if (want && list.includes(want)) mc.value = want;
+    mc.dataset.cc = "";
+  }
+  const lbl = $("mCatWrap") && $("mCatWrap").querySelector(".cat-lbl"); if (lbl) lbl.textContent = ccOn() ? "공통 분류" : "분류";
   // 💱 화폐 (끝에 '＋ 화폐 추가') · 소분류 (그 분류에서 전에 쓴 것 추천)
   const curs = currencies(), cv0 = fill ? fill.cur || "원" : $("mCur").value, cv = cv0 && cv0 !== "__add" ? cv0 : "원";
   if (!curs.includes(cv)) curs.push(cv);
   $("mCur").innerHTML = curs.map((c) => `<option>${esc(c)}</option>`).join("") + '<option value="__add">＋ 화폐 추가</option>';
   $("mCur").value = cv;
   if (fill) $("mNote").value = fill.note || "";
-  const sv = fill ? fill.sub || "" : $("mSub").value;
-  $("mSub").innerHTML = subOptions(k, mc.value, sv && sv !== "__add" ? sv : "");
+  const sv = fill ? (ccOn() ? ccOf(fill).s || "" : fill.sub || "") : $("mSub").value;
+  $("mSub").innerHTML = ccOn() ? ccSubOptions(mc.value, sv && sv !== "__add" ? sv : "") : subOptions(k, mc.value, sv && sv !== "__add" ? sv : "");
   salaryHint();
   // ❤️ 공통비용 (냐냐 보드만 칸이 있음): 지출만. 체크하면 공통 저장소로 복사돼서 욱진이 가계부에도 보임
-  const cw = $("mCommonWrap"); if (cw) { cw.hidden = k !== "expense"; if (fill) $("mCommon").checked = !!fill.common; }
+  const cw = $("mCommonWrap"); if (cw) cw.hidden = k !== "expense";
   $("mHint").textContent = k === "income" ? "월급, 수당 같은 들어온 돈이에요."
     : k === "expense" ? "카드로 냈으면 카드를 고르세요. 카드값은 나중에 '이체'로 통장 → 카드로 적으면 돼요."
     : k === "transfer" ? `${partner()}에게 보낸 돈이에요. 남은 돈에서 빠져요.`
@@ -1068,6 +1092,11 @@ function saveSubs(kind, cat, list, msg) {
 export function subOptions(kind, cat, cur, add = true) {
   const list = subsOf(kind, cat).slice(); if (cur && !list.includes(cur)) list.push(cur);
   return '<option value="">-</option>' + list.map((v) => `<option${v === cur ? " selected" : ""}>${esc(v)}</option>`).join("") + (add ? '<option value="__add">＋ 소분류 추가</option>' : "");
+}
+// 🏷 공통 소분류 고르는 칸 (공통 분류에서, 더하기는 공통 탭 '🏷 공통 분류'에서)
+function ccSubOptions(cat, cur) {
+  const c = (ccList() || []).find((x) => x.n === cat), list = c ? c.s.slice() : []; if (cur && !list.includes(cur)) list.push(cur);
+  return '<option value="">-</option>' + list.map((v) => `<option${v === cur ? " selected" : ""}>${esc(v)}</option>`).join("");
 }
 // 고르는 칸에서 '＋ 소분류 추가' → 이름 묻고 설정에 더한 뒤 그걸로 골라 둠
 export function askNewSub(kind, cat, sel) {
@@ -1175,7 +1204,8 @@ export function makeDemoData() {
 // 돈 관리 화면의 입력 칸 연결 (bindMoney 다음에 한 번)
 export function initMoney() {
   document.addEventListener("mousemove", pieTip); document.addEventListener("click", pieTip);
-  $("mCat").addEventListener("change", () => { $("mSub").innerHTML = subOptions(ui.kind, $("mCat").value, ""); salaryHint(); });
+  $("mCat").addEventListener("change", () => { $("mSub").innerHTML = ccOn() ? ccSubOptions($("mCat").value, "") : subOptions(ui.kind, $("mCat").value, ""); salaryHint(); });
+  if ($("mCommon")) $("mCommon").addEventListener("change", () => renderMoneyForm());   // 🏷 ❤️ 체크하면 분류 칸이 공통 분류로 (냐냐)
   $("mSub").addEventListener("change", () => { if ($("mSub").value === "__add") askNewSub(ui.kind, $("mCat").value, $("mSub")); });
   // ▦ 다건입력: 구분 바꾸면 그 줄 칸 다시, Enter = 아래 칸 (마지막 줄이면 줄 더), 붙여넣기
   $("bulkBody").addEventListener("change", (ev) => {
@@ -1232,7 +1262,8 @@ export function initMoney() {
     const cur = $("mCur").value && $("mCur").value !== "원" && $("mCur").value !== "__add" ? $("mCur").value : null;
     const doc = { kind: k, amount, date, cat: k === "move" ? null : $("mCat").value, sub: k === "move" || !$("mSub").value || $("mSub").value === "__add" ? null : $("mSub").value, cur,
       memo: $("mMemo").value.trim(), note: $("mNote").value.trim() || null, account, toAccount,
-      common: k === "expense" && $("mCommon") && $("mCommon").checked ? true : null };
+      common: k === "expense" && $("mCommon") && $("mCommon").checked ? true : null, ccat: null, csub: null };
+    if (k === "expense" && ccOn()) { doc.ccat = doc.cat; doc.csub = doc.sub; doc.cat = commonCatName(); doc.sub = null; }   // 🏷 공통 분류 → ccat·csub, 내 분류는 '💙 공통비용'
     rememberAcct(k, account); if (k === "move") rememberAcct("moveTo", toAccount);
     const editing = ui.mEdit && S.money.has(ui.mEdit), id0 = editing ? ui.mEdit : null, old = editing ? S.money.get(id0).pics || {} : {};
     // 📷 사진: 남긴 것 + 새로 붙인 것 → money.pics, 뺀 것은 pics/에서 지움

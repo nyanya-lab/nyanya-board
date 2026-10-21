@@ -21,6 +21,15 @@ const LS_PW = "uri-board-pw";
 const NAME = { nyanya: "냐냐", ukjin: "욱진" };
 const PAYER = { nyanya: "냐냐", ukjin: "욱진", joint: "공동 통장" };
 export const URI_CATS = ["식비", "카페·간식", "장보기", "생활용품", "주거·공과금", "데이트", "여행", "선물", "기타"];
+// 🏷 공통 분류 (공통 저장소 settings/cats, 둘이 같이 씀): [{ n: 대분류, s: [소분류…] }] — 처음 열 때 없으면 이걸로 만듦 (냐냐가 정함 2026-10-21)
+export const COMMON_CATS = [
+  { n: "식비", s: ["외식", "배달", "장보기"] },
+  { n: "문화생활", s: ["영화", "인형뽑기", "노래방", "야구", "콘서트"] },
+  { n: "여행", s: ["식비", "숙소", "체험 및 기타", "교통 및 비행기"] },
+  { n: "쇼핑", s: ["기타"] },
+  { n: "기타", s: [] }
+];
+const catsOf = (v) => (Array.isArray(v) ? v : v && typeof v === "object" ? Object.values(v) : []).filter((c) => c && c.n).map((c) => ({ n: c.n, s: Array.isArray(c.s) ? c.s.filter(Boolean) : c.s && typeof c.s === "object" ? Object.values(c.s).filter(Boolean) : [] }));
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 // ⏸ 욱진 보드에선 잠깐 '준비 중'만 (냐냐 요청 2026-10-20: 가계부 ❤️ 공통까지 다 만든 뒤 한꺼번에 공개). 공개할 때 false로
 const HOLD_UKJIN = true;
@@ -55,13 +64,13 @@ export function mountUri(root, opts = {}) {
   root.classList.add("uri");
   if (who === "ukjin" && HOLD_UKJIN) {
     root.innerHTML = `<div class="uri-card"><h3>🤝 준비 중이에요</h3><p class="uri-muted">냐냐와 같이 쓰는 공간을 만들고 있어요. 곧 열려요!</p></div>`;
-    return { render() {}, usePassword() {}, setMirror() {} };
+    return { render() {}, usePassword() {}, setMirror() {}, cats: () => null };
   }
 
   const st = {
     phase: "start",            // start → locked | open | error
     msg: "", askNew: false, pendingPw: null,
-    costs: {}, loaded: false,
+    costs: {}, loaded: false, cats: null,   // cats = 공통 분류 (settings/cats)
     month: today().slice(0, 7),
     view: null,                // null = 한눈에 표(첫 화면), "YYYY-MM" = 그 달, "trip:이름" = 그 여행 묶음
     showDone: false,           // 표에서 정산 끝난 줄도 보기
@@ -120,6 +129,13 @@ export function mountUri(root, opts = {}) {
   function open(r) {
     unsubs.forEach((u) => u()); unsubs = [];
     room = r; st.phase = "open"; st.msg = ""; st.askNew = false; st.pendingPw = null;
+    unsubs.push(rt.onValue(path(room, "settings", "cats"), (snap) => {
+      const v = snap.val();
+      if (!v) { rt.set(path(room, "settings", "cats"), COMMON_CATS).catch(() => {}); st.cats = COMMON_CATS.map((c) => ({ n: c.n, s: c.s.slice() })); }
+      else st.cats = catsOf(v);
+      if (typeof opts.onCats === "function") opts.onCats(st.cats);
+      render();
+    }));
     unsubs.push(rt.onValue(path(room, "costs"), (snap) => {
       st.costs = snap.val() || {}; st.loaded = true; summary(); render(); reconcile();
     }, (e) => { toast(isDenied(e) ? "공통 저장소 규칙을 확인해 주세요." : "공통비용을 불러오지 못했어요."); }));
@@ -134,14 +150,14 @@ export function mountUri(root, opts = {}) {
     const want = {};
     for (const [id, d] of Object.entries(mirror)) {
       if (!d || !d.date || !Number(d.amount)) continue;   // 마이너스(환불·취소)도 같이 — 합계·정산에서 빠지게
-      want[`${who}-${id}`] = { date: d.date, title: d.memo || d.cat || "공통비용", amount: Number(d.amount), cat: d.cat || "기타", payer: who, by: who, src: "money", memo: null, _settled: !!d.settled };
+      want[`${who}-${id}`] = { date: d.date, title: d.memo || d.cat || "공통비용", amount: Number(d.amount), cat: d.cat || "기타", sub: d.sub || null, payer: who, by: who, src: "money", memo: null, _settled: !!d.settled };
     }
     const patch = {};
     for (const [k, v] of Object.entries(want)) {
       const cur = st.costs[k];
       const { _settled, ...base } = v;
       if (!cur) patch[k] = { ...base, at: Date.now(), settled: _settled ? "가져오기" : null };
-      else for (const f of ["date", "title", "amount", "cat", "payer"]) if (cur[f] !== v[f]) patch[`${k}/${f}`] = v[f];
+      else for (const f of ["date", "title", "amount", "cat", "sub", "payer"]) if ((cur[f] ?? null) !== (v[f] ?? null)) patch[`${k}/${f}`] = v[f];
     }
     for (const [k, c] of Object.entries(st.costs)) if (c && c.src === "money" && c.by === who && !want[k]) patch[k] = null;
     if (!Object.keys(patch).length) return;
@@ -230,6 +246,18 @@ export function mountUri(root, opts = {}) {
       ${r.left ? `<p class="uri-muted uri-small">남는 돈 <b>${won(r.left)}</b> — 다음 기록이 그보다 커서 여기서 멈춰요. 다음에 정산할 때 같이 넣어 주세요.</p>` : ""}
       ${r.take.length ? `<div class="uri-row"><button type="button" class="uri-btn" data-uri="payDo">✅ ${r.take.length}건 정산 기록</button><button type="button" class="uri-btn ghost" data-uri="payClose">취소</button>${nextOpen ? `<span class="uri-muted uri-small">정산 후 남는 미정산 ${nextOpen}건</span>` : ""}</div>` : ""}`;
   }
+  // 🏷 공통 분류 고치기 (둘이 같이 씀): 대분류마다 소분류 칩(× 빼기) + 소분류 더하기, 대분류 더하기·빼기. 빼도 이미 적은 기록은 그대로
+  function catsHtml() {
+    if (!st.cats) return "";
+    return `<details class="uri-card uri-cats"${st.catsOpen ? " open" : ""}><summary><h4>🏷 공통 분류 <span class="uri-muted uri-small">${partner}와 같이 써요 · 가계부에서 ❤️ 체크하면 이 분류로 골라요</span></h4></summary>
+      ${st.cats.map((c, i) => `<div class="uri-cat-row"><b>${esc(c.n)}</b>
+        <span class="uri-chips">${c.s.map((v, j) => `<span class="uri-chip-s">${esc(v)}<button type="button" class="uri-x" data-uri="subDel" data-i="${i}" data-j="${j}" aria-label="${esc(v)} 빼기">×</button></span>`).join("")}
+        <form class="uri-sub-add" data-uri="subAdd" data-i="${i}"><input class="uri-input" name="v" maxlength="20" placeholder="＋ 소분류" aria-label="${esc(c.n)} 소분류 더하기"></form></span>
+        <button type="button" class="uri-x" data-uri="catDel" data-i="${i}" aria-label="${esc(c.n)} 대분류 빼기" title="대분류 빼기">🗑</button></div>`).join("")}
+      <form class="uri-row" data-uri="catAdd"><input class="uri-input" name="v" maxlength="20" placeholder="새 대분류 (예: 생활용품)"><button class="uri-btn ghost" type="submit">대분류 더하기</button></form>
+      <p class="uri-muted uri-small">빼도 이미 적은 기록의 분류는 그대로예요.</p></details>`;
+  }
+  const saveCats = (list, msg) => save(rt.set(path(room, "settings", "cats"), list), msg).catch(() => {});
   // 📊 첫 화면: 냐냐 엑셀 첫 시트처럼 묶음(달·여행)마다 합계 · 정산 · 미정산 · 1인당 미정산
   function summaryHtml() {
     const gs = groups(), open = all().filter((c) => !c.settled), os = settleOf(open), now = today().slice(0, 7);
@@ -256,6 +284,7 @@ export function mountUri(root, opts = {}) {
         </table></div>
         ${hid || st.showDone ? `<button type="button" class="uri-link" data-uri="showDone">${st.showDone ? "정산 끝난 달 숨기기" : `정산 끝난 달 ${hid}개 더 보기`}</button>` : ""}`}
       </div>
+      ${catsHtml()}
       <p class="uri-foot"><button type="button" class="uri-link" data-uri="lock">🔒 ${hostSaves ? "이 보드에 기억한" : "이 기기에서"} 공통 비밀번호 지우기</button></p>`;
   }
 
@@ -299,7 +328,7 @@ export function mountUri(root, opts = {}) {
         lastDate = c.date;
       }
       rows += `<li class="uri-item${st.edit === c.id ? " on" : ""}${c.settled ? " settled" : ""}">
-        <span class="uri-cat">${esc(c.cat || "기타")}</span>
+        <span class="uri-cat">${esc(c.cat || "기타")}${c.sub ? ` · ${esc(c.sub)}` : ""}</span>
         <span class="uri-title">${esc(c.title || "")}${c.memo ? `<small>${esc(c.memo)}</small>` : ""}</span>
         <span class="uri-payer p-${esc(c.payer)}">${esc(PAYER[c.payer] || "?")}</span>
         <b class="uri-amt">${c.settled ? '<span class="uri-ok" title="정산 완료">✅</span> ' : ""}${won(c.amount)}</b>
@@ -405,6 +434,14 @@ export function mountUri(root, opts = {}) {
       } catch (err) { st.msg = isDenied(err) ? "공통 저장소 규칙을 확인해 주세요." : "열지 못했어요. 인터넷 연결을 확인해 주세요."; render(); }
       return;
     }
+    if ((form.dataset.uri === "catAdd" || form.dataset.uri === "subAdd") && st.cats) {
+      const v = String(form.elements.v.value || "").trim().slice(0, 20); if (!v) return;
+      const list = st.cats.map((c) => ({ n: c.n, s: c.s.slice() }));
+      if (form.dataset.uri === "catAdd") { if (list.some((c) => c.n === v)) { toast("이미 있는 대분류예요."); return; } list.push({ n: v, s: [] }); }
+      else { const c = list[+form.dataset.i]; if (!c) return; if (c.s.includes(v)) { toast("이미 있는 소분류예요."); return; } c.s.push(v); }
+      st.catsOpen = true; saveCats(list, `🏷 '${v}'을 더했어요.`);
+      return;
+    }
     if (form.dataset.uri === "cost") {
       const v = Object.fromEntries(new FormData(form));
       const amount = digits(v.amount), title = String(v.title || "").trim();
@@ -461,6 +498,11 @@ export function mountUri(root, opts = {}) {
     }
     else if (a === "view" && b.dataset.k) { st.view = b.dataset.k; st.edit = null; render(true); root.scrollIntoView({ block: "start" }); }
     else if (a === "back") { st.view = null; st.edit = null; render(true); }
+    else if ((a === "subDel" || a === "catDel") && st.cats) {
+      const list = st.cats.map((c) => ({ n: c.n, s: c.s.slice() })), c = list[+b.dataset.i]; if (!c) return;
+      if (a === "subDel") { const v = c.s[+b.dataset.j]; c.s.splice(+b.dataset.j, 1); st.catsOpen = true; saveCats(list, `'${v}' 소분류를 뺐어요.`); }
+      else { if (!confirm(`'${c.n}' 대분류를 뺄까요? 이미 적은 기록은 그대로예요.`)) return; list.splice(+b.dataset.i, 1); st.catsOpen = true; saveCats(list, `'${c.n}' 대분류를 뺐어요.`); }
+    }
     else if (a === "showDone") { st.showDone = !st.showDone; render(); }
     else if (a === "payOpen") { st.pay = { amount: "" }; render(); const i = root.querySelector("[data-uri-pay]"); if (i) i.focus(); }
     else if (a === "payClose") { st.pay = null; render(); }
@@ -490,10 +532,11 @@ export function mountUri(root, opts = {}) {
     }
   });
 
+  root.addEventListener("toggle", (e) => { if (e.target.classList && e.target.classList.contains("uri-cats")) st.catsOpen = e.target.open; }, true);
   root.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches && e.target.matches('tr[data-uri="view"]')) e.target.click(); });
   render();
   start();
-  return { render, usePassword, setMirror };
+  return { render, usePassword, setMirror, cats: () => st.cats };
 }
 
 let styled = false;
@@ -580,6 +623,12 @@ function injectStyle() {
 .uri-pay-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .uri-pay-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 8px; background: var(--sunk); font-size: 14px; white-space: nowrap; }
 .uri-pay-list b { font-weight: 600; }
+.uri-cats summary { cursor: pointer; list-style: none; } .uri-cats summary::-webkit-details-marker { display: none; }
+.uri-cat-row { display: grid; grid-template-columns: 88px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.uri-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.uri-chip-s { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 10px; border-radius: 999px; background: var(--sunk); font-size: 13px; }
+.uri-x { font: inherit; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 4px; }
+.uri-sub-add .uri-input { width: 110px; padding: 4px 8px; font-size: 13px; }
 .uri-link { font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
 @media (max-width: 1000px) { .uri-grid, .uri-grid.uri-mirror { grid-template-columns: 1fr; } }
 @media (max-width: 720px) {

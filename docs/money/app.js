@@ -5,8 +5,8 @@
 // ❤️ 공통: 지출에 common: true → ../uri/uri.js setMirror로 공통 저장소(uri-board)에 저절로 복사, '❤️ 공통' 탭에서 둘 다 보기 + 반반 정산.
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
-import { mountUri } from "../uri/uri.js?v=20261021d";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml } from "./money.js?v=20261021p";
+import { mountUri } from "../uri/uri.js?v=20261021e";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml } from "./money.js?v=20261021q";
 import { mountRepeat } from "./repeat.js?v=20261021d";
 import { mountAcctSet } from "./acctset.js?v=20261021a";
 import { mountBalance } from "./balance.js?v=20261021a";
@@ -145,7 +145,7 @@ function render() {
 // ✈️ 내용 칸 자동완성: 예전에 쓴 여행 이름 (소분류가 '여행…'이고 숫자로 시작하는 내용 — '2026 상해'처럼, 최근 것 먼저) — 공통 탭 여행 묶음이 같은 이름으로 묶여서
 let tripKey = "";
 function tripList() {
-  const seen = new Map(); S.money.forEach((x) => { if (x && x.memo && /^여행/.test(x.sub || "") && /^\d/.test(x.memo)) { const d = seen.get(x.memo); if (!d || x.date > d) seen.set(x.memo, x.date); } });
+  const seen = new Map(); S.money.forEach((x) => { if (x && x.memo && (/^여행/.test(x.sub || "") || x.ccat === "여행") && /^\d/.test(x.memo)) { const d = seen.get(x.memo); if (!d || x.date > d) seen.set(x.memo, x.date); } });
   const names = [...seen].sort((a, b) => b[1].localeCompare(a[1])).map(([n]) => n), key = names.join("|");
   if (key === tripKey) return; tripKey = key;
   $("tripNames").innerHTML = names.map((n) => `<option value="${esc(n)}">`).join("");
@@ -154,7 +154,8 @@ function tripList() {
 function mirrorCommon() {
   if (!S.loaded) return;
   const docs = {};
-  S.money.forEach((x, id) => { if (x && x.common && (x.kind === "expense" || !x.kind) && isWon(x)) docs[id] = { date: x.date, amount: x.amount, cat: /공통/.test(x.cat || "") && x.sub ? x.sub : x.cat, memo: x.memo, settled: !!x.settled }; });   // 분류가 '공통비용'이면 소분류(식비(외식) 등)로
+  S.money.forEach((x, id) => { if (x && x.common && (x.kind === "expense" || !x.kind) && isWon(x)) docs[id] = x.ccat ? { date: x.date, amount: x.amount, cat: x.ccat, sub: x.csub || null, memo: x.memo, settled: !!x.settled }   // 🏷 공통 분류로 적은 것
+    : { date: x.date, amount: x.amount, cat: /공통/.test(x.cat || "") && x.sub ? x.sub : x.cat, sub: null, memo: x.memo, settled: !!x.settled }; });   // 예전 방식: 분류가 '공통비용'이면 소분류(식비(외식) 등)로
   uri.setMirror(docs);
 }
 
@@ -240,8 +241,10 @@ document.addEventListener("click", (ev) => {
 
 // ---------- 시작 ----------
 // ❤️ 공통 탭: 둘이 ❤️로 표시한 지출 + 반반 정산. 공통 비밀번호는 보드 설정 uriPw에 기억 (보드와 같이)
+let moneyBound = false;
 const uri = mountUri($("uriRoot"), {
   who: "nyanya", toast, mirror: true,
+  onCats: () => { if (moneyBound && backend) renderMoneyForm(); },   // 🏷 공통 분류가 바뀌면 기록 창 분류 칸도
   savePassword: (pw) => { if (backend) act(backend.saveUriPw(pw || null)).catch(() => {}); }
 });
 bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum, deepMerge, esc, isAdminDevice, moneyShort, monthLabel, openDlg, pad, partner, quietly, ready, render, rid, rows, shiftMonth, shortDate, shrinkPic, statTile, toast, today, ui, viewPic, won,
@@ -250,8 +253,9 @@ bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum,
   mineView: true,   // 💑 내 몫으로 보기 버튼 (공통비용 절반·욱진입금 빼고, 기본 꺼짐 — settings.moneyMine)
   catRank: true,   // 분류 색: 원형마다 금액 큰 8개가 서로 다른 색, 9번째부터 '그 밖' (냐냐 요청)
   pieFull: true,   // 분류 원형(통계·내역 지출·예산)은 가운데 구멍 없이 꽉 찬 원형 (냐냐 요청, 자산 구성 원형은 그대로)
+  commonCats: () => uri.cats(),   // 🏷 ❤️ 공통비용 체크 시 분류 칸 = 공통 분류 (공통 저장소)
   get backend() { return backend; }, get testMode() { return false; } });
-initMoney();
+initMoney(); moneyBound = true;
 // 🧮 실제 잔액 맞추기 · 🙈 숨기기 (자산 탭)
 const bal = mountBalance($("balPanel"), { S, backend: () => backend, toast, act, esc, won: wonS, rows, balances });
 // 📥 편한가계부 가져오기 (가계부 설정 탭)
