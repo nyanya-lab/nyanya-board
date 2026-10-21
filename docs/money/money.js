@@ -4,6 +4,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
 //   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌,
 //   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — env.pieFull이면 분류 원형(통계·내역 지출·예산)에 씀 (자산 구성 원형은 그대로),
+//   달력 칸 합계(수입−지출) 줄은 수입·지출 하나만 있어도 보임,
 //   분류 색 = 원형마다 금액 큰 8개가 서로 다른 색(늘 쓰는 색 먼저), 9번째부터 '그 밖' (E.catRank, setCatView),
 //   ▦ 다건입력 채우기 손잡이(bulkFillInit, 엑셀처럼 끌어서 복사),
 //   자산 고르는 칸 = 자산 탭 순서로 현금·통장·카드·저축 묶음 + 이름_계좌번호 (acctOptsHtml),
@@ -681,7 +682,7 @@ function renderMCal(m, r) {
   let h = WDS.map((w, i) => `<div class="mc-wd${i === 0 ? " sun" : i === 6 ? " sat" : ""}">${w}</div>`).join("");
   for (let i = 0; i < Math.ceil((lead + last) / 7) * 7; i++) {
     const dt = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1 - lead + i), d = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`, v = day[d] || { inc: 0, out: 0 }, dow = dt.getDay();
-    const lines = (f !== "expense" && v.inc ? num(Math.abs(v.inc), "plus", v.inc < 0 ? "-" : "") : "") + (f !== "income" && v.out ? num(Math.abs(v.out), "minus", v.out < 0 ? "-" : "") : "") + (f === "all" && v.inc && v.out ? num(Math.abs(v.inc - v.out), v.inc - v.out < 0 ? "net minus" : "net plus", "") : "");   // 냐냐: 기호 없이 색으로만
+    const lines = (f !== "expense" && v.inc ? num(Math.abs(v.inc), "plus", v.inc < 0 ? "-" : "") : "") + (f !== "income" && v.out ? num(Math.abs(v.out), "minus", v.out < 0 ? "-" : "") : "") + (f === "all" && (v.inc || v.out) ? num(Math.abs(v.inc - v.out), v.inc - v.out < 0 ? "net minus" : "net plus", "") : "");   // 냐냐: 기호 없이 색으로만
     h += `<button type="button" class="mc-d${d.slice(0, 7) !== m ? " out" : ""}${d === t ? " today" : ""}${d === sel ? " on" : ""}${dow === 0 ? " sun" : dow === 6 ? " sat" : ""}" data-act="mcDay" data-day="${d}" aria-label="${shortDate(d)}"><span class="mc-n">${d.slice(0, 7) !== m ? `${dt.getMonth() + 1}/` : ""}${dt.getDate()}</span><span class="mc-v">${lines}</span></button>`;
   }
   $("mcCal").innerHTML = h;

@@ -106,5 +106,7 @@ table.bulk { min-width: 1200px; }
 :root[data-theme="dark"] { --c0: #3987e5; --c1: #d95926; --c2: #199e70; --c3: #c98500; --c4: #d55181; --c5: #008300; --c6: #9085e9; --c7: #e66767; --c8: #77766f; }
 /* 🧾 내역 아래 '지출' 칸의 분류 원형 빼기 (예산 막대·합계는 그대로) */
 #catBars { display: none; }
-/* 📅 가계부 달력: 칸 안 '수입 − 지출'(넷팅) 줄은 검은 글씨 + 옅은 회색 바탕 (수입·지출 색과 안 헷갈리게, 냐냐 요청) */
-#moneyPage .mc-v i.net, #moneyPage .mc-v i.net.plus, #moneyPage .mc-v i.net.minus { color: var(--fg); background: var(--sunk); border-radius: 4px; padding: 0 4px; }
+/* 📅 가계부 달력: 칸 안 합계(수입 − 지출) 줄 = 검은 글씨 + 바탕색 (플러스 옅은 빨강 · 마이너스 옅은 파랑, 냐냐 요청) */
+#moneyPage .mc-v i.net { color: var(--fg); border-radius: 4px; padding: 0 4px; }
+#moneyPage .mc-v i.net.plus { color: var(--fg); background: color-mix(in srgb, var(--danger, #d9412a) 16%, transparent); }
+#moneyPage .mc-v i.net.minus { color: var(--fg); background: color-mix(in srgb, var(--blue, #2f6feb) 16%, transparent); }
