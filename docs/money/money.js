@@ -4,7 +4,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
 //   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌,
 //   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — env.pieFull이면 분류 원형(통계·내역 지출·예산)에 씀 (자산 구성 원형은 그대로),
-//   제목 = env.tabTitles[탭] (냐냐: 예산·내역·달력…),
+//   제목 = env.tabTitles[탭] (냐냐: 예산·내역·달력…), 💳 cardDue = 이용기간 끝난 최근 결제(저번 달 사용분, 결제일 없어도) · 결제 기록 내용 '카드정산 결제',
 //   🧾 내역 기간 고르기(ui.txRange, ./range.js 창 — 달 이름·[이번 달]을 누르면 열림, txPick·txShift) — 내역 표·요약 칸·아래 '지출' 칸이 그 기간을 따라감.
 // (원래 설명) 보드(index.html)와 가계부 모드(money.html → index.html?app=money)가 같이 쓰는 코드
 // 한 달 예산 · 지출 기록 · 자산(통장·카드·현금, 카드 결제일) · 분류·색·원형 그래프 · 줄 돈 15일 자동 · 카드값 할 일 · 연습 데이터
@@ -222,18 +222,21 @@ export function doCardPay() {
   if (!S.accounts.has(from)) { toast("카드값이 빠지는 통장을 골라 주세요."); return; }
   cardPayFor = null; closeDlg($("moveDlg"));
   const card = S.accounts.get(o.card), t = today(), id = o.taskId;
-  const doc = { kind: "move", account: from, toAccount: o.card, amount: amt, date, memo: `💳 ${cardValue(card && card.name)}${o.start ? ` (${shortDate(o.start)}~${shortDate(o.end)} 사용분)` : ""}`, createdAt: Date.now() };
+  const doc = { kind: "move", account: from, toAccount: o.card, amount: amt, date, memo: "카드정산 결제", note: o.start ? `${shortDate(o.start)}~${shortDate(o.end)} 사용분` : null, createdAt: Date.now() };   // 냐냐: 편한가계부처럼 내용 '카드정산 결제' (원래: 💳 ○○카드값 (기간 사용분))
   act((async () => {
     if (id) { await E.backend.set("money", id, doc); await E.backend.update("tasks", id, { done: true, doneDate: t }); }
     else await E.backend.add("money", doc);
   })(), `💳 카드값 ${won(amt)} 이체를 기록했어요.`).catch(() => {});
 }
-// 다음 결제: 이번 달 결제일이 안 지났으면 이번 달, 지났으면 다음 달. 결제예정 = 지금 카드값 − 그 결제 이용기간 뒤에 쓴 돈(미결제)
+// 결제예정 = 지금 카드값 − 그 결제 이용기간 뒤에 쓴 돈(미결제)
+// 냐냐 쪽 (편한가계부처럼): 이용기간이 끝난 가장 최근 결제 = '저번 달 사용분'을 결제예정으로. 결제일을 안 정한 카드도 지난달 1일~말일로
+//   (욱진 보드 원래: 결제일이 안 지났으면 이번 달, 지났으면 다음 달 결제 · 결제일 없으면 null)
 export function cardDue(a, owed) {
-  const p = a && a.pay; if (!p || !p.day) return null;
+  if (!a || a.type !== "card") return null;
+  const p = a.pay && a.pay.day ? a.pay : { day: 1, fm: -1, fd: 1, tm: -1, td: 31 };
   const t = today(), m0 = t.slice(0, 7);
   let m = m0, pl = cardPayPlan(p, m0);
-  if (pl.date < t) { m = shiftMonth(m0, 1); pl = cardPayPlan(p, m); }
+  if (pl.to >= t) { m = shiftMonth(m0, -1); pl = cardPayPlan(p, m); }
   let open = 0; S.money.forEach((x) => { if ((x.kind === "expense" || !x.kind) && isWon(x) && x.account === a.id && x.date > pl.to) open += Number(x.amount) || 0; });
   return { m, ...pl, open: Math.min(open, Math.max(0, owed)), due: Math.max(0, owed - open) };
 }
