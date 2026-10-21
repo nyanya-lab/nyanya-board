@@ -5,11 +5,11 @@
 // ❤️ 공통: 지출에 common: true → ../uri/uri.js setMirror로 공통 저장소(uri-board)에 저절로 복사, '❤️ 공통' 탭에서 둘 다 보기 + 반반 정산.
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
-import { mountUri } from "../uri/uri.js?v=20261021g";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml } from "./money.js?v=20261021r";
+import { mountUri } from "../uri/uri.js?v=20261021h";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml } from "./money.js?v=20261021s";
 import { mountRepeat } from "./repeat.js?v=20261021d";
 import { mountAcctSet } from "./acctset.js?v=20261021a";
-import { mountCcMigrate } from "./ccmigrate.js?v=20261021a";
+import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
 import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
 
@@ -245,7 +245,7 @@ document.addEventListener("click", (ev) => {
 let moneyBound = false;
 const uri = mountUri($("uriRoot"), {
   who: "nyanya", toast, mirror: true,
-  onCats: () => { if (moneyBound && backend) renderMoneyForm(); },   // 🏷 공통 분류가 바뀌면 기록 창 분류 칸도
+  onCats: () => { if (moneyBound && backend) { renderMoneyForm(); if (!$("catEditor").contains(document.activeElement)) renderCatEditor(); } },   // 🏷 공통 분류가 바뀌면 기록 창 분류 칸도
   // 📊 공통 통계 원형: 가계부와 같은 원형 (큰 순서 8개 색 + '그 밖' 회색, 가운데 구멍 없이)
   pie: (list, label) => { const top = list.slice(0, 8), rest = list.slice(8), xs = rest.length ? top.concat([{ cat: "그 밖", amt: rest.reduce((t, x) => t + x.amt, 0), other: true }]) : top;
     return pieHtml(null, xs, label, { color: (x) => `var(--c${top.indexOf(x) < 0 ? 8 : top.indexOf(x)})`, legend: false, full: true }); },
@@ -258,6 +258,7 @@ bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum,
   catRank: true,   // 분류 색: 원형마다 금액 큰 8개가 서로 다른 색, 9번째부터 '그 밖' (냐냐 요청)
   pieFull: true,   // 분류 원형(통계·내역 지출·예산)은 가운데 구멍 없이 꽉 찬 원형 (냐냐 요청, 자산 구성 원형은 그대로)
   commonCats: () => uri.cats(),   // 🏷 ❤️ 공통비용 체크 시 분류 칸 = 공통 분류 (공통 저장소)
+  saveCommonCats: (list) => uri.setCats(list),   // 🏷 공통 분류 고치기 (설정 '분류', 냐냐만)
   get backend() { return backend; }, get testMode() { return false; } });
 initMoney(); moneyBound = true;
 // 🧮 실제 잔액 맞추기 · 🙈 숨기기 (자산 탭)

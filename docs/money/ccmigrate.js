@@ -12,8 +12,8 @@ export function mountCcMigrate(root, env) {
   };
   function render() {
     const list = todo();
-    if (!list.length || !env.commonCats()) { root.hidden = true; root.innerHTML = ""; return; }
-    root.hidden = false;
+    if (!list.length || !env.commonCats()) { root.classList.add("ccm-none"); root.innerHTML = ""; return; }   // 탭 바꿀 때 hidden이 풀려서 class로 숨김
+    root.classList.remove("ccm-none");
     const g = {};
     list.forEach(({ x, o }) => { const k = `${x.sub || "(소분류 없음)"}→${o.c}${o.s ? " · " + o.s : ""}`; (g[k] ||= { from: x.sub || "(소분류 없음)", to: o.c + (o.s ? " · " + o.s : ""), n: 0, amt: 0 }); g[k].n++; g[k].amt += Number(x.amount) || 0; });
     const rows = Object.values(g).sort((a, b) => b.n - a.n);

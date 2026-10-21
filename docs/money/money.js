@@ -1119,13 +1119,25 @@ export function askNewSub(kind, cat, sel) {
   const list = subsOf(kind, cat); if (list.includes(name)) { sel.value = name; return; }
   saveSubs(kind, cat, list.concat([name]), `'${cat}' 소분류에 '${name}'을 더했어요.`).then(() => { sel.innerHTML = subOptions(kind, cat, name); sel.value = name; });
 }
+// 🏷 공통 분류 편집 (냐냐 쪽에서 더함): 설정 '분류'의 💙 공통비용 밑에 대분류마다 소분류 칩. 공통 저장소에 저장 (E.saveCommonCats), 욱진 보드엔 이 칸이 없음
+function ccEditHtml() {
+  const cc = ccList() || [];
+  return `<div class="cc-edit"><div class="small muted">🏷 공통 분류 — ❤️ 체크하고 적을 때 이 분류로 골라요. ${esc(partner())}와 같이 쓰고, 고치는 건 냐냐만 해요.</div>` +
+    cc.map((c, i) => `<div class="cc-row"><b>${esc(c.n)}</b><span class="sub-chips">${c.s.map((v, j) => `<span class="chip">${esc(v)} <button class="link-btn" type="button" data-act="ccSubDel" data-i="${i}" data-j="${j}" aria-label="${esc(v)} 빼기">×</button></span>`).join("")}` +
+      `<form class="sub-add" data-cc-sub="${i}" autocomplete="off"><input type="text" maxlength="20" placeholder="＋ 소분류" aria-label="${esc(c.n)} 소분류 더하기"></form></span>` +
+      `<button class="link-btn" type="button" data-act="ccCatDel" data-i="${i}" aria-label="${esc(c.n)} 빼기" title="공통 대분류 빼기">×</button></div>`).join("") +
+    `<form class="mini-row" data-cc-cat autocomplete="off"><input type="text" maxlength="12" placeholder="새 공통 대분류" aria-label="공통 대분류 더하기"><button class="btn small ghost" type="submit">공통 분류 추가</button></form></div>`;
+}
+function saveCc(list, msg) { return act(E.saveCommonCats(list), msg).then(() => { renderCatEditor(); renderMoneyForm(); }).catch(() => {}); }
+const ccCopy = () => (ccList() || []).map((c) => ({ n: c.n, s: c.s.slice() }));
 export function renderCatEditor() {
   const groups = [["expense", "지출 분류"], ["income", "수입 분류"], ["transfer", "보낸 돈 분류"]];
   $("catEditor").innerHTML = groups.map(([k, label]) =>
     `<div class="set-grp"><h4>${label}</h4><div class="cat-rows">` +
     moneyCats(k).map((c, i) => `<div class="cat-row"><span class="cat-name"><button type="button" class="cdot-btn" data-act="catColor" data-k="${k}" data-i="${i}" style="--c:${catVar(k, c)}" aria-label="${esc(c)} 색 바꾸기" title="눌러서 색 바꾸기"></button><span class="nm">${esc(c)}</span><button class="link-btn" type="button" data-act="catRen" data-k="${k}" data-c="${esc(c)}" aria-label="${esc(c)} 이름 바꾸기" title="이름 바꾸기 (기록도 같이)">✏️</button><button class="link-btn" type="button" data-act="catDel" data-k="${k}" data-i="${i}" aria-label="${esc(c)} 분류 지우기" title="분류 지우기">×</button></span>` +
+      (k === "expense" && c === commonCatName() && ccList() && E.saveCommonCats ? ccEditHtml() :   // 🏷 💙 공통비용 밑엔 공통 분류 (냐냐만 고침)
       `<div class="sub-chips">${subsOf(k, c).map((v, j) => `<span class="chip"><button class="link-btn sub-nm" type="button" data-act="subRen" data-k="${k}" data-c="${esc(c)}" data-s="${esc(v)}" title="눌러서 이름 바꾸기 (기록도 같이)">${esc(v)}</button> <button class="link-btn" type="button" data-act="subDel" data-k="${k}" data-i="${i}" data-j="${j}" aria-label="${esc(v)} 소분류 지우기">×</button></span>`).join("")}` +
-      `<form class="sub-add" data-sub-form="${k}" data-i="${i}" autocomplete="off"><input type="text" maxlength="20" placeholder="＋ 소분류" aria-label="${esc(c)} 소분류 추가"></form></div></div>`).join("") +
+      `<form class="sub-add" data-sub-form="${k}" data-i="${i}" autocomplete="off"><input type="text" maxlength="20" placeholder="＋ 소분류" aria-label="${esc(c)} 소분류 추가"></form></div>`) + `</div>`).join("") +
     `</div>${(() => {   // 냐냐: 목록엔 없는데 기록엔 남아 있는 분류 → ✏️로 다른 분류로 옮기기
       const have = new Set(moneyCats(k)), odd = {};
       S.money.forEach((x) => { if (x && x.kind !== "move" && (x.kind || "expense") === k && x.cat && !have.has(x.cat)) odd[x.cat] = (odd[x.cat] || 0) + 1; });
@@ -1309,6 +1321,15 @@ export function initMoney() {
       .then(() => closeDlg($("acctDlg"))).catch(() => {});
   });
   $("catEditor").addEventListener("submit", (ev) => {
+    const cs = ev.target.closest("[data-cc-sub]"), cf = ev.target.closest("[data-cc-cat]");
+    if (cs || cf) {   // 🏷 공통 분류 더하기 (냐냐)
+      ev.preventDefault();
+      const v = (cs || cf).querySelector("input").value.trim().slice(0, 20), list = ccCopy(); if (!v) return;
+      if (cf) { if (list.some((c) => c.n === v)) { toast("이미 있는 공통 대분류예요."); return; } list.push({ n: v, s: [] }); }
+      else { const c = list[+cs.dataset.ccSub]; if (!c) return; if (c.s.includes(v)) { toast("이미 있는 소분류예요."); return; } c.s.push(v); }
+      saveCc(list, `🏷 공통 분류에 '${v}'을 더했어요.`);
+      return;
+    }
     const sf = ev.target.closest("[data-sub-form]");
     if (sf) {   // 소분류 더하기 (Enter)
       ev.preventDefault();
@@ -1440,6 +1461,12 @@ export function moneyAction(a, el, id, t) {
   if (a === "catDel") { const list = moneyCats(el.dataset.k); list.splice(+el.dataset.i, 1); if (!list.length) { toast("분류는 하나 이상 있어야 해요."); return true; } saveCats(el.dataset.k, list); return true; }
   if (a === "catReset") { saveCats(null); return true; }
   if (a === "catRen") { renameCat(el.dataset.k, el.dataset.c); return true; }
+  if ((a === "ccSubDel" || a === "ccCatDel") && E.saveCommonCats) {   // 🏷 공통 분류 빼기 (냐냐)
+    const list = ccCopy(), c = list[+el.dataset.i]; if (!c) return true;
+    if (a === "ccSubDel") { const v = c.s[+el.dataset.j]; c.s.splice(+el.dataset.j, 1); saveCc(list, `'${v}' 공통 소분류를 뺐어요. 이미 적은 기록은 그대로예요.`); }
+    else { if (!confirm(`공통 대분류 '${c.n}'을 뺄까요? 이미 적은 기록은 그대로예요.`)) return true; list.splice(+el.dataset.i, 1); saveCc(list, `'${c.n}' 공통 대분류를 뺐어요.`); }
+    return true;
+  }
   if (a === "subRen") { renameSub(el.dataset.k, el.dataset.c, el.dataset.s); return true; }
   return false;
 }

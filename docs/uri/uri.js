@@ -64,7 +64,7 @@ export function mountUri(root, opts = {}) {
   root.classList.add("uri");
   if (who === "ukjin" && HOLD_UKJIN) {
     root.innerHTML = `<div class="uri-card"><h3>🤝 준비 중이에요</h3><p class="uri-muted">냐냐와 같이 쓰는 공간을 만들고 있어요. 곧 열려요!</p></div>`;
-    return { render() {}, usePassword() {}, setMirror() {}, cats: () => null };
+    return { render() {}, usePassword() {}, setMirror() {}, cats: () => null, setCats: () => Promise.reject(new Error("준비 중")) };
   }
 
   const st = {
@@ -322,7 +322,6 @@ export function mountUri(root, opts = {}) {
         </table></div>
         ${hid || st.showDone ? `<button type="button" class="uri-link" data-uri="showDone">${st.showDone ? "정산 끝난 달 숨기기" : `정산 끝난 달 ${hid}개 더 보기`}</button>` : ""}`}
       </div>
-      ${catsHtml()}
       <p class="uri-foot"><button type="button" class="uri-link" data-uri="lock">🔒 ${hostSaves ? "이 보드에 기억한" : "이 기기에서"} 공통 비밀번호 지우기</button></p>`;
   }
 
@@ -584,7 +583,9 @@ export function mountUri(root, opts = {}) {
   root.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches && e.target.matches('tr[data-uri="view"]')) e.target.click(); });
   render();
   start();
-  return { render, usePassword, setMirror, cats: () => st.cats };
+  // 🏷 공통 분류 저장 (냐냐 가계부 설정 '분류'에서만 부름 — 고치는 건 냐냐만, 욱진 보드는 보기만)
+  const setCats = (list) => room ? rt.set(path(room, "settings", "cats"), list) : Promise.reject(new Error("공통 공간이 안 열렸어요"));
+  return { render, usePassword, setMirror, cats: () => st.cats, setCats };
 }
 
 let styled = false;
