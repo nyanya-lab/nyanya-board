@@ -7,6 +7,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   통계에서 💙 공통비용을 누르면 공통 분류별로 펼침(#stCcSub, ui.stCc),
 //   🏷 공통 분류(E.commonCats, ccOn·ccOf: ❤️ 체크하면 분류 칸이 공통 대분류·소분류 → 기록 ccat·csub, 내 분류는 '💙 공통비용'),
 //   💑 내 몫으로 보기(cntAmt·mineOn: 공통비용 절반·욱진입금 빼고, 기본 꺼짐),
+//   💸 이체 '공통비용 정산' 체크(#mSettle → 공통 저장소 정산 장부 settles/{이체 id}에 금액, 기록 settle: true, 메모 비면 '2511 잔액 …', 체크 빼거나 지우면 장부에서도 뺌),
 //   달력 칸 합계(수입−지출) 줄은 수입·지출 하나만 있어도 보임,
 //   분류 색 = 원형마다 금액 큰 8개가 서로 다른 색(늘 쓰는 색 먼저), 9번째부터 '그 밖' (E.catRank, setCatView),
 //   ▦ 다건입력 채우기 손잡이(bulkFillInit, 엑셀처럼 끌어서 복사),
@@ -1009,6 +1010,14 @@ export function renderMoneyForm(fill) {
   salaryHint();
   // ❤️ 공통비용 (냐냐 보드만 칸이 있음): 지출만. 체크하면 공통 저장소로 복사돼서 욱진이 가계부에도 보임
   const cw = $("mCommonWrap"); if (cw) cw.hidden = k !== "expense";
+  // 💸 이체할 때 '공통비용 정산' 체크 (냐냐 쪽에서 더함, E.settleCommon): 체크하고 저장하면 이 금액만큼 선입선출 정산. 이미 정산한 이체는 ✅만
+  const sw = $("mSettleWrap");
+  if (sw) {
+    sw.hidden = k !== "move" || !E.settleCommon;
+    const done = !!(fill && fill.settle) || !!(editing && S.money.get(ui.mEdit) && S.money.get(ui.mEdit).settle);
+    if (fill || !editing) $("mSettle").checked = done;
+    sw.querySelector(".ms-done").hidden = !done;   // 체크를 빼고 저장하면 정산 장부에서도 빠짐
+  }
   $("mHint").textContent = k === "income" ? "월급, 수당 같은 들어온 돈이에요."
     : k === "expense" ? "카드로 냈으면 카드를 고르세요. 카드값은 나중에 '이체'로 통장 → 카드로 적으면 돼요."
     : k === "transfer" ? `${partner()}에게 보낸 돈이에요. 남은 돈에서 빠져요.`
@@ -1292,6 +1301,17 @@ export function initMoney() {
     if (k === "expense" && ccOn()) { doc.ccat = doc.cat; doc.csub = doc.sub; doc.cat = commonCatName(); doc.sub = null; }   // 🏷 공통 분류 → ccat·csub, 내 분류는 '💙 공통비용'
     rememberAcct(k, account); if (k === "move") rememberAcct("moveTo", toAccount);
     const editing = ui.mEdit && S.money.has(ui.mEdit), id0 = editing ? ui.mEdit : null, old = editing ? S.money.get(id0).pics || {} : {};
+    // 💸 공통비용 정산 (이체 + 체크 + 아직 이 이체로 정산 안 함): 미리보기 확인 → 저장 뒤 정산, 메모가 비면 '2511 잔액 601,900원'처럼
+    // 💸 정산 장부: 새로 체크 → 미리보기 확인 후 장부에 한 줄 (이체 id로), 이미 정산한 이체 → 금액·날짜 바뀌면 장부도 고침, 체크 뺌 → 장부에서 지움
+    const wasSettle = !!(editing && S.money.get(id0).settle), wantSettle = k === "move" && !!E.settleCommon && !!$("mSettle") && $("mSettle").checked;
+    let settle = null;
+    if (wantSettle && !wasSettle) {
+      const pv = E.settlePreview(amount);
+      if (!pv) { toast("공통 공간이 아직 안 열렸어요. 공통 탭을 한 번 열고 다시 해 주세요."); return; }
+      if (!confirm(`💸 ${won(amount)}을 공통비용 정산으로 적을까요? (오래된 것부터 금액만큼)\n${pv.text}${pv.left ? `\n남는 돈 ${won(pv.left)}` : ""}\n→ ${pv.rest}`)) return;
+      settle = pv; if (!doc.note) doc.note = pv.rest;
+    }
+    doc.settle = wantSettle ? true : null;
     // 📷 사진: 남긴 것 + 새로 붙인 것 → money.pics, 뺀 것은 pics/에서 지움
     const fresh = mPics.filter((p) => !p.old && p.full).map((p) => ({ ...p, id: rid() })), pics = {};
     mPics.filter((p) => p.old).forEach((p) => { pics[p.id] = old[p.id] || date; });
@@ -1302,7 +1322,9 @@ export function initMoney() {
       const id = editing ? (await E.backend.update("money", id0, doc), id0) : await E.backend.add("money", { ...doc, createdAt: Date.now() });
       for (const p of fresh) await E.backend.putPic(p.id, { full: p.full, thumb: p.thumb, money: id, kind: "money", title: doc.memo || doc.cat || "", date, at: Date.now() });
       for (const pid of gone) await E.backend.putPic(pid, null);
-    })(), editing ? "고쳤어요." : "기록했어요.")
+      if (wantSettle) await E.settleCommon(amount, id, { date, memo: doc.memo || doc.note || "이체", money: id });
+      else if (wasSettle) await E.unsettleCommon(id);
+    })(), settle ? `💸 정산했어요. ${settle.rest}` : wasSettle && !wantSettle ? "정산 장부에서 뺐어요." : editing ? "고쳤어요." : "기록했어요.")
       .then(() => { const mm = shownMonth(doc); if (mm !== ui.month) ui.month = mm; resetMoneyForm(); }).catch(() => {});
   });
 
@@ -1394,7 +1416,8 @@ export function moneyAction(a, el, id, t) {
   if (a === "mDelete") {
     if (!ready() || !ui.mEdit) return true;
     if (el.dataset.armed !== "1") { el.dataset.armed = "1"; el.classList.add("armed"); el.textContent = "정말 삭제?"; return true; }
-    act(E.backend.remove("money", ui.mEdit), "삭제했어요.").then(resetMoneyForm).catch(() => {});
+    const gone0 = ui.mEdit, wasS = !!(S.money.get(gone0) || {}).settle;
+    act(E.backend.remove("money", gone0).then(() => wasS && E.unsettleCommon ? E.unsettleCommon(gone0) : null), wasS ? "삭제했어요. 정산 장부에서도 뺐어요." : "삭제했어요.").then(resetMoneyForm).catch(() => {});
     return true;
   }
   if (a === "asSel") { ui.asSel = id; ui.asOpen = true; renderMoney(); if (window.matchMedia("(max-width: 1100px)").matches) $("asGrid").scrollIntoView({ block: "start" }); return true; }
@@ -1434,7 +1457,7 @@ export function moneyAction(a, el, id, t) {
     if (!ready() || !txSel.size) return true;
     if (el.dataset.armed !== "1") { el.dataset.armed = "1"; el.textContent = `정말 ${txSel.size}개 삭제?`; return true; }
     const ids = [...txSel]; txSel.clear();
-    act((async () => { for (const k of ids) await E.backend.remove("money", k); })(), `${ids.length}개를 지웠어요. (↶로 되돌릴 수 있어요)`).catch(() => {});
+    act((async () => { for (const k of ids) { const wasS = !!(S.money.get(k) || {}).settle; await E.backend.remove("money", k); if (wasS && E.unsettleCommon) await E.unsettleCommon(k); } })(), `${ids.length}개를 지웠어요. (↶로 되돌릴 수 있어요)`).catch(() => {});
     return true;
   }
   if (a === "newAcct") { openAcct(null); return true; }

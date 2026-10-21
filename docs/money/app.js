@@ -5,8 +5,8 @@
 // ❤️ 공통: 지출에 common: true → ../uri/uri.js setMirror로 공통 저장소(uri-board)에 저절로 복사, '❤️ 공통' 탭에서 둘 다 보기 + 반반 정산.
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
-import { mountUri } from "../uri/uri.js?v=20261021h";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml } from "./money.js?v=20261021s";
+import { mountUri } from "../uri/uri.js?v=20261021j";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml } from "./money.js?v=20261021u";
 import { mountRepeat } from "./repeat.js?v=20261021d";
 import { mountAcctSet } from "./acctset.js?v=20261021a";
 import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
@@ -259,6 +259,9 @@ bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum,
   pieFull: true,   // 분류 원형(통계·내역 지출·예산)은 가운데 구멍 없이 꽉 찬 원형 (냐냐 요청, 자산 구성 원형은 그대로)
   commonCats: () => uri.cats(),   // 🏷 ❤️ 공통비용 체크 시 분류 칸 = 공통 분류 (공통 저장소)
   saveCommonCats: (list) => uri.setCats(list),   // 🏷 공통 분류 고치기 (설정 '분류', 냐냐만)
+  settlePreview: (amt) => uri.ready() ? uri.settlePreview(amt) : null,   // 💸 이체로 정산: 미리보기
+  settleCommon: (amt, tag, meta) => uri.settleBy(amt, tag, meta),   // 💸 이체로 정산: 정산 장부 settles/{이체 id}에 금액
+  unsettleCommon: (tag) => uri.unsettle(tag),   // 💸 체크 빼거나 이체 지우면 장부에서 뺌
   get backend() { return backend; }, get testMode() { return false; } });
 initMoney(); moneyBound = true;
 // 🧮 실제 잔액 맞추기 · 🙈 숨기기 (자산 탭)

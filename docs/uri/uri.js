@@ -64,18 +64,20 @@ export function mountUri(root, opts = {}) {
   root.classList.add("uri");
   if (who === "ukjin" && HOLD_UKJIN) {
     root.innerHTML = `<div class="uri-card"><h3>🤝 준비 중이에요</h3><p class="uri-muted">냐냐와 같이 쓰는 공간을 만들고 있어요. 곧 열려요!</p></div>`;
-    return { render() {}, usePassword() {}, setMirror() {}, cats: () => null, setCats: () => Promise.reject(new Error("준비 중")) };
+    return { render() {}, usePassword() {}, setMirror() {}, cats: () => null, setCats: () => Promise.reject(new Error("준비 중")), settlePreview: () => null, settleBy: () => Promise.reject(new Error("준비 중")), unsettle: () => Promise.resolve(), ready: () => false };
   }
 
   const st = {
     phase: "start",            // start → locked | open | error
     msg: "", askNew: false, pendingPw: null,
     costs: {}, loaded: false, cats: null,   // cats = 공통 분류 (settings/cats)
+    settles: {}, settlesLoaded: false,       // 💸 정산 장부 settles/{id} = { date, amount, memo, by, at } — 금액으로 정산 (냐냐 방식 2026-10-21)
     month: today().slice(0, 7),
     view: null,                // null = 한눈에 표(첫 화면), "YYYY-MM" = 그 달, "trip:이름" = 그 여행 묶음
     showDone: false,           // 표에서 정산 끝난 줄도 보기
     pay: null,                 // 💸 정산하기 창: { amount: "123,000" } (null = 닫힘)
-    stats: null,               // 📊 통계 보기: { mode: "month"|"year"|"all", m: "YYYY-MM", y: "YYYY", sel: 대분류|null } (null = 안 봄)
+    tab: "spend",              // 공통 탭 안 작은 탭: "spend" = 📊 지출 (처음), "settle" = 💸 정산
+    stats: { mode: "month", m: today().slice(0, 7), y: today().slice(0, 4), trip: null, sel: null },   // 📊 지출: 달·해·전체·여행(trip) + 고른 대분류
     edit: null,                // 고치는 중인 기록 id
     form: null                 // 다시 그릴 때 입력 중이던 값 유지
   };
@@ -137,8 +139,9 @@ export function mountUri(root, opts = {}) {
       if (typeof opts.onCats === "function") opts.onCats(st.cats);
       render();
     }));
+    unsubs.push(rt.onValue(path(room, "settles"), (snap) => { st.settles = snap.val() || {}; st.settlesLoaded = true; seedSettles(); render(); }));
     unsubs.push(rt.onValue(path(room, "costs"), (snap) => {
-      st.costs = snap.val() || {}; st.loaded = true; summary(); render(); reconcile();
+      st.costs = snap.val() || {}; st.loaded = true; seedSettles(); summary(); render(); reconcile();
     }, (e) => { toast(isDenied(e) ? "공통 저장소 규칙을 확인해 주세요." : "공통비용을 불러오지 못했어요."); }));
     rotateBackups(); clearInterval(bakTimer); bakTimer = setInterval(rotateBackups, 10 * 60 * 1000);
     render();
@@ -193,11 +196,11 @@ export function mountUri(root, opts = {}) {
   function tripNames(list) { const t = new Set(); list.forEach((c) => { if (/^여행/.test(c.cat || "") && /^\d/.test(c.title || "")) t.add(c.title); }); return t; }
   function groupOf(c, trips) { return c.title && trips.has(c.title) ? "trip:" + c.title : c.date.slice(0, 7); }
   // 묶음마다 합계·정산·미정산 (정렬: 달 = 그 달, 여행 = 그 여행의 마지막 날짜 달 — 엑셀처럼 그 달 바로 뒤)
-  function groups() {
-    const list = all(), trips = tripNames(list), g = {};
+  function groups(extra = 0) {
+    const list = all(), trips = tripNames(list), g = {}, al = alloc(extra);
     for (const c of list) {
       const k = groupOf(c, trips), x = (g[k] ||= { key: k, trip: k.startsWith("trip:"), name: k.startsWith("trip:") ? k.slice(5) : k, total: 0, done: 0, open: 0, n: 0, nOpen: 0, last: "" });
-      const a = Number(c.amount) || 0; x.total += a; x.n++; if (c.settled) x.done += a; else { x.open += a; x.nOpen++; }
+      const a = Number(c.amount) || 0, d = al.m[c.id] ?? 0; x.total += a; x.n++; x.done += d; x.open += a - d; if (a - d > 0) x.nOpen++;
       if (c.date > x.last) x.last = c.date;
     }
     return Object.values(g).sort((a, b) => (a.trip ? a.last.slice(0, 7) + "~" : a.key).localeCompare(b.trip ? b.last.slice(0, 7) + "~" : b.key));
@@ -205,14 +208,30 @@ export function mountUri(root, opts = {}) {
   const viewKey = () => st.view || st.month;
   const monthList = () => { const list = all(), trips = tripNames(list), k = viewKey();
     return list.filter((c) => groupOf(c, trips) === k).sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0)); };
-  // 💸 선입선출 정산: 넣은 총액만큼 오래된 묶음·오래된 기록부터 정산. 다음 기록이 남은 돈보다 크면 거기서 멈춤 (엑셀에서 손으로 자르던 방식)
+  // 💸 금액으로 정산 (냐냐 방식): 정산 장부(settles) 합계만큼, 공통비용을 날짜 순서대로 앞에서부터 채움. 채워진 만큼 정산, 나머지 미정산.
+  //   기록마다 정산 표시를 붙이지 않음 → 장부에 한 줄 더하거나 지우면 저절로 다시 계산. m[기록 id] = 그 기록에서 정산된 금액
+  const settledSum = () => Object.values(st.settles || {}).reduce((t, x) => t + (Number(x && x.amount) || 0), 0);
+  function alloc(extra = 0) {
+    const list = all().sort((a, b) => a.date.localeCompare(b.date) || (a.at || 0) - (b.at || 0) || a.id.localeCompare(b.id));
+    let rem = settledSum() + extra; const m = {};
+    for (const c of list) { const a = Number(c.amount) || 0; let d; if (a <= 0 || rem >= a) { d = a; rem -= a; } else { d = rem; rem = 0; } m[c.id] = d; }
+    return { m, left: rem };
+  }
+  const openOf = (c, al) => (Number(c.amount) || 0) - (al.m[c.id] ?? 0);
+  // 그 금액을 더 정산하면: 묶음마다 얼마씩 · 몇 건이 새로 다 정산되는지 · 다 채우고 남는 돈
   function fifo(amount) {
-    const list = all(), trips = tripNames(list), order = groups().map((x) => x.key);
-    const open = list.filter((c) => !c.settled).sort((a, b) => order.indexOf(groupOf(a, trips)) - order.indexOf(groupOf(b, trips)) || a.date.localeCompare(b.date) || (a.at || 0) - (b.at || 0));
-    let left = amount; const take = [];
-    for (const c of open) { const a = Number(c.amount) || 0; if (a > left) break; take.push(c); left -= a; }
-    const by = {}; take.forEach((c) => { const k = groupOf(c, trips); by[k] = (by[k] || 0) + (Number(c.amount) || 0); });
-    return { take, left, by };
+    const g0 = groups(0), g1 = groups(amount), by = {};
+    g1.forEach((x) => { const o = g0.find((y) => y.key === x.key); const d = o.open - x.open; if (d) by[x.key] = d; });
+    const a0 = alloc(0), a1 = alloc(amount), take = all().filter((c) => openOf(c, a0) > 0 && openOf(c, a1) <= 0);
+    return { take, by, left: a1.left };
+  }
+  // 처음 한 번: 장부가 비어 있으면 예전 방식(기록마다 '정산됨')의 합계를 '가져오기' 한 줄로 → 지금 숫자 그대로 이어짐
+  function seedSettles() {
+    if (!room || !st.loaded || !st.settlesLoaded || Object.keys(st.settles || {}).length) return;
+    const sum = all().filter((c) => c.settled).reduce((t, c) => t + (Number(c.amount) || 0), 0);
+    if (!sum) return;
+    st.settles = { import: { date: "가져오기", amount: sum, memo: "편한가계부·엑셀에서 정산한 합계", by: who, at: Date.now() } };
+    rt.set(path(room, "settles", "import"), st.settles.import).catch(() => {});
   }
 
   function summary() {
@@ -230,7 +249,9 @@ export function mountUri(root, opts = {}) {
     if (st.phase === "error") { root.innerHTML = `<div class="uri-card"><p class="uri-err">${esc(st.msg)}</p></div>`; return; }
     if (st.phase === "locked") { root.innerHTML = lockHtml(); return; }
     const keepAmt = st.pay && root.querySelector('[data-uri-pay]');
-    root.innerHTML = st.stats ? statsHtml() : st.view ? openHtml() : summaryHtml();
+    root.innerHTML = st.view && !mirrorMode ? openHtml()   // (가계부 연결 없는 보드: 예전 달 화면에서 적기)
+      : `<div class="uri-tabs" role="tablist" aria-label="공통 보기"><button type="button" data-uri="tab" data-k="spend" aria-pressed="${st.tab !== "settle"}">📊 지출</button><button type="button" data-uri="tab" data-k="settle" aria-pressed="${st.tab === "settle"}">💸 정산</button></div>`
+        + (st.tab === "settle" ? summaryHtml() : statsHtml());
     restoreForm();
     if (keepAmt && document.activeElement === document.body) { const i = root.querySelector('[data-uri-pay]'); if (i) i.focus(); }
   }
@@ -241,16 +262,16 @@ export function mountUri(root, opts = {}) {
     const amt = digits(st.pay && st.pay.amount);
     if (!amt) return `<p class="uri-muted uri-small">공통 통장에서 내 통장으로 뺀 <b>총액</b>(둘이 넣은 돈 합)을 넣으면, 가장 오래된 미정산부터 차례로 정산돼요.</p>`;
     const r = fifo(amt), gs = groups().filter((x) => r.by[x.key]);
-    const nextOpen = all().filter((c) => !c.settled).length - r.take.length;
     return `<ul class="uri-pay-list">${gs.map((x) => { const after = x.open - r.by[x.key];
-        return `<li><span>${esc(groupLabel(x))}</span><span class="uri-muted">${won(x.open)} →</span><b>${after ? `남은 ${won(after)}` : "✅ 다 정산"}</b></li>`; }).join("") || `<li class="uri-muted">가장 오래된 기록 하나보다 금액이 적어서 정산할 게 없어요.</li>`}</ul>
-      ${r.left ? `<p class="uri-muted uri-small">남는 돈 <b>${won(r.left)}</b> — 다음 기록이 그보다 커서 여기서 멈춰요. 다음에 정산할 때 같이 넣어 주세요.</p>` : ""}
-      ${r.take.length ? `<div class="uri-row"><button type="button" class="uri-btn" data-uri="payDo">✅ ${r.take.length}건 정산 기록</button><button type="button" class="uri-btn ghost" data-uri="payClose">취소</button>${nextOpen ? `<span class="uri-muted uri-small">정산 후 남는 미정산 ${nextOpen}건</span>` : ""}</div>` : ""}`;
+        return `<li><span>${esc(groupLabel(x))}</span><span class="uri-muted">${won(x.open)} →</span><b>${after ? `잔액 ${won(after)}` : "✅ 다 정산"}</b></li>`; }).join("")}</ul>
+      ${r.left ? `<p class="uri-muted uri-small">남는 돈 <b>${won(r.left)}</b> — 미정산을 다 채우고도 남아요.</p>` : ""}
+      <div class="uri-row"><button type="button" class="uri-btn" data-uri="payDo">✅ ${won(amt)} 정산 장부에 적기</button><button type="button" class="uri-btn ghost" data-uri="payClose">취소</button><span class="uri-muted uri-small">보통은 가계부에서 이체를 적을 때 '💸 공통비용 정산'을 체크하면 돼요.</span></div>`;
   }
   // 📊 공통 통계: 기간(달·해·전체) 안의 공통비용을 공통 대분류별로 (원형은 보드가 주면 — opts.pie), 대분류를 누르면 소분류별 + 내역. 둘이 낸 것 합쳐서
   function statsHtml() {
-    const sp = st.stats, list = all().filter((c) => sp.mode === "all" || (sp.mode === "year" ? c.date.slice(0, 4) === sp.y : c.date.slice(0, 7) === sp.m));
-    const lab = sp.mode === "all" ? "전체" : sp.mode === "year" ? `${sp.y}년` : `${sp.m.slice(0, 4)}년 ${+sp.m.slice(5)}월`;
+    const sp = st.stats, every = all(), trips = tripNames(every);
+    const list = every.filter((c) => sp.mode === "all" || (sp.mode === "trip" ? groupOf(c, trips) === "trip:" + sp.trip : sp.mode === "year" ? c.date.slice(0, 4) === sp.y : c.date.slice(0, 7) === sp.m));
+    const lab = sp.mode === "all" ? "전체" : sp.mode === "trip" ? `✈️ ${sp.trip}` : sp.mode === "year" ? `${sp.y}년` : `${sp.m.slice(0, 4)}년 ${+sp.m.slice(5)}월`;
     const pay = settleOf(list), sum = (arr) => arr.reduce((t, c) => t + (Number(c.amount) || 0), 0);
     const by = (arr, key) => { const g = {}; arr.forEach((c) => { const k = key(c); (g[k] ||= []).push(c); }); return Object.entries(g).map(([k, v]) => ({ k, v, amt: sum(v) })).sort((a, b) => b.amt - a.amt); };
     const cats = by(list, (c) => c.cat || "기타"), total = sum(list);
@@ -262,13 +283,9 @@ export function mountUri(root, opts = {}) {
     const row = (x, act) => `<button type="button" class="uri-st-row${act ? "" : " flat"}"${act ? ` data-uri="stSel" data-k="${esc(x.k)}"` : ""}><span class="uri-st-p">${pct(x.amt)}%</span><span class="uri-st-n">${esc(x.k)} <small>${x.v.length}</small></span><b>${won(x.amt)}</b></button>`;
     const recs = (selList || []).slice().sort((a, b) => b.date.localeCompare(a.date));
     return `
-      <div class="uri-head">
-        <button type="button" class="uri-chip" data-uri="stClose">‹ 한눈에 보기</button>
-        <h3>📊 공통비용 통계</h3>
-      </div>
       <div class="uri-row uri-st-per">
-        <span class="uri-seg">${[["month", "달"], ["year", "해"], ["all", "전체"]].map(([k, l]) => `<label><input type="radio" name="stMode" value="${k}"${sp.mode === k ? " checked" : ""} data-uri="stMode"><span>${l}</span></label>`).join("")}</span>
-        ${sp.mode === "all" ? "" : `<button type="button" class="uri-round" data-uri="stPrev" aria-label="이전">‹</button><b>${esc(lab)}</b><button type="button" class="uri-round" data-uri="stNext" aria-label="다음">›</button>`}
+        ${sp.mode === "trip" ? `<button type="button" class="uri-chip" data-uri="stMonth">‹ 달로 보기</button><b>${esc(lab)}</b>` : `<span class="uri-seg">${[["month", "달"], ["year", "해"], ["all", "전체"]].map(([k, l]) => `<label><input type="radio" name="stMode" value="${k}"${sp.mode === k ? " checked" : ""} data-uri="stMode"><span>${l}</span></label>`).join("")}</span>
+        ${sp.mode === "all" ? "" : `<button type="button" class="uri-round" data-uri="stPrev" aria-label="이전">‹</button><b>${esc(lab)}</b><button type="button" class="uri-round" data-uri="stNext" aria-label="다음">›</button>`}`}
       </div>
       <div class="uri-tiles">
         <div class="uri-tile t-me"><span>${esc(lab)} 합계</span><b>${won(total)}</b></div>
@@ -284,6 +301,23 @@ export function mountUri(root, opts = {}) {
         ${sel ? `<div class="uri-card"><h4>${esc(sel)} 내역 <span class="uri-muted uri-small">${recs.length}건</span></h4><ul class="uri-list">${recs.map((c) => `<li class="uri-item${c.settled ? " settled" : ""}"><span class="uri-cat">${esc(c.date.slice(2).replace(/-/g, "."))}</span><span class="uri-title">${esc(c.title || "")}${c.sub ? `<small>${esc(c.sub)}</small>` : ""}</span><span class="uri-payer p-${esc(c.payer)}">${esc(PAYER[c.payer] || "?")}</span><b class="uri-amt">${won(c.amount)}</b><span></span></li>`).join("")}</ul></div>` : ""}
       </div>`;
   }
+  // 📜 정산한 내역: 같은 이체(settledBy)나 같은 날 정산한 것끼리 → 날짜 · 정산한 금액 · 건수 · 어느 달들. 편한가계부 엑셀에서 가져온 정산은 '가져오기'
+  function historyHtml() {
+    const rows = Object.entries(st.settles || {}).map(([id, x]) => ({ id, ...x })).filter((x) => x && Number(x.amount))
+      .sort((a, b) => (b.date === "가져오기" ? -1 : 0) - (a.date === "가져오기" ? -1 : 0) || String(b.date).localeCompare(String(a.date)) || (b.at || 0) - (a.at || 0));
+    if (!rows.length) return "";
+    const d = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v.slice(2, 4)}.${+v.slice(5, 7)}.${+v.slice(8)}` : v;
+    return `<div class="uri-card"><h4>📜 정산 장부 <span class="uri-muted uri-small">언제 얼마 정산했는지 · 합계 ${won(settledSum())}</span></h4><ul class="uri-hist">${rows.map((x) => `<li><span>${esc(d(String(x.date)))}</span><span class="uri-muted uri-small">${esc(x.memo || "")}${x.money ? " · 💸 가계부 이체" : ""}</span><b>${won(x.amount)}</b>${/^tab-/.test(x.id) ? `<button type="button" class="uri-x" data-uri="setDel" data-id="${esc(x.id)}" aria-label="이 정산 지우기" title="지우기">×</button>` : "<span></span>"}</li>`).join("")}</ul>
+      <p class="uri-muted uri-small">가계부 이체로 적은 줄은 그 이체에서 '💸 공통비용 정산' 체크를 빼거나 이체를 지우면 같이 빠져요.</p></div>`;
+  }
+  function historyHtmlOld() {
+    const g = {};
+    all().filter((c) => c.settled).forEach((c) => { const k = c.settledBy ? "by:" + c.settledBy : "d:" + c.settled; const x = (g[k] ||= { k, date: c.settled, by: !!c.settledBy, amt: 0, n: 0, from: c.date, to: c.date }); x.amt += Number(c.amount) || 0; x.n++; if (c.date < x.from) x.from = c.date; if (c.date > x.to) x.to = c.date; });
+    const list = Object.values(g).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 12);
+    if (!list.length) return "";
+    const d = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v.slice(2, 4)}.${+v.slice(5, 7)}.${+v.slice(8)}` : v;
+    return `<div class="uri-card"><h4>📜 정산한 내역 <span class="uri-muted uri-small">최근 ${list.length}번</span></h4><ul class="uri-hist">${list.map((x) => `<li><span>${esc(d(x.date))}${x.by ? ' <span class="uri-muted uri-small">💸 이체</span>' : ""}</span><span class="uri-muted uri-small">${esc(x.from.slice(2, 7).replace("-", "."))}${x.to.slice(0, 7) !== x.from.slice(0, 7) ? `~${esc(x.to.slice(2, 7).replace("-", "."))}` : ""} · ${x.n}건</span><b>${won(x.amt)}</b></li>`).join("")}</ul></div>`;
+  }
   // 🏷 공통 분류 고치기 (둘이 같이 씀): 대분류마다 소분류 칩(× 빼기) + 소분류 더하기, 대분류 더하기·빼기. 빼도 이미 적은 기록은 그대로
   function catsHtml() {
     if (!st.cats) return "";
@@ -298,7 +332,7 @@ export function mountUri(root, opts = {}) {
   const saveCats = (list, msg) => save(rt.set(path(room, "settings", "cats"), list), msg).catch(() => {});
   // 📊 첫 화면: 냐냐 엑셀 첫 시트처럼 묶음(달·여행)마다 합계 · 정산 · 미정산 · 1인당 미정산
   function summaryHtml() {
-    const gs = groups(), open = all().filter((c) => !c.settled), os = settleOf(open), now = today().slice(0, 7);
+    const gs = groups(), al = alloc(), open = all().map((c) => ({ ...c, amount: openOf(c, al) })).filter((c) => c.amount > 0), os = settleOf(open), now = today().slice(0, 7);
     const shown = gs.filter((x) => st.showDone || x.open || x.key === now), hid = gs.length - shown.length;
     const sum = gs.reduce((t, x) => ({ total: t.total + x.total, done: t.done + x.done, open: t.open + x.open }), { total: 0, done: 0, open: 0 });
     const w = (n) => n ? Math.round(n).toLocaleString("ko-KR") : "-", W = (n) => Math.round(n).toLocaleString("ko-KR");   // 표 안 숫자는 '원' 없이 (엑셀처럼)
@@ -306,14 +340,14 @@ export function mountUri(root, opts = {}) {
       <div class="uri-owe${os.diff ? "" : " zero"}">
         <span>💸 아직 정산 안 된 돈 (전체)</span>
         <b>${dirText(os.diff)}</b>
-        <small>${open.length ? `미정산 ${open.length}건 · ${won(os.total)}` : "다 정산했어요 🎉"}</small>
+        <small>${open.length ? `미정산 ${won(os.total)} · 정산한 돈 합계 ${won(settledSum())}` : "다 정산했어요 🎉"}</small>
         ${open.length && !st.pay ? `<div class="uri-row"><button type="button" class="uri-btn" data-uri="payOpen">💸 정산하기</button></div>` : ""}
       </div>
       ${st.pay ? `<div class="uri-card uri-pay"><h4>💸 정산하기 <span class="uri-muted uri-small">선입선출</span></h4>
         <label class="uri-f"><span>공통 통장에서 뺀 총액</span><input class="uri-input" type="text" inputmode="numeric" data-uri-pay value="${esc(st.pay.amount || "")}" placeholder="예: 2,412,560" autocomplete="off"></label>
         <div id="uri-pay-prev">${payPreview()}</div></div>` : ""}
       <div class="uri-card">
-        <div class="uri-row" style="justify-content:space-between"><h4>한눈에 보기 <span class="uri-muted uri-small">줄을 누르면 그 내역</span></h4><button type="button" class="uri-chip" data-uri="stOpen">📊 통계</button></div>
+        <h4>한눈에 보기 <span class="uri-muted uri-small">줄을 누르면 📊 지출에서 그 달(여행)</span></h4>
         ${!st.loaded ? `<p class="uri-muted">불러오는 중…</p>` : `<div class="uri-tbl-wrap"><table class="uri-tbl">
           <thead><tr><th>달 <span class="uri-muted">(원)</span></th><th>합계</th><th class="c-done">정산</th><th>미정산</th><th>1인당 미정산</th></tr></thead>
           <tbody>${shown.map((x) => `<tr class="${x.open ? "" : "done"}${x.trip ? " trip" : ""}" data-uri="view" data-k="${esc(x.key)}" tabindex="0"><td>${esc(groupLabel(x))}</td><td>${w(x.total)}</td><td class="c-done">${w(x.done)}</td><td class="op">${w(x.open)}</td><td class="op">${w(Math.round(x.open / 2))}</td></tr>`).join("")}</tbody>
@@ -322,6 +356,7 @@ export function mountUri(root, opts = {}) {
         </table></div>
         ${hid || st.showDone ? `<button type="button" class="uri-link" data-uri="showDone">${st.showDone ? "정산 끝난 달 숨기기" : `정산 끝난 달 ${hid}개 더 보기`}</button>` : ""}`}
       </div>
+      ${historyHtml()}
       <p class="uri-foot"><button type="button" class="uri-link" data-uri="lock">🔒 ${hostSaves ? "이 보드에 기억한" : "이 기기에서"} 공통 비밀번호 지우기</button></p>`;
   }
 
@@ -533,10 +568,20 @@ export function mountUri(root, opts = {}) {
       }
       st.edit = null; render(true);
     }
-    else if (a === "view" && b.dataset.k) { st.view = b.dataset.k; st.edit = null; render(true); root.scrollIntoView({ block: "start" }); }
+    else if (a === "view" && b.dataset.k) {
+      const k = b.dataset.k;
+      if (mirrorMode) { st.tab = "spend"; st.stats = k.startsWith("trip:") ? { ...st.stats, mode: "trip", trip: k.slice(5), sel: null } : { ...st.stats, mode: "month", m: k, y: k.slice(0, 4), sel: null }; render(); }
+      else { st.view = k; st.edit = null; render(true); }
+      root.scrollIntoView({ block: "start" });
+    }
+    else if (a === "tab") { st.tab = b.dataset.k === "settle" ? "settle" : "spend"; st.pay = null; render(); }
+    else if (a === "stMonth") { st.stats = { ...st.stats, mode: "month", trip: null, sel: null }; render(); }
+    else if (a === "setDel" && st.settles[id]) {
+      const x = st.settles[id];
+      if (!confirm(`정산 장부에서 ${won(x.amount)} 줄을 지울까요? 그만큼 다시 미정산으로 돌아가요.`)) return;
+      save(rt.remove(path(room, "settles", id)), "정산 한 줄을 지웠어요.").catch(() => {});
+    }
     else if (a === "back") { st.view = null; st.edit = null; render(true); }
-    else if (a === "stOpen") { const t = today(); st.stats = { mode: "month", m: t.slice(0, 7), y: t.slice(0, 4), sel: null }; render(); root.scrollIntoView({ block: "start" }); }
-    else if (a === "stClose") { st.stats = null; render(); }
     else if (a === "stSel" && st.stats) { st.stats.sel = b.dataset.k || null; render(); }
     else if ((a === "stPrev" || a === "stNext") && st.stats) {
       const d = a === "stNext" ? 1 : -1, sp = st.stats;
@@ -553,10 +598,9 @@ export function mountUri(root, opts = {}) {
     else if (a === "payOpen") { st.pay = { amount: "" }; render(); const i = root.querySelector("[data-uri-pay]"); if (i) i.focus(); }
     else if (a === "payClose") { st.pay = null; render(); }
     else if (a === "payDo" && st.pay) {
-      const amt = digits(st.pay.amount), r = fifo(amt); if (!r.take.length) return;
-      if (!confirm(`${won(amt)}으로 공통비용 ${r.take.length}건을 정산 완료로 바꿀까요?${r.left ? ` (남는 돈 ${won(r.left)})` : ""} ${partner} 보드에서도 같이 바뀌어요.`)) return;
-      const patch = {}, t = today(); r.take.forEach((c) => { patch[`${c.id}/settled`] = t; });
-      save(rt.update(path(room, "costs"), patch), `✅ ${r.take.length}건 정산했어요.${r.left ? ` 남는 돈 ${won(r.left)}` : ""}`).then(() => { st.pay = null; render(); }).catch(() => {});
+      const amt = digits(st.pay.amount); if (!amt) return;
+      if (!confirm(`정산 장부에 ${won(amt)}을 적을까요? 오래된 미정산부터 금액만큼 정산돼요. ${partner} 보드에서도 같이 보여요.`)) return;
+      save(settleBy(amt, "tab-" + Date.now(), { memo: "공통 탭에서 적음" }), `✅ ${won(amt)} 정산했어요.`).then(() => { st.pay = null; render(); }).catch(() => {});
     } else if (a === "edit" && st.costs[id]) { st.edit = id; render(true); root.querySelector('form[data-uri="cost"]').scrollIntoView({ block: "nearest", behavior: "smooth" }); }
     else if (a === "cancel") { st.edit = null; render(true); }
     else if (a === "settleMonth" || a === "unsettleMonth") {
@@ -585,7 +629,22 @@ export function mountUri(root, opts = {}) {
   start();
   // 🏷 공통 분류 저장 (냐냐 가계부 설정 '분류'에서만 부름 — 고치는 건 냐냐만, 욱진 보드는 보기만)
   const setCats = (list) => room ? rt.set(path(room, "settings", "cats"), list) : Promise.reject(new Error("공통 공간이 안 열렸어요"));
-  return { render, usePassword, setMirror, cats: () => st.cats, setCats };
+  // 💸 이체로 정산 (가계부 이체 기록의 '공통비용 정산' 체크): 장부 settles/{이체 id}에 금액 한 줄. preview = 확인 창 글
+  function settlePreview(amount) {
+    const r = fifo(Number(amount) || 0), gs = groups().filter((x) => r.by[x.key]);
+    const restG = groups(amount).find((x) => x.open > 0);   // 정산 뒤 가장 오래된 남은 묶음 → 메모 '2511 잔액 601,900원'처럼
+    const short = (x) => x.trip ? x.name : x.key.slice(2, 4) + x.key.slice(5, 7);
+    return { n: Object.keys(r.by).length, left: r.left, text: gs.map((x) => `· ${groupLabel(x)}: ${won(x.open)} → ${x.open - r.by[x.key] ? `남은 ${won(x.open - r.by[x.key])}` : "다 정산"}`).join("\n"),
+      rest: restG ? `${short(restG)} 잔액 ${won(restG.open)}` : "미정산 없음" };
+  }
+  async function settleBy(amount, tag, meta = {}) {
+    if (!room) throw new Error("공통 공간이 안 열렸어요");
+    const id = String(tag || "tab-" + Date.now()).replace(/[.#$[\]/]/g, "_");
+    await rt.set(path(room, "settles", id), { date: meta.date || today(), amount: Math.round(Number(amount) || 0), memo: meta.memo || null, money: meta.money || null, by: who, at: Date.now() });
+    return { ok: true };
+  }
+  const unsettle = (tag) => room ? rt.remove(path(room, "settles", String(tag).replace(/[.#$[\]/]/g, "_"))) : Promise.resolve();
+  return { render, usePassword, setMirror, cats: () => st.cats, setCats, settlePreview, settleBy, unsettle, ready: () => !!room && st.loaded && st.settlesLoaded };
 }
 
 let styled = false;
@@ -672,6 +731,12 @@ function injectStyle() {
 .uri-pay-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .uri-pay-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 8px; background: var(--sunk); font-size: 14px; white-space: nowrap; }
 .uri-pay-list b { font-weight: 600; }
+.uri-hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.uri-hist li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto 18px; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 8px; background: var(--sunk); font-size: 14px; }
+.uri-hist b { font-weight: 500; font-variant-numeric: tabular-nums; }
+.uri-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--sunk); border: 1px solid var(--line); border-radius: 10px; padding: 4px; max-width: 360px; }
+.uri-tabs button { font: inherit; border: 0; background: transparent; border-radius: 7px; padding: 8px 4px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.uri-tabs button[aria-pressed="true"] { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
 .uri-st-per { gap: 8px; } .uri-st-per b { font-family: var(--f-mono); min-width: 96px; text-align: center; }
 .uri-st-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .uri-st-list { display: grid; gap: 4px; }
