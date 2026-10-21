@@ -4,6 +4,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
 //   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌,
 //   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — env.pieFull이면 분류 원형(통계·내역 지출·예산)에 씀 (자산 구성 원형은 그대로),
+//   ✏️ 분류·소분류 이름 바꾸기(renameCat·renameSub: 기록·예산·반복도 같이, 있는 이름이면 합침) + 기록에만 남은 분류 표시,
 //   자산 계좌번호(accounts.number)·메모(accounts.memo) = 목록·자산별 보기에 보임 (고치는 곳은 acctset.js),
 //   제목 = env.tabTitles[탭] (냐냐: 예산·내역·달력…), 💳 cardDue = 이용기간 끝난 최근 결제(저번 달 사용분, 결제일 없어도) · 결제 기록 내용 '카드정산 결제',
 //   🧾 내역 기간 고르기(ui.txRange, ./range.js 창 — 달 이름·[이번 달]을 누르면 열림, txPick·txShift) — 내역 표·요약 칸·아래 '지출' 칸이 그 기간을 따라감.
@@ -969,11 +970,16 @@ export function renderCatEditor() {
   const groups = [["expense", "지출 분류"], ["income", "수입 분류"], ["transfer", "보낸 돈 분류"]];
   $("catEditor").innerHTML = groups.map(([k, label]) =>
     `<div class="set-grp"><h4>${label}</h4><div class="cat-rows">` +
-    moneyCats(k).map((c, i) => `<div class="cat-row"><span class="cat-name"><button type="button" class="cdot-btn" data-act="catColor" data-k="${k}" data-i="${i}" style="--c:${catVar(k, c)}" aria-label="${esc(c)} 색 바꾸기" title="눌러서 색 바꾸기"></button><span class="nm">${esc(c)}</span><button class="link-btn" type="button" data-act="catDel" data-k="${k}" data-i="${i}" aria-label="${esc(c)} 분류 지우기" title="분류 지우기">×</button></span>` +
-      `<div class="sub-chips">${subsOf(k, c).map((v, j) => `<span class="chip">${esc(v)} <button class="link-btn" type="button" data-act="subDel" data-k="${k}" data-i="${i}" data-j="${j}" aria-label="${esc(v)} 소분류 지우기">×</button></span>`).join("")}` +
+    moneyCats(k).map((c, i) => `<div class="cat-row"><span class="cat-name"><button type="button" class="cdot-btn" data-act="catColor" data-k="${k}" data-i="${i}" style="--c:${catVar(k, c)}" aria-label="${esc(c)} 색 바꾸기" title="눌러서 색 바꾸기"></button><span class="nm">${esc(c)}</span><button class="link-btn" type="button" data-act="catRen" data-k="${k}" data-c="${esc(c)}" aria-label="${esc(c)} 이름 바꾸기" title="이름 바꾸기 (기록도 같이)">✏️</button><button class="link-btn" type="button" data-act="catDel" data-k="${k}" data-i="${i}" aria-label="${esc(c)} 분류 지우기" title="분류 지우기">×</button></span>` +
+      `<div class="sub-chips">${subsOf(k, c).map((v, j) => `<span class="chip"><button class="link-btn sub-nm" type="button" data-act="subRen" data-k="${k}" data-c="${esc(c)}" data-s="${esc(v)}" title="눌러서 이름 바꾸기 (기록도 같이)">${esc(v)}</button> <button class="link-btn" type="button" data-act="subDel" data-k="${k}" data-i="${i}" data-j="${j}" aria-label="${esc(v)} 소분류 지우기">×</button></span>`).join("")}` +
       `<form class="sub-add" data-sub-form="${k}" data-i="${i}" autocomplete="off"><input type="text" maxlength="20" placeholder="＋ 소분류" aria-label="${esc(c)} 소분류 추가"></form></div></div>`).join("") +
-    `</div><form class="mini-row" data-cat-form="${k}" autocomplete="off"><input type="text" maxlength="12" placeholder="새 분류 이름" aria-label="${label} 추가"><button class="btn small" type="submit">분류 추가</button></form></div>`
-  ).join("") + '<div class="set-foot"><button class="btn ghost small" type="button" data-act="catReset">기본 분류로 되돌리기</button><span class="small muted">이미 적은 기록의 분류·소분류는 바뀌지 않아요. 소분류는 입력하고 Enter.</span></div>';
+    `</div>${(() => {   // 냐냐: 목록엔 없는데 기록엔 남아 있는 분류 → ✏️로 다른 분류로 옮기기
+      const have = new Set(moneyCats(k)), odd = {};
+      S.money.forEach((x) => { if (x && x.kind !== "move" && (x.kind || "expense") === k && x.cat && !have.has(x.cat)) odd[x.cat] = (odd[x.cat] || 0) + 1; });
+      const list = Object.entries(odd); if (!list.length) return "";
+      return `<p class="small muted cat-odd">목록에 없는 분류 (기록엔 있음): ${list.map(([c, n]) => `<span class="chip">${esc(c)} ${n}건 <button class="link-btn" type="button" data-act="catRen" data-k="${k}" data-c="${esc(c)}" title="다른 이름·분류로 옮기기">✏️</button></span>`).join(" ")}</p>`;
+    })()}<form class="mini-row" data-cat-form="${k}" autocomplete="off"><input type="text" maxlength="12" placeholder="새 분류 이름" aria-label="${label} 추가"><button class="btn small" type="submit">분류 추가</button></form></div>`
+  ).join("") + '<div class="set-foot"><button class="btn ghost small" type="button" data-act="catReset">기본 분류로 되돌리기</button><span class="small muted">✏️·소분류 이름을 누르면 이름을 바꿔요 — 이미 적은 기록도 같이 바뀌어요 (있는 이름이면 합쳐져요). ×로 지우면 목록에서만 빠지고 기록은 그대로예요. 소분류는 입력하고 Enter.</span></div>';
 }
 function renderCurEditor() {
   $("curEditor").innerHTML = `<div class="sub-chips">${currencies().map((c, i) => `<span class="chip">${esc(c)}${i ? ` <button class="link-btn" type="button" data-act="curDel" data-i="${i}" aria-label="${esc(c)} 지우기">×</button>` : ' <span class="muted small">기본</span>'}</span>`).join("")}` +
@@ -987,6 +993,42 @@ export function saveCats(kind, list) {
   act(E.backend.saveSettings({ moneyCats: kind ? all : null }), "분류를 저장했어요.").then(() => { renderCatEditor(); renderMoneyForm(); }).catch(() => {});
 }
 
+// ✏️ 분류·소분류 이름 바꾸기 (냐냐 쪽에서 더함): 목록 · 색 · 소분류 · 이미 적은 기록 · 예산 · 매월 반복을 한 번에 (backend.rootUpdate)
+//   새 이름이 이미 있으면 합침 (소분류도 합침). 목록에 없는 '기록에만 있는' 분류도 옮길 수 있음
+const kindOfRec = (x) => x.kind || "expense";
+function renameCat(k, old) {
+  if (!ready() || !E.backend.rootUpdate) return;
+  const name = (prompt(`'${old}' 분류의 새 이름 (이미 있는 분류 이름을 쓰면 합쳐져요)`, old) || "").trim().slice(0, 20);
+  if (!name || name === old) return;
+  const list = moneyCats(k), merge = list.includes(name), ids = [];
+  S.money.forEach((x, id) => { if (x && x.kind !== "move" && kindOfRec(x) === k && x.cat === old) ids.push(id); });
+  if (!confirm(`'${old}' → '${name}'${merge ? " (있는 분류와 합치기)" : ""}
+기록 ${ids.length.toLocaleString()}건의 분류도 같이 바꿀까요?`)) return;
+  const p = {}, oK = catKey(old), nK = catKey(name);
+  const nl = list.filter((c) => c !== old); if (!merge) { const i = list.indexOf(old); nl.splice(i < 0 ? nl.length : i, 0, name); }
+  p[`settings/moneyCats/${k}`] = nl;
+  ["income", "expense", "transfer"].forEach((kk) => { if (kk !== k && !(S.settings.moneyCats || {})[kk]) p[`settings/moneyCats/${kk}`] = moneyCats(kk); });   // 기본 목록을 쓰던 종류도 같이 저장 (saveCats와 같게)
+  const col = ((S.settings.catColors || {})[k] || {})[oK];
+  if (col != null) { p[`settings/catColors/${k}/${oK}`] = null; if (!merge || ((S.settings.catColors || {})[k] || {})[nK] == null) p[`settings/catColors/${k}/${nK}`] = col; }
+  const subs = subsOf(k, old); if (subs.length || merge) { const ms = subsOf(k, name).slice(); subs.forEach((v) => { if (!ms.includes(v)) ms.push(v); }); p[`settings/moneySubs/${k}/${oK}`] = null; p[`settings/moneySubs/${k}/${nK}`] = ms; }
+  ids.forEach((id) => { p[`money/${id}/cat`] = name; });
+  if (k === "expense") Object.entries(S.settings.budgets || {}).forEach(([m, b]) => Object.entries((b && b.items) || {}).forEach(([iid, v]) => { if (v && v.cat === old) p[`settings/budgets/${m}/items/${iid}/cat`] = name; }));
+  Object.entries(S.settings.moneyRepeat || {}).forEach(([rid0, r]) => { if (r && r.kind !== "move" && (r.kind || "expense") === k && r.cat === old) p[`settings/moneyRepeat/${rid0}/cat`] = name; });
+  act(E.backend.rootUpdate(p), `'${old}' → '${name}'로 바꿨어요 (기록 ${ids.length.toLocaleString()}건).`).then(() => { renderCatEditor(); renderMoneyForm(); render(); }).catch(() => {});
+}
+function renameSub(k, cat, old) {
+  if (!ready() || !E.backend.rootUpdate) return;
+  const name = (prompt(`'${cat}'의 소분류 '${old}' 새 이름 (이미 있는 이름이면 합쳐져요)`, old) || "").trim().slice(0, 20);
+  if (!name || name === old) return;
+  const list = subsOf(k, cat), merge = list.includes(name), ids = [];
+  S.money.forEach((x, id) => { if (x && x.kind !== "move" && kindOfRec(x) === k && x.cat === cat && x.sub === old) ids.push(id); });
+  if (!confirm(`'${cat}' 소분류 '${old}' → '${name}'${merge ? " (합치기)" : ""}
+기록 ${ids.length.toLocaleString()}건도 같이 바꿀까요?`)) return;
+  const p = { [`settings/moneySubs/${k}/${catKey(cat)}`]: merge ? list.filter((v) => v !== old) : list.map((v) => v === old ? name : v) };
+  ids.forEach((id) => { p[`money/${id}/sub`] = name; });
+  Object.entries(S.settings.moneyRepeat || {}).forEach(([rid0, r]) => { if (r && (r.kind || "expense") === k && r.cat === cat && r.sub === old) p[`settings/moneyRepeat/${rid0}/sub`] = name; });
+  act(E.backend.rootUpdate(p), `'${old}' → '${name}'로 바꿨어요 (기록 ${ids.length.toLocaleString()}건).`).then(() => { renderCatEditor(); renderMoneyForm(); render(); }).catch(() => {});
+}
 
 // 🧪 연습 가계부 가짜 데이터: 통장·카드·현금·저축, 지난 3달 + 이번 달 월급(10일)·지출·카드값(15일)·줄 돈(15일), 예산·줄 돈
 // 특정 상황이 필요하면 여기에 더 넣으면 됨 (주인이 말해 주면 Claude가 상황에 맞게 추가)
@@ -1239,5 +1281,7 @@ export function moneyAction(a, el, id, t) {
   }
   if (a === "catDel") { const list = moneyCats(el.dataset.k); list.splice(+el.dataset.i, 1); if (!list.length) { toast("분류는 하나 이상 있어야 해요."); return true; } saveCats(el.dataset.k, list); return true; }
   if (a === "catReset") { saveCats(null); return true; }
+  if (a === "catRen") { renameCat(el.dataset.k, el.dataset.c); return true; }
+  if (a === "subRen") { renameSub(el.dataset.k, el.dataset.c, el.dataset.s); return true; }
   return false;
 }

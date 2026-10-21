@@ -86,3 +86,9 @@
   .ak-row > span { grid-area: i; align-self: start; padding-top: 6px; } .ak-row [data-ak="name"] { grid-area: n; } .ak-row .ak-hide { grid-area: h; }
   .ak-row .ak-num { grid-area: u; } .ak-row .ak-memo { grid-area: m; }
 }
+/* ⚙ 설정 탭 안 작은 탭 (분류·자산·반복·가져오기·화폐) */
+.st-tabs { grid-template-columns: repeat(5, 1fr); }
+.st-tabs button { white-space: nowrap; }
+#moneyPage .st-off { display: none !important; }
+.cat-odd { margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sub-nm { color: inherit; text-decoration: none; }

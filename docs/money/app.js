@@ -6,7 +6,7 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261020p";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf } from "./money.js?v=20261021f";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf } from "./money.js?v=20261021g";
 import { mountRepeat } from "./repeat.js?v=20261021b";
 import { mountAcctSet } from "./acctset.js?v=20261021a";
 import { mountBalance } from "./balance.js?v=20261020a";
@@ -249,6 +249,15 @@ const rp = mountRepeat($("repeatPanel"), { S, backend: () => backend, toast, act
   cats: (k) => { const c = (S.settings.moneyCats || {})[k]; return (c && c.length ? c : MONEY_CATS[k] || []).slice(); }, subs: subsOf });
 // 🏦 자산 관리 (가계부 설정 탭) — 이름 · 계좌번호 · 메모 · 🙈 숨기기
 const ak = mountAcctSet($("acctSetPanel"), { S, backend: () => backend, toast, act, esc, rows });
+// ⚙ 설정 탭 안 작은 탭: 분류 · 자산 · 반복 · 가져오기 · 화폐 (이 기기에 기억)
+function setSubTab(k) {
+  const ks = ["cat", "acct", "repeat", "import", "cur"]; if (!ks.includes(k)) k = "cat";
+  try { localStorage.setItem("nyanya-stab", k); } catch (e) { /* 무시 */ }
+  document.querySelectorAll("#moneyPage [data-st]").forEach((el) => el.classList.toggle("st-off", el.dataset.st !== k));
+  document.querySelectorAll("#setTabs [data-st-k]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.stK === k)));
+}
+$("setTabs").addEventListener("click", (ev) => { const b = ev.target.closest("[data-st-k]"); if (b) setSubTab(b.dataset.stK); });
+try { setSubTab(localStorage.getItem("nyanya-stab") || "cat"); } catch (e) { setSubTab("cat"); }
 // 보드 첫 화면 '공통비용' 칸에서 바로 오면 (#common)
 if (location.hash === "#common") { try { localStorage.setItem("nyanya-mtab", "common"); } catch (e) { /* 무시 */ } }
 setSync();
