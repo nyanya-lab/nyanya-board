@@ -110,3 +110,5 @@ table.bulk { min-width: 1200px; }
 #moneyPage .mc-v i.net { color: var(--fg); border-radius: 4px; padding: 0 4px; }
 #moneyPage .mc-v i.net.plus { color: var(--fg); background: color-mix(in srgb, var(--danger, #d9412a) 16%, transparent); }
 #moneyPage .mc-v i.net.minus { color: var(--fg); background: color-mix(in srgb, var(--blue, #2f6feb) 16%, transparent); }
+/* 합계 줄 바탕 안쪽 여백만큼 수입·지출 줄도 같은 여백 → 숫자 오른쪽 끝이 다 맞음 */
+#moneyPage .mc-v i { padding: 0 4px; box-sizing: border-box; }
