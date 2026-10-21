@@ -66,3 +66,7 @@
 /* 🧾 내역 기간: 달 이름을 누르면 기간 고르기 창 (range.js) */
 .tx-pick { font: inherit; font-family: var(--f-mono); font-weight: 600; min-width: 64px; padding: 4px 8px; border: 1px solid transparent; border-radius: 8px; background: none; color: inherit; cursor: pointer; white-space: nowrap; }
 .tx-pick:hover { border-color: var(--line); }
+/* 기록 창: 날짜 위 한 줄, 금액 아래 한 줄 통째로 + 글자 크게 (냐냐 요청) */
+.m-amt-full .amt-in { font-size: 20px; font-weight: 600; font-family: var(--f-mono); padding-top: 10px; padding-bottom: 10px; }
+.m-amt-full .amt-cur { grid-template-columns: minmax(0, 1fr) 76px; }
+.m-amt-full .amt-cur select { min-width: 0; width: 100%; }
