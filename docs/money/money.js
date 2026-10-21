@@ -4,6 +4,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
 //   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌,
 //   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — env.pieFull이면 분류 원형(통계·내역 지출·예산)에 씀 (자산 구성 원형은 그대로),
+//   ▦ 다건입력 채우기 손잡이(bulkFillInit, 엑셀처럼 끌어서 복사),
 //   자산 고르는 칸 = 자산 탭 순서로 현금·통장·카드·저축 묶음 + 이름_계좌번호 (acctOptsHtml),
 //   금액 +/- 기호 없음 (색으로만, app.js won = 부호 없음) — 직접 -로 적은 금액만 - (amtText),
 //   ✏️ 분류·소분류 이름 바꾸기(renameCat·renameSub: 기록·예산·반복도 같이, 있는 이름이면 합침) + 기록에만 남은 분류 표시,
@@ -786,6 +787,58 @@ function bulkPaste(ev) {
   bulkCount();
 }
 
+// ⬛ 채우기 손잡이 (냐냐 쪽에서 더함, 엑셀처럼): 고른 칸 오른쪽 아래 작은 네모를 아래(위)로 끌면 그 줄들 같은 칸에 같은 값 복사
+//   구분을 복사하면 그 줄 칸을 구분에 맞게 다시 만들고, 분류를 복사하면 소분류 고르는 칸도 그 분류 것으로
+let bkSrc = null;
+function bulkFillPlace() {
+  const h = $("bkFill"), wrap = h && h.parentElement; if (!h) return;
+  const el = bkSrc && bkSrc.isConnected ? bkSrc : null; if (!el) { h.hidden = true; return; }
+  const td = el.closest("td"), r = td.getBoundingClientRect(), w = wrap.getBoundingClientRect();
+  h.hidden = false; h.style.left = (r.right - w.left + wrap.scrollLeft - 5) + "px"; h.style.top = (r.bottom - w.top + wrap.scrollTop - 5) + "px";
+}
+function bulkFillInit() {
+  const body = $("bulkBody"), wrap = body.closest(".bulk-wrap");
+  wrap.style.position = "relative";
+  wrap.insertAdjacentHTML("beforeend", '<div class="bk-fill" id="bkFill" hidden title="끌어서 아래 줄에 복사"></div>');
+  const h = $("bkFill");
+  body.addEventListener("focusin", (ev) => { if (ev.target.dataset.c) { bkSrc = ev.target; bulkFillPlace(); } });
+  wrap.addEventListener("scroll", bulkFillPlace);
+  window.addEventListener("resize", bulkFillPlace);
+  let drag = null;
+  const rowAt = (x, y) => { const el = document.elementFromPoint(x, y), tr = el && el.closest && el.closest("#bulkBody tr"); return tr ? [...body.rows].indexOf(tr) : -1; };
+  const mark = (on) => { body.querySelectorAll(".bk-fill-on").forEach((td) => td.classList.remove("bk-fill-on")); if (!on || !drag) return; const [a, z] = [Math.min(drag.r0, drag.r1), Math.max(drag.r0, drag.r1)]; for (let i = a; i <= z; i++) { const c = body.rows[i] && body.rows[i].querySelector(`[data-c="${drag.col}"]`); if (c) c.closest("td").classList.add("bk-fill-on"); } };
+  h.addEventListener("pointerdown", (ev) => {
+    if (!bkSrc || !bkSrc.isConnected) return;
+    ev.preventDefault(); h.setPointerCapture(ev.pointerId);
+    const r0 = [...body.rows].indexOf(bkSrc.closest("tr")); drag = { r0, r1: r0, col: bkSrc.dataset.c }; mark(true);
+  });
+  h.addEventListener("pointermove", (ev) => {
+    if (!drag) return;
+    const i = rowAt(ev.clientX, ev.clientY); if (i >= 0 && i !== drag.r1) { drag.r1 = i; mark(true); }
+    const w = wrap.getBoundingClientRect(); if (ev.clientY > w.bottom - 20) wrap.scrollTop += 12; else if (ev.clientY < w.top + 30) wrap.scrollTop -= 12;   // 끝에 가면 저절로 넘김
+  });
+  const end = () => {
+    if (!drag) return;
+    const d = drag; drag = null; mark(false);
+    if (d.r1 === d.r0) return;
+    const src = body.rows[d.r0].querySelector(`[data-c="${d.col}"]`), val = src.value, text = src.tagName === "SELECT" ? (src.selectedOptions[0] || {}).text || "" : src.value;
+    const srcCat = body.rows[d.r0].querySelector('[data-c="cat"]').value;
+    const [a, z] = [Math.min(d.r0, d.r1), Math.max(d.r0, d.r1)];
+    for (let i = a; i <= z; i++) {
+      if (i === d.r0) continue;
+      let tr = body.rows[i], el = tr.querySelector(`[data-c="${d.col}"]`); if (!el) continue;
+      if (d.col === "kind") { el.value = val; tr = bulkRekind(tr); continue; }
+      if (d.col === "sub" && tr.querySelector('[data-c="cat"]').value !== srcCat) continue;   // 소분류는 같은 분류 줄에만
+      if (el.tagName === "SELECT") { if ([...el.options].some((o) => o.value === val)) el.value = val; else bulkCell(el, text); }
+      else el.value = val;
+      if (d.col === "cat" && tr.querySelector('[data-c="kind"]').value !== "move") tr.querySelector('[data-c="sub"]').innerHTML = subOptions(tr.querySelector('[data-c="kind"]').value, el.value, "");
+    }
+    bulkCount();
+    const back = body.rows[d.r0] && body.rows[d.r0].querySelector(`[data-c="${d.col}"]`); if (back) { bkSrc = back; bulkFillPlace(); }
+  };
+  h.addEventListener("pointerup", end); h.addEventListener("pointercancel", end);
+}
+
 // 지출 탭 ＋: 새 기록 (지출, 마지막에 쓴 자산)
 function txAdd() {
   ui.mEdit = null; ui.kind = "expense"; ui.asFor = null;
@@ -1087,6 +1140,7 @@ export function initMoney() {
   });
   $("bulkBody").addEventListener("input", bulkCount);
   $("bulkBody").addEventListener("paste", bulkPaste);
+  bulkFillInit();   // ⬛ 채우기 손잡이 (냐냐)
   $("bulkBody").addEventListener("keydown", (ev) => {
     if (ev.key !== "Enter" || ev.isComposing || !ev.target.dataset.c) return;
     ev.preventDefault();

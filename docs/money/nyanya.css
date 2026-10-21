@@ -94,3 +94,9 @@
 .sub-nm { color: inherit; text-decoration: none; }
 /* 통계 분류 목록 · 설정 분류 편집의 색 동그라미 숨기기 (냐냐 요청) */
 .st-cat .cdot, .cat-row .cdot-btn { display: none; }
+/* ▦ 다건입력: 창을 옆으로 넓게 + 채우기 손잡이 (엑셀처럼) */
+.dlg.bulk-dlg { width: calc(100vw - 24px); max-width: 1800px; }
+table.bulk { min-width: 1200px; }
+.bk-fill { position: absolute; width: 9px; height: 9px; background: var(--coral, #f0604d); border: 2px solid var(--surface, #fff); border-radius: 2px; cursor: ns-resize; z-index: 3; touch-action: none; }
+.bulk td.bk-fill-on { background: color-mix(in srgb, var(--coral, #f0604d) 14%, transparent); outline: 1px dashed var(--coral, #f0604d); outline-offset: -2px; }
+.bk-fill::after { content: ""; position: absolute; inset: -9px; }   /* 손가락으로도 잡기 쉽게 */
