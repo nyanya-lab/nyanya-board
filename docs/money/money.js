@@ -4,6 +4,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
 //   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌,
 //   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — env.pieFull이면 분류 원형(통계·내역 지출·예산)에 씀 (자산 구성 원형은 그대로),
+//   자산 계좌번호(accounts.number)·메모(accounts.memo) = 목록·자산별 보기에 보임 (고치는 곳은 acctset.js),
 //   제목 = env.tabTitles[탭] (냐냐: 예산·내역·달력…), 💳 cardDue = 이용기간 끝난 최근 결제(저번 달 사용분, 결제일 없어도) · 결제 기록 내용 '카드정산 결제',
 //   🧾 내역 기간 고르기(ui.txRange, ./range.js 창 — 달 이름·[이번 달]을 누르면 열림, txPick·txShift) — 내역 표·요약 칸·아래 '지출' 칸이 그 기간을 따라감.
 // (원래 설명) 보드(index.html)와 가계부 모드(money.html → index.html?app=money)가 같이 쓰는 코드
@@ -493,7 +494,7 @@ function renderAssets(accts, bal) {
       `<span>${ACCT_ICON[t]} ${label}<small>${list.length}</small><i class="as-chev" aria-hidden="true"></i></span>` +
       (card ? two("결제예정", won(dues.reduce((s2, d) => s2 + d.due, 0)), "미결제", won(dues.reduce((s2, d) => s2 + d.open, 0))) : `<b class="won${sg(sum)}">${won(sum)}</b>`) + "</button>" +
       (shut ? "" : list.map((a, i) => { const v = bal[a.id] || 0, d = dues[i];
-        return `<button type="button" class="as-row${a.id === sel ? " on" : ""}" data-act="asSel" data-id="${esc(a.id)}" aria-pressed="${a.id === sel}"><span class="as-name">${esc(a.name)}</span>` +
+        return `<button type="button" class="as-row${a.id === sel ? " on" : ""}" data-act="asSel" data-id="${esc(a.id)}" aria-pressed="${a.id === sel}"><span class="as-name">${esc(a.name)}${a.number ? `<small class="as-num">${esc(a.number)}</small>` : ""}</span>` +   // 냐냐: 계좌번호 (accounts.number)
           (card ? `<span class="as-cp"><b class="won${d.due ? " minus" : ""}">${won(d.due)}</b><b class="won${d.open ? " minus" : ""}">${d.none ? "-" : won(d.open)}</b></span>` : `<b class="won${sg(v)}">${won(v)}</b>`) + "</button>";
       }).join("")) + "</div>";
   }).join("") : '<p class="muted small" style="margin:0">통장·카드·현금을 추가하면 어디서 쓰고 어디로 들어왔는지 기록하고, 자산마다 잔액을 볼 수 있어요.</p>');
@@ -547,6 +548,7 @@ function renderAssetDetail(id) {
     `<div class="as-month"><button class="chip" type="button" data-act="month" data-d="-1" aria-label="이전 달">‹</button><b>${monthLabel(m)}</b><button class="chip" type="button" data-act="month" data-d="1" aria-label="다음 달">›</button></div></div>` +
     `<p class="small muted as-period">${payCard ? `<b>${+m.slice(5)}월 ${+p.date.slice(8)}일 결제</b> · 이용기간 ${ymdDot(p.from)} ~ ${ymdDot(p.to)}`
       : `기간 ${ymdDot(p.from)} ~ ${ymdDot(p.to)}${card ? ` · <button class="link-btn" type="button" data-act="editAcct" data-id="${esc(id)}">결제일을 정하면</button> 결제일 기준으로 보여요` : ""}`}</p>` +
+    (a.number || a.memo ? `<p class="small as-info">${a.number ? `<span class="mono">${esc(a.number)}</span>` : ""}${a.number && a.memo ? " · " : ""}${a.memo ? `<span class="as-memo">📝 ${esc(a.memo)}</span>` : ""}</p>` : "") +   // 냐냐: 계좌번호 · 자산 메모 (가계부 설정 '자산 관리'에서)
     `<div class="as-stats">${payCard
       ? tile("결제할 돈", won(out), "minus") + tile("낸 돈", won(inn), "plus") + tile("남은 결제액", won(Math.max(0, out - inn)), out > inn ? "minus" : "") + tile("지금 카드값", won(Math.max(0, -run)))
       : tile(card ? "갚은 돈" : "입금", won(inn), "plus") + tile(card ? "쓴 돈" : "출금", won(out), "minus") + tile("합계", won(inn - out), inn - out < 0 ? "minus" : "plus") +
