@@ -4,6 +4,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
 //   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌,
 //   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — env.pieFull이면 분류 원형(통계·내역 지출·예산)에 씀 (자산 구성 원형은 그대로),
+//   통계에서 💙 공통비용을 누르면 공통 분류별로 펼침(#stCcSub, ui.stCc),
 //   🏷 공통 분류(E.commonCats, ccOn·ccOf: ❤️ 체크하면 분류 칸이 공통 대분류·소분류 → 기록 ccat·csub, 내 분류는 '💙 공통비용'),
 //   💑 내 몫으로 보기(cntAmt·mineOn: 공통비용 절반·욱진입금 빼고, 기본 꺼짐),
 //   달력 칸 합계(수입−지출) 줄은 수입·지출 하나만 있어도 보임,
@@ -755,8 +756,21 @@ function renderStats() {
   $("stCats").innerHTML = `<button type="button" class="st-cat all${sel ? "" : " on"}" data-act="stCat" data-k=""><span>${label} 전체 <small>${recs.length}</small></span><b class="won">${wonN(total)}</b></button>` +
     cats.map(([c, v]) => `<button type="button" class="st-cat${sel === c ? " on" : ""}" data-act="stCat" data-k="${esc(c)}"><i class="st-pct" style="--c:${catVar(kind, c)}">${pct(v)}%</i><span>${catDot(kind, c)}${esc(c)}</span><b class="won">${wonN(v)}</b></button>`).join("");
   // 오른쪽: 합계 · 흐름 그래프 (그 칸 포함 앞 12칸, 기간이면 그 안의 달) · 내역
-  const shown = sel ? recs.filter((x) => (x.cat || "기타") === sel) : recs, stot = sel ? byCat[sel] : total;
+  let shown = sel ? recs.filter((x) => (x.cat || "기타") === sel) : recs, stot = sel ? byCat[sel] : total;
   $("stHead").innerHTML = `<h3>${esc(sel || label + " 전체")}</h3><b class="won">${wonN(stot)}</b>`;
+  // 🏷 💙 공통비용을 누르면 공통 분류별로 펼치기 (냐냐): 대분류마다 % · 금액, 누르면 그 대분류 기록만
+  const ccBox = $("stCcSub");
+  if (ccBox) {
+    const isCc = !!sel && kind === "expense" && /공통비용/.test(sel) && !!E.commonCats;
+    ccBox.hidden = !isCc;
+    if (isCc) {
+      const g = {}; shown.forEach((x) => { const c = ccOf(x).c; g[c] = (g[c] || 0) + cntAmt(x); });
+      const rows = Object.entries(g).sort((a, b) => b[1] - a[1]), base = rows.reduce((t, [, v]) => t + v, 0);
+      if (ui.stCc && !(ui.stCc in g)) ui.stCc = null;
+      ccBox.innerHTML = `<div class="st-cc-h small muted">공통 분류별 · 누르면 그것만</div>` + rows.map(([c, v]) => `<button type="button" class="st-cat${ui.stCc === c ? " on" : ""}" data-act="stCc" data-k="${esc(c)}"><i class="st-pct">${base ? Math.round(v / base * 100) : 0}%</i><span>${esc(c)}</span><b class="won">${wonN(v)}</b></button>`).join("");
+      if (ui.stCc) shown = shown.filter((x) => ccOf(x).c === ui.stCc);
+    } else ui.stCc = null;
+  }
   $("stChip").innerHTML = `<i class="st-pct" style="--c:${sel ? catVar(kind, sel) : "var(--coral)"}">${sel ? pct(stot) : 100}%</i> ${esc(sel || "전체")} <b class="won">${won(stot)}</b>`;
   const sum = (from, to) => { let t = 0; S.money.forEach((x) => { if ((x.kind || "expense") === kind && isWon(x) && x.date >= from && x.date <= to && (!sel || (x.cat || "기타") === sel)) t += cntAmt(x); }); return t; };
   let pts;
@@ -1370,7 +1384,8 @@ export function moneyAction(a, el, id, t) {
   if (a === "mcDay") { ui.mcDay = el.dataset.day; if (ui.mcDay.slice(0, 7) !== ui.month) ui.month = ui.mcDay.slice(0, 7); renderMoney(); if (window.matchMedia("(max-width: 1100px)").matches) $("mcDay").scrollIntoView({ behavior: "smooth", block: "nearest" }); return true; }
   if (a === "mcAdd") { const d = ui.mcDay && ui.mcDay.slice(0, 7) === ui.month ? ui.mcDay : today().slice(0, 7) === ui.month ? today() : `${ui.month}-01`; txAdd(); $("mDate").value = d; return true; }
   if (a === "stKind") { ui.stK = el.dataset.k; ui.stCat = null; renderMoney(); return true; }
-  if (a === "stCat") { ui.stCat = el.dataset.k || null; renderMoney(); return true; }
+  if (a === "stCat") { ui.stCat = el.dataset.k || null; ui.stCc = null; renderMoney(); return true; }
+  if (a === "stCc") { ui.stCc = ui.stCc === el.dataset.k ? null : el.dataset.k || null; renderMoney(); return true; }   // 🏷 공통비용 펼친 줄 (냐냐)
   if (a === "stMove") { const st = stState(), d = +el.dataset.d; ui.stAt = st.p === "week" ? addDaysS(st.anchor, 7 * d) : st.p === "year" ? `${+st.anchor.slice(0, 4) + d}${st.anchor.slice(4)}` : `${shiftMonth(st.anchor.slice(0, 7), d)}-01`; renderMoney(); return true; }
   if (a === "txKind") { ui.txKind = el.dataset.k; renderMoney(); return true; }
   if (a === "txAdd") { txAdd(); return true; }

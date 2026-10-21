@@ -133,3 +133,7 @@ table.bulk { min-width: 1200px; }
 .ccm-row span:nth-child(n+3) { text-align: right; font-variant-numeric: tabular-nums; }
 .ccm-th { background: none; color: var(--muted); font-size: 12px; }
 @media (max-width: 720px) { .ccm-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px; } .ccm-row span:nth-child(4) { display: none; } }
+/* 📊 통계: 💙 공통비용을 누르면 공통 분류별로 펼침 */
+.st-cc { display: grid; gap: 4px; margin: 4px 0 10px; padding: 8px; border-radius: 12px; background: color-mix(in srgb, var(--blue) 6%, transparent); }
+.st-cc .st-cat .st-pct { background: var(--blue); }
+.st-cc-h { padding: 0 4px 2px; }

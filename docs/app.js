@@ -3,7 +3,7 @@
 // 로그인 없음, 비밀번호 = 저장 위치. 항목마다 따로 저장해서 폰·PC가 서로 덮어쓰지 않음.
 
 import { firebaseConfig } from "./firebase-config.js?v=20261020l";
-import { mountUri } from "./uri/uri.js?v=20261021e";
+import { mountUri } from "./uri/uri.js?v=20261021g";
 import { createLinks, vocabToday, vocabStreak, isWatching, finishDays, watchPeriods, dayActivity } from "./links.js?v=20261020l";
 
 const FB_VER = "10.12.2";

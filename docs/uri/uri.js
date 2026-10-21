@@ -75,6 +75,7 @@ export function mountUri(root, opts = {}) {
     view: null,                // null = 한눈에 표(첫 화면), "YYYY-MM" = 그 달, "trip:이름" = 그 여행 묶음
     showDone: false,           // 표에서 정산 끝난 줄도 보기
     pay: null,                 // 💸 정산하기 창: { amount: "123,000" } (null = 닫힘)
+    stats: null,               // 📊 통계 보기: { mode: "month"|"year"|"all", m: "YYYY-MM", y: "YYYY", sel: 대분류|null } (null = 안 봄)
     edit: null,                // 고치는 중인 기록 id
     form: null                 // 다시 그릴 때 입력 중이던 값 유지
   };
@@ -229,7 +230,7 @@ export function mountUri(root, opts = {}) {
     if (st.phase === "error") { root.innerHTML = `<div class="uri-card"><p class="uri-err">${esc(st.msg)}</p></div>`; return; }
     if (st.phase === "locked") { root.innerHTML = lockHtml(); return; }
     const keepAmt = st.pay && root.querySelector('[data-uri-pay]');
-    root.innerHTML = st.view ? openHtml() : summaryHtml();
+    root.innerHTML = st.stats ? statsHtml() : st.view ? openHtml() : summaryHtml();
     restoreForm();
     if (keepAmt && document.activeElement === document.body) { const i = root.querySelector('[data-uri-pay]'); if (i) i.focus(); }
   }
@@ -245,6 +246,43 @@ export function mountUri(root, opts = {}) {
         return `<li><span>${esc(groupLabel(x))}</span><span class="uri-muted">${won(x.open)} →</span><b>${after ? `남은 ${won(after)}` : "✅ 다 정산"}</b></li>`; }).join("") || `<li class="uri-muted">가장 오래된 기록 하나보다 금액이 적어서 정산할 게 없어요.</li>`}</ul>
       ${r.left ? `<p class="uri-muted uri-small">남는 돈 <b>${won(r.left)}</b> — 다음 기록이 그보다 커서 여기서 멈춰요. 다음에 정산할 때 같이 넣어 주세요.</p>` : ""}
       ${r.take.length ? `<div class="uri-row"><button type="button" class="uri-btn" data-uri="payDo">✅ ${r.take.length}건 정산 기록</button><button type="button" class="uri-btn ghost" data-uri="payClose">취소</button>${nextOpen ? `<span class="uri-muted uri-small">정산 후 남는 미정산 ${nextOpen}건</span>` : ""}</div>` : ""}`;
+  }
+  // 📊 공통 통계: 기간(달·해·전체) 안의 공통비용을 공통 대분류별로 (원형은 보드가 주면 — opts.pie), 대분류를 누르면 소분류별 + 내역. 둘이 낸 것 합쳐서
+  function statsHtml() {
+    const sp = st.stats, list = all().filter((c) => sp.mode === "all" || (sp.mode === "year" ? c.date.slice(0, 4) === sp.y : c.date.slice(0, 7) === sp.m));
+    const lab = sp.mode === "all" ? "전체" : sp.mode === "year" ? `${sp.y}년` : `${sp.m.slice(0, 4)}년 ${+sp.m.slice(5)}월`;
+    const pay = settleOf(list), sum = (arr) => arr.reduce((t, c) => t + (Number(c.amount) || 0), 0);
+    const by = (arr, key) => { const g = {}; arr.forEach((c) => { const k = key(c); (g[k] ||= []).push(c); }); return Object.entries(g).map(([k, v]) => ({ k, v, amt: sum(v) })).sort((a, b) => b.amt - a.amt); };
+    const cats = by(list, (c) => c.cat || "기타"), total = sum(list);
+    const sel = sp.sel && cats.find((x) => x.k === sp.sel) ? sp.sel : null, selList = sel ? cats.find((x) => x.k === sel).v : null;
+    const base = sel ? sum(selList) : total, pct = (v) => base ? Math.round(v / base * 100) : 0;   // 소분류 %는 그 대분류 안에서
+    const subs = sel ? by(selList, (c) => c.sub || "(소분류 없음)") : null;
+    const pieList = (sel ? subs : cats).filter((x) => x.amt > 0).map((x) => ({ cat: x.k, amt: x.amt }));
+    const pie = typeof opts.pie === "function" && pieList.length ? opts.pie(pieList, sel || "공통비용") : "";
+    const row = (x, act) => `<button type="button" class="uri-st-row${act ? "" : " flat"}"${act ? ` data-uri="stSel" data-k="${esc(x.k)}"` : ""}><span class="uri-st-p">${pct(x.amt)}%</span><span class="uri-st-n">${esc(x.k)} <small>${x.v.length}</small></span><b>${won(x.amt)}</b></button>`;
+    const recs = (selList || []).slice().sort((a, b) => b.date.localeCompare(a.date));
+    return `
+      <div class="uri-head">
+        <button type="button" class="uri-chip" data-uri="stClose">‹ 한눈에 보기</button>
+        <h3>📊 공통비용 통계</h3>
+      </div>
+      <div class="uri-row uri-st-per">
+        <span class="uri-seg">${[["month", "달"], ["year", "해"], ["all", "전체"]].map(([k, l]) => `<label><input type="radio" name="stMode" value="${k}"${sp.mode === k ? " checked" : ""} data-uri="stMode"><span>${l}</span></label>`).join("")}</span>
+        ${sp.mode === "all" ? "" : `<button type="button" class="uri-round" data-uri="stPrev" aria-label="이전">‹</button><b>${esc(lab)}</b><button type="button" class="uri-round" data-uri="stNext" aria-label="다음">›</button>`}
+      </div>
+      <div class="uri-tiles">
+        <div class="uri-tile t-me"><span>${esc(lab)} 합계</span><b>${won(total)}</b></div>
+        <div class="uri-tile"><span>냐냐가 낸 돈</span><b>${won(pay.paid.nyanya)}</b></div>
+        <div class="uri-tile"><span>욱진이 낸 돈</span><b>${won(pay.paid.ukjin)}</b></div>
+        <div class="uri-tile"><span>1인당</span><b>${won(Math.round(total / 2))}</b></div>
+      </div>
+      <div class="uri-grid uri-st-grid">
+        <div class="uri-card">${pie || ""}
+          ${sel ? `<button type="button" class="uri-chip" data-uri="stSel" data-k="">‹ 대분류 전체</button><h4>${esc(sel)} <span class="uri-muted uri-small">소분류별</span></h4>` : `<h4>대분류별 <span class="uri-muted uri-small">누르면 소분류</span></h4>`}
+          ${list.length ? `<div class="uri-st-list">${(sel ? subs : cats).map((x) => row(x, !sel)).join("")}</div>` : `<p class="uri-muted">${esc(lab)} 공통비용이 없어요.</p>`}
+        </div>
+        ${sel ? `<div class="uri-card"><h4>${esc(sel)} 내역 <span class="uri-muted uri-small">${recs.length}건</span></h4><ul class="uri-list">${recs.map((c) => `<li class="uri-item${c.settled ? " settled" : ""}"><span class="uri-cat">${esc(c.date.slice(2).replace(/-/g, "."))}</span><span class="uri-title">${esc(c.title || "")}${c.sub ? `<small>${esc(c.sub)}</small>` : ""}</span><span class="uri-payer p-${esc(c.payer)}">${esc(PAYER[c.payer] || "?")}</span><b class="uri-amt">${won(c.amount)}</b><span></span></li>`).join("")}</ul></div>` : ""}
+      </div>`;
   }
   // 🏷 공통 분류 고치기 (둘이 같이 씀): 대분류마다 소분류 칩(× 빼기) + 소분류 더하기, 대분류 더하기·빼기. 빼도 이미 적은 기록은 그대로
   function catsHtml() {
@@ -275,7 +313,7 @@ export function mountUri(root, opts = {}) {
         <label class="uri-f"><span>공통 통장에서 뺀 총액</span><input class="uri-input" type="text" inputmode="numeric" data-uri-pay value="${esc(st.pay.amount || "")}" placeholder="예: 2,412,560" autocomplete="off"></label>
         <div id="uri-pay-prev">${payPreview()}</div></div>` : ""}
       <div class="uri-card">
-        <h4>한눈에 보기 <span class="uri-muted uri-small">줄을 누르면 그 내역</span></h4>
+        <div class="uri-row" style="justify-content:space-between"><h4>한눈에 보기 <span class="uri-muted uri-small">줄을 누르면 그 내역</span></h4><button type="button" class="uri-chip" data-uri="stOpen">📊 통계</button></div>
         ${!st.loaded ? `<p class="uri-muted">불러오는 중…</p>` : `<div class="uri-tbl-wrap"><table class="uri-tbl">
           <thead><tr><th>달 <span class="uri-muted">(원)</span></th><th>합계</th><th class="c-done">정산</th><th>미정산</th><th>1인당 미정산</th></tr></thead>
           <tbody>${shown.map((x) => `<tr class="${x.open ? "" : "done"}${x.trip ? " trip" : ""}" data-uri="view" data-k="${esc(x.key)}" tabindex="0"><td>${esc(groupLabel(x))}</td><td>${w(x.total)}</td><td class="c-done">${w(x.done)}</td><td class="op">${w(x.open)}</td><td class="op">${w(Math.round(x.open / 2))}</td></tr>`).join("")}</tbody>
@@ -498,6 +536,15 @@ export function mountUri(root, opts = {}) {
     }
     else if (a === "view" && b.dataset.k) { st.view = b.dataset.k; st.edit = null; render(true); root.scrollIntoView({ block: "start" }); }
     else if (a === "back") { st.view = null; st.edit = null; render(true); }
+    else if (a === "stOpen") { const t = today(); st.stats = { mode: "month", m: t.slice(0, 7), y: t.slice(0, 4), sel: null }; render(); root.scrollIntoView({ block: "start" }); }
+    else if (a === "stClose") { st.stats = null; render(); }
+    else if (a === "stSel" && st.stats) { st.stats.sel = b.dataset.k || null; render(); }
+    else if ((a === "stPrev" || a === "stNext") && st.stats) {
+      const d = a === "stNext" ? 1 : -1, sp = st.stats;
+      if (sp.mode === "year") sp.y = String(+sp.y + d);
+      else { const [y, m] = sp.m.split("-").map(Number), dt = new Date(y, m - 1 + d, 1); sp.m = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}`; }
+      sp.sel = null; render();
+    }
     else if ((a === "subDel" || a === "catDel") && st.cats) {
       const list = st.cats.map((c) => ({ n: c.n, s: c.s.slice() })), c = list[+b.dataset.i]; if (!c) return;
       if (a === "subDel") { const v = c.s[+b.dataset.j]; c.s.splice(+b.dataset.j, 1); st.catsOpen = true; saveCats(list, `'${v}' 소분류를 뺐어요.`); }
@@ -532,6 +579,7 @@ export function mountUri(root, opts = {}) {
     }
   });
 
+  root.addEventListener("change", (e) => { if (e.target.name === "stMode" && st.stats) { st.stats.mode = e.target.value; st.stats.sel = null; render(); } });
   root.addEventListener("toggle", (e) => { if (e.target.classList && e.target.classList.contains("uri-cats")) st.catsOpen = e.target.open; }, true);
   root.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches && e.target.matches('tr[data-uri="view"]')) e.target.click(); });
   render();
@@ -623,6 +671,15 @@ function injectStyle() {
 .uri-pay-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .uri-pay-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 8px; background: var(--sunk); font-size: 14px; white-space: nowrap; }
 .uri-pay-list b { font-weight: 600; }
+.uri-st-per { gap: 8px; } .uri-st-per b { font-family: var(--f-mono); min-width: 96px; text-align: center; }
+.uri-st-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.uri-st-list { display: grid; gap: 4px; }
+.uri-st-row { font: inherit; display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border: 0; border-radius: 10px; background: var(--sunk); color: var(--fg); text-align: left; cursor: pointer; }
+.uri-st-row.flat { cursor: default; }
+.uri-st-row:not(.flat):hover { outline: 1px solid var(--line); }
+.uri-st-p { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.uri-st-n small { color: var(--muted); font-size: 12px; margin-left: 4px; }
+.uri-st-row b { font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .uri-cats summary { cursor: pointer; list-style: none; } .uri-cats summary::-webkit-details-marker { display: none; }
 .uri-cat-row { display: grid; grid-template-columns: 88px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
 .uri-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -630,7 +687,7 @@ function injectStyle() {
 .uri-x { font: inherit; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 4px; }
 .uri-sub-add .uri-input { width: 110px; padding: 4px 8px; font-size: 13px; }
 .uri-link { font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
-@media (max-width: 1000px) { .uri-grid, .uri-grid.uri-mirror { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) { .uri-grid, .uri-grid.uri-mirror, .uri-st-grid { grid-template-columns: 1fr; } }
 @media (max-width: 720px) {
   .uri-tbl { font-size: 12.5px; } .uri-tbl th, .uri-tbl td { padding: 7px 3px; } .uri-tbl td:first-child { white-space: normal; } .uri-tbl th { font-size: 11px; white-space: normal; }
   .uri-tbl .c-done { display: none; }   /* 폰: '정산' 칸은 숨김 (합계 − 미정산) */
