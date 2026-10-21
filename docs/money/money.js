@@ -3,8 +3,8 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   고칠 때 욱진 보드에도 필요한 고침인지 생각하고, 그렇다면 "욱진 보드도 같이 고칠까?" 물어보기 (CLAUDE.md).
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
 //   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌,
-//   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — 통계 원형에 env.statPieFull이면 씀,
-//   🧾 내역 기간 고르기(ui.txRange, ./range.js 창 — 달 이름·[이번 달]을 누르면 열림, txPick·txShift).
+//   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — env.pieFull이면 분류 원형(통계·내역 지출·예산)에 씀 (자산 구성 원형은 그대로),
+//   🧾 내역 기간 고르기(ui.txRange, ./range.js 창 — 달 이름·[이번 달]을 누르면 열림, txPick·txShift) — 내역 표·요약 칸·아래 '지출' 칸이 그 기간을 따라감.
 // (원래 설명) 보드(index.html)와 가계부 모드(money.html → index.html?app=money)가 같이 쓰는 코드
 // 한 달 예산 · 지출 기록 · 자산(통장·카드·현금, 카드 결제일) · 분류·색·원형 그래프 · 줄 돈 15일 자동 · 카드값 할 일 · 연습 데이터
 // 화면 마크업은 index.html의 #moneyPage(⚙ 설정 탭 #catEditor·#curEditor 포함) · #acctDlg · #mDrawer · #bulkDlg. 보드 쪽 공통 함수·상태는 시작할 때 bindMoney(env)로 받음
@@ -300,7 +300,7 @@ export function renderPlan(m, r) {
       return `<div class="plan-tile give"><span>💝 ${esc(partner())}에게 ${auto || sent ? "준 돈 ✅" : "줄 돈"}${g.state === "ok" ? " ✔" : ""}</span><b>${give == null ? "아직 안 정함" : won(give)}</b><small>${sub}</small></div>`;
     })()) +
     `<div class="plan-tile left${left < 0 ? " minus" : ""}"><span>잔액</span><b>${pl.income ? won(left) : "-"}</b><small>수입 − 쓸 돈${give == null ? "" : " − 줄 돈"}</small></div>`;
-  $("planPie").innerHTML = pieHtml("expense", pl.items.map((v) => ({ cat: v.cat, amt: Number(v.amount) || 0 })), "예산");
+  $("planPie").innerHTML = pieHtml("expense", pl.items.map((v) => ({ cat: v.cat, amt: Number(v.amount) || 0 })), "예산", { full: E.pieFull });
   if (document.activeElement !== $("planGive")) $("planGive").value = give == null ? "" : commaNum(give);
   const gf = $("planGiveFrom"), gfv = S.settings.giveFrom || "";
   gf.innerHTML = '<option value="">선택 안 함</option>' + sortedAccts().filter((x) => x.type !== "card").map((x) => `<option value="${esc(x.id)}">${ACCT_ICON[x.type] || ""} ${esc(x.name)}</option>`).join("");
@@ -402,17 +402,20 @@ export function renderMoney() {
   renderPlan(m, r);
 
   // 지출 예산·분류 (한 달 예산을 짰으면 그 합계, 아니면 예전 '한 달 지출 예산')
+  // 내역에서 기간을 골랐으면(ui.txRange) 이 칸도 그 기간 지출 — 예산은 한 달 단위라 기간일 땐 막대·예산 칸을 숨기고 합계만
+  const rng = ui.txRange, rs = rng ? monthTotals(null, rng) : r;
   const planTotal = planOf(m).total;
-  const budget = planTotal || Number(S.settings.budget) || 0;
-  $("budgetForm").hidden = !!planTotal; $("budgetFromPlan").hidden = !planTotal;
-  const bar = $("budgetBar");
-  bar.classList.toggle("over", budget > 0 && r.exp > budget);
-  bar.firstElementChild.style.width = (budget ? Math.min(100, Math.round(r.exp / budget * 100)) : 0) + "%";
-  $("budgetLeft").innerHTML = budget
-    ? `예산 ${won(budget)} 중 <span class="won">${won(r.exp)}</span> 씀 · ` + (r.exp > budget ? `<span class="won minus">${won(r.exp - budget)} 초과</span>` : `<span class="won plus">${won(budget - r.exp)} 남음</span>`)
+  const budget = rng ? 0 : planTotal || Number(S.settings.budget) || 0;
+  $("budgetForm").hidden = !!planTotal || !!rng; $("budgetFromPlan").hidden = !planTotal || !!rng;
+  const bar = $("budgetBar"); bar.hidden = !!rng;
+  bar.classList.toggle("over", budget > 0 && rs.exp > budget);
+  bar.firstElementChild.style.width = (budget ? Math.min(100, Math.round(rs.exp / budget * 100)) : 0) + "%";
+  $("budgetLeft").innerHTML = rng ? `${esc(rangeLabel(rng.from, rng.to))} 지출 <span class="won">${won(rs.exp)}</span>`
+    : budget
+    ? `예산 ${won(budget)} 중 <span class="won">${won(rs.exp)}</span> 씀 · ` + (rs.exp > budget ? `<span class="won minus">${won(rs.exp - budget)} 초과</span>` : `<span class="won plus">${won(budget - rs.exp)} 남음</span>`)
     : "예산을 넣으면 남은 금액이 보여요";
-  if (document.activeElement !== $("budgetIn")) $("budgetIn").value = commaNum(budget || "");
-  $("catBars").innerHTML = pieHtml("expense", Object.entries(r.byCat).map(([cat, amt]) => ({ cat, amt })), "지출") || '<div class="muted small">이번 달 지출 기록이 아직 없어요.</div>';
+  if (document.activeElement !== $("budgetIn")) $("budgetIn").value = commaNum(planTotal || Number(S.settings.budget) || "");
+  $("catBars").innerHTML = pieHtml("expense", Object.entries(rs.byCat).map(([cat, amt]) => ({ cat, amt })), "지출", { full: E.pieFull }) || `<div class="muted small">${rng ? "이 기간" : "이번 달"} 지출 기록이 아직 없어요.</div>`;
 
   // 최근 내역 조회: 6개월 · 1년 · 기간 (오늘 기준, 새 달이 위). 줄을 누르면 그 달로 (위 예산·내역이 그 달 것으로)
   const tm = today().slice(0, 7), hr = ui.histRange || "6";
@@ -678,7 +681,7 @@ function renderStats() {
   const byCat = {}; recs.forEach((x) => { const c = x.cat || "기타"; byCat[c] = (byCat[c] || 0) + (Number(x.amount) || 0); });
   const total = recs.reduce((t, x) => t + (Number(x.amount) || 0), 0), cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
   const sel = ui.stCat && byCat[ui.stCat] != null ? ui.stCat : null, pct = (v) => total ? Math.round(v / total * 100) : 0;
-  $("stPie").innerHTML = pieHtml(kind, cats.map(([cat, amt]) => ({ cat, amt })), label, { legend: false, full: E.statPieFull }) || `<p class="muted small" style="margin:0">${esc(cur.name)} ${label} 기록이 없어요.</p>`;
+  $("stPie").innerHTML = pieHtml(kind, cats.map(([cat, amt]) => ({ cat, amt })), label, { legend: false, full: E.pieFull }) || `<p class="muted small" style="margin:0">${esc(cur.name)} ${label} 기록이 없어요.</p>`;
   $("stCats").innerHTML = `<button type="button" class="st-cat all${sel ? "" : " on"}" data-act="stCat" data-k=""><span>${label} 전체 <small>${recs.length}</small></span><b class="won">${won(total)}</b></button>` +
     cats.map(([c, v]) => `<button type="button" class="st-cat${sel === c ? " on" : ""}" data-act="stCat" data-k="${esc(c)}"><i class="st-pct" style="--c:${catVar(kind, c)}">${pct(v)}%</i><span>${catDot(kind, c)}${esc(c)}</span><b class="won">${won(v)}</b></button>`).join("");
   // 오른쪽: 합계 · 흐름 그래프 (그 칸 포함 앞 12칸, 기간이면 그 안의 달) · 내역
