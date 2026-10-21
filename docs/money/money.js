@@ -4,6 +4,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
 //   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌,
 //   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — env.pieFull이면 분류 원형(통계·내역 지출·예산)에 씀 (자산 구성 원형은 그대로),
+//   금액 +/- 기호 없음 (색으로만, app.js won = 부호 없음) — 직접 -로 적은 금액만 - (amtText),
 //   ✏️ 분류·소분류 이름 바꾸기(renameCat·renameSub: 기록·예산·반복도 같이, 있는 이름이면 합침) + 기록에만 남은 분류 표시,
 //   자산 계좌번호(accounts.number)·메모(accounts.memo) = 목록·자산별 보기에 보임 (고치는 곳은 acctset.js),
 //   제목 = env.tabTitles[탭] (냐냐: 예산·내역·달력…), 💳 cardDue = 이용기간 끝난 최근 결제(저번 달 사용분, 결제일 없어도) · 결제 기록 내용 '카드정산 결제',
@@ -30,7 +31,7 @@ export const KIND_LABEL = { income: "수입", expense: "지출", transfer: "보�
 // 💱 화폐: 기본 원 (cur 없음). settings.currencies에 더한 화폐(달러·엔…)도 고를 수 있고, 원이 아닌 기록은 합계·잔액에서 빼고 금액만 그 화폐로 보여 줌
 export const isWon = (x) => !x || !x.cur || x.cur === "원";
 export const currencies = () => ["원"].concat((S.settings.currencies || []).filter((c) => c && c !== "원"));
-export const amtText = (x) => isWon(x) ? won(x.amount) : `${commaNum(Number(x.amount) || 0)} ${x.cur}`;
+export const amtText = (x) => (Number(x.amount) < 0 ? "-" : "") + (isWon(x) ? won(x.amount) : `${commaNum(Math.abs(Number(x.amount) || 0))} ${x.cur}`);   // 냐냐: 직접 -로 적은 금액만 - (won은 부호 없이)
 // 분류는 설정에서 바꿀 수 있음 (없으면 기본)
 export const moneyCats = (kind) => ((S.settings.moneyCats && S.settings.moneyCats[kind]) || MONEY_CATS[kind] || []).slice();
 // 🎨 분류 색: --c0~--c7 (파랑·코랄·민트·노랑·보라·분홍·청록·갈색), --c8 회색. 기본은 분류 목록 순서대로, '기타…'는 회색
@@ -484,7 +485,7 @@ function renderAssets(accts, bal) {
   // 위 3칸: 자산(+ 잔액 합) · 부채(− 잔액·카드값 합) · 합계 — + 빨강 / − 파랑
   const sg = (v) => v > 0 ? " plus" : v < 0 ? " minus" : "", A0 = accts.reduce((s2, a) => s2 + Math.max(0, bal[a.id] || 0), 0), D0 = accts.reduce((s2, a) => s2 + Math.max(0, -(bal[a.id] || 0)), 0);
   $("assetTotal").hidden = !accts.length;
-  $("assetTotal").innerHTML = `<div><span>자산</span><b class="won plus">${won(A0)}</b></div><div><span>부채</span><b class="won minus">${D0 ? "-" : ""}${won(D0)}</b></div><div><span>합계</span><b class="won${sg(A0 - D0)}">${won(A0 - D0)}</b></div>`;
+  $("assetTotal").innerHTML = `<div><span>자산</span><b class="won plus">${won(A0)}</b></div><div><span>부채</span><b class="won minus">${won(D0)}</b></div><div><span>합계</span><b class="won${sg(A0 - D0)}">${won(A0 - D0)}</b></div>`;
   $("acctList").innerHTML = (accts.length ? `<button type="button" class="as-all${sel === "__all" ? " on" : ""}" data-act="asSel" data-id="__all" aria-pressed="${sel === "__all"}"><span>전체<small>${accts.length}</small></span><b class="won${sg(total)}">${won(total)}</b></button>` : "") + (accts.length ? AS_GROUPS.map(([t, label]) => {
     const list = accts.filter((a) => (ACCT_TYPES[a.type] ? a.type : "bank") === t); if (!list.length) return "";
     const card = t === "card", shut = !!fold[t], sum = list.reduce((s2, a) => s2 + (card ? owedOf(a) : bal[a.id] || 0), 0);
@@ -600,7 +601,7 @@ function renderTx(m, r) {
   const sums = { all: r.inc - r.exp - r.out, income: r.inc, expense: r.exp, transfer: r.out };
   const lab = ui.txRange ? rangeLabel(ui.txRange.from, ui.txRange.to) : monthLabel(m);
   $("txMonth").textContent = lab;
-  $("txSum").innerHTML = TX_KINDS.map(([k, l]) => `<button type="button" class="tx-k k-${k}" role="tab" data-act="txKind" data-k="${k}" aria-selected="${f === k}"><span>${l} (${cnt[k]})</span><b class="won${k === "all" ? (sums.all < 0 ? " minus" : " plus") : ""}"><span class="tx-l">${k === "all" && sums.all < 0 ? "-" : ""}${won(Math.abs(sums[k]))}</span><span class="tx-short">${k === "all" && sums.all < 0 ? "-" : ""}${moneyShort(Math.abs(sums[k]))}</span></b></button>`).join("");
+  $("txSum").innerHTML = TX_KINDS.map(([k, l]) => `<button type="button" class="tx-k k-${k}" role="tab" data-act="txKind" data-k="${k}" aria-selected="${f === k}"><span>${l} (${cnt[k]})</span><b class="won${k === "all" ? (sums.all < 0 ? " minus" : " plus") : ""}"><span class="tx-l">${won(Math.abs(sums[k]))}</span><span class="tx-short">${moneyShort(Math.abs(sums[k]))}</span></b></button>`).join("");
   const items = r.items.filter((x) => f === "all" || (x.kind || "expense") === f).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
   [...txSel].forEach((id) => { if (!items.some((x) => x.id === id)) txSel.delete(id); });
   $("txSel").hidden = !txSel.size;
@@ -619,10 +620,10 @@ function txRow(x, ck, o = {}) {   // o.d = 이 자산 쪽에서 본 +/− (자�
         return `<div class="tx-row k-${kind}${ck ? "" : " no-ck"}${ui.mEdit === x.id ? " cur" : ""}${ck && txSel.has(x.id) ? " sel" : ""}" data-act="editMoney" data-id="${esc(x.id)}" role="button" tabindex="0">` +
           (ck ? `<label class="tx-ck" data-noedit><input type="checkbox" data-txck="${esc(x.id)}" ${txSel.has(x.id) ? "checked" : ""} aria-label="고르기"></label>` : "") +
           `<span class="tx-d mono">${shortDate(x.date)}</span><span class="tx-a">${where}</span><span class="tx-c">${cat}</span><span class="tx-s">${esc(x.sub || "")}</span>` +
-          (o.d != null ? `<span class="tx-amt won ${o.d > 0 ? "plus" : "minus"}">${o.d > 0 ? "+" : "-"}${won(Math.abs(o.d))}${o.bal ? `<small class="tx-bal">${o.bal}</small>` : ""}</span>`
+          (o.d != null ? `<span class="tx-amt won ${o.d > 0 ? "plus" : "minus"}">${Number(x.amount) < 0 ? "-" : ""}${won(Math.abs(o.d))}${o.bal ? `<small class="tx-bal">${o.bal}</small>` : ""}</span>`
             : (() => {   // 마이너스 금액(환불·취소)은 부호를 뒤집어 보여 줌 (냐냐 쪽에서 더함 — 편한가계부 가져온 환불 줄)
               const neg = Number(x.amount) < 0, plus = kind === "income" ? !neg : kind === "move" ? null : neg;
-              return `<span class="tx-amt won ${plus == null ? "" : plus ? "plus" : "minus"}">${plus == null ? "" : plus ? "+" : "-"}${amtText(neg ? { ...x, amount: -Number(x.amount) } : x)}</span>`;
+              return `<span class="tx-amt won ${plus == null ? "" : plus ? "plus" : "minus"}">${amtText(x)}</span>`;   // 냐냐: +·- 기호 없이 색으로만, 직접 -로 적은 것만 -
             })()) +
           `<span class="tx-m">${esc(x.memo || "")}</span><span class="tx-n">${x.note ? esc(x.note) : ""}${n ? ` <span class="m-mark">📷${n > 1 ? n : ""}</span>` : ""}</span></div>`;
 }
@@ -638,7 +639,7 @@ function renderMCal(m, r) {
   const cnt = { all: items.length, income: items.filter(isInc).length, expense: items.filter((x) => !isInc(x)).length }, inc = r.inc, out = r.exp + r.out;
   const sums = { all: inc - out, income: inc, expense: out };
   $("mcMonth").textContent = monthLabel(m);
-  $("mcSum").innerHTML = MC_KINDS.map(([k, l]) => `<button type="button" class="tx-k k-${k}" role="tab" data-act="mcKind" data-k="${k}" aria-selected="${f === k}"><span>${l} (${cnt[k]})</span><b class="won${k === "all" ? (sums.all < 0 ? " minus" : " plus") : ""}"><span class="tx-l">${sums[k] < 0 ? "-" : ""}${won(Math.abs(sums[k]))}</span><span class="tx-short">${sums[k] < 0 ? "-" : ""}${moneyShort(Math.abs(sums[k]))}</span></b></button>`).join("");
+  $("mcSum").innerHTML = MC_KINDS.map(([k, l]) => `<button type="button" class="tx-k k-${k}" role="tab" data-act="mcKind" data-k="${k}" aria-selected="${f === k}"><span>${l} (${cnt[k]})</span><b class="won${k === "all" ? (sums.all < 0 ? " minus" : " plus") : ""}"><span class="tx-l">${won(Math.abs(sums[k]))}</span><span class="tx-short">${moneyShort(Math.abs(sums[k]))}</span></b></button>`).join("");
   const first = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1), last = new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate(), lead = first.getDay();
   const sel = ui.mcDay && ui.mcDay.slice(0, 7) === m ? ui.mcDay : t.slice(0, 7) === m ? t : `${m}-01`;
   const short = (v) => v >= 1e5 ? Math.round(v / 1e4) + "만" : v >= 1e4 ? +(v / 1e4).toFixed(1) + "만" : commaNum(v);   // 폰 칸: 160만 · 4.4만 · 8,700
@@ -646,7 +647,7 @@ function renderMCal(m, r) {
   let h = WDS.map((w, i) => `<div class="mc-wd${i === 0 ? " sun" : i === 6 ? " sat" : ""}">${w}</div>`).join("");
   for (let i = 0; i < Math.ceil((lead + last) / 7) * 7; i++) {
     const dt = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1 - lead + i), d = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`, v = day[d] || { inc: 0, out: 0 }, dow = dt.getDay();
-    const lines = (f !== "expense" && v.inc ? num(v.inc, "plus", "+") : "") + (f !== "income" && v.out ? num(v.out, "minus", "-") : "") + (f === "all" && v.inc && v.out ? num(Math.abs(v.inc - v.out), v.inc - v.out < 0 ? "net minus" : "net plus", v.inc - v.out < 0 ? "-" : "") : "");
+    const lines = (f !== "expense" && v.inc ? num(v.inc, "plus", "") : "") + (f !== "income" && v.out ? num(Math.abs(v.out), "minus", "") : "") + (f === "all" && v.inc && v.out ? num(Math.abs(v.inc - v.out), v.inc - v.out < 0 ? "net minus" : "net plus", "") : "");   // 냐냐: 기호 없이 색으로만
     h += `<button type="button" class="mc-d${d.slice(0, 7) !== m ? " out" : ""}${d === t ? " today" : ""}${d === sel ? " on" : ""}${dow === 0 ? " sun" : dow === 6 ? " sat" : ""}" data-act="mcDay" data-day="${d}" aria-label="${shortDate(d)}"><span class="mc-n">${d.slice(0, 7) !== m ? `${dt.getMonth() + 1}/` : ""}${dt.getDate()}</span><span class="mc-v">${lines}</span></button>`;
   }
   $("mcCal").innerHTML = h;
@@ -656,7 +657,7 @@ function renderMCal(m, r) {
     `<div class="mc-ds"><span>수입<b class="won plus">${won(dv.inc)}</b></span><span>지출<b class="won minus">${won(dv.out)}</b></span></div>` +
     `<div class="mc-list">${its.map((x) => { const k = x.kind || "expense";
       return `<button type="button" class="mc-it" data-act="editMoney" data-id="${esc(x.id)}"><span class="c">${x.cat ? esc(x.cat) : esc(KIND_LABEL[k])}${x.sub ? ` <span class="muted small">· ${esc(x.sub)}</span>` : ""}${k === "transfer" ? " 💝" : ""}</span>` +
-        `<span class="a won ${k === "income" ? "plus" : k === "transfer" ? "give" : "minus"}">${k === "income" ? "+" : "-"}${amtText(x)}</span><span class="m">${esc([x.memo, acctName(x.account)].filter(Boolean).join(" · "))}${memoMarks({ ...x, sub: null })}</span></button>`; }).join("") ||
+        `<span class="a won ${k === "income" ? "plus" : k === "transfer" ? "give" : "minus"}">${amtText(x)}</span><span class="m">${esc([x.memo, acctName(x.account)].filter(Boolean).join(" · "))}${memoMarks({ ...x, sub: null })}</span></button>`; }).join("") ||
       '<p class="muted small" style="margin:0">이 날 기록이 없어요.</p>'}</div>`;
 }
 

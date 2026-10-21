@@ -50,7 +50,7 @@ export function mountRepeat(root, env) {
     root.innerHTML = `<div class="panel-head"><div><h3>🔁 매월 반복</h3><span class="muted small">보험료·월세·구독료처럼 매달 같은 날 나가는 돈. 그날이 되면 가계부를 열 때 기록이 저절로 생겨요 (생긴 기록은 내역에서 고치거나 지울 수 있어요).</span></div></div>
       <div class="rp-list">${rules.length ? rules.sort((a, b) => (a[1].day || 0) - (b[1].day || 0)).map(([id, r]) => `<div class="rp-row">
           <span><b>매월 ${r.day}일</b> · ${r.kind === "move" ? `${esc(acctName(r.account))} → ${esc(acctName(r.toAccount))} <span class="muted">이체</span>` : `${esc(acctName(r.account))} · ${esc(r.cat || "기타")}${r.sub ? " / " + esc(r.sub) : ""}`}${r.memo ? ` <span class="muted">${esc(r.memo)}</span>` : ""}</span>
-          <b class="${r.kind === "income" ? "rp-in" : r.kind === "move" ? "muted" : ""}">${r.kind === "income" ? "+" : ""}${esc(won(r.amount))}</b>
+          <b class="${r.kind === "income" ? "rp-in" : r.kind === "move" ? "muted" : ""}">${r.amount < 0 ? "-" : ""}${esc(won(r.amount))}</b>
           <span class="small muted">${esc(r.from.replace("-", "."))}부터</span>
           <button class="btn ghost sm" type="button" data-rp-del="${esc(id)}">그만하기</button></div>`).join("") : '<p class="muted small" style="margin:0">아직 반복이 없어요.</p>'}</div>
       <div class="rp-form">
@@ -96,7 +96,7 @@ export function mountRepeat(root, env) {
     const rule = move ? { kind: "move", amount, day, account: f.account, toAccount: f.toAccount, memo: f.memo.trim(), from: f.from, at: Date.now() }
       : { kind: f.kind, amount, day, account: f.account, cat: f.cat, sub: f.sub || null, memo: f.memo.trim(), from: f.from, at: Date.now() };
     const first = repeatDate(f.from, day) <= env.today() ? ` ${f.from.replace("-", "년 ")}월부터 오늘까지 기록도 바로 생겨요.` : "";
-    if (!confirm(`매월 ${day}일 ${won(amount)} ${move ? "이체" : f.kind === "income" ? "수입" : "지출"}을 반복할까요?${first}`)) return;
+    if (!confirm(`매월 ${day}일 ${amount < 0 ? "-" : ""}${won(amount)} ${move ? "이체" : f.kind === "income" ? "수입" : "지출"}을 반복할까요?${first}`)) return;
     env.act(be.rootUpdate({ [`settings/moneyRepeat/${env.rid()}`]: rule }), "🔁 반복을 추가했어요.").then(() => {
       Object.assign(f, { amount: "", day: "", memo: "", sub: "", toAccount: "" }); render();
     }).catch(() => {});

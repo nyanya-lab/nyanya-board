@@ -6,10 +6,10 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261020p";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf } from "./money.js?v=20261021g";
-import { mountRepeat } from "./repeat.js?v=20261021b";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf } from "./money.js?v=20261021h";
+import { mountRepeat } from "./repeat.js?v=20261021c";
 import { mountAcctSet } from "./acctset.js?v=20261021a";
-import { mountBalance } from "./balance.js?v=20261020a";
+import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
 
 const FB_VER = "10.12.2";
@@ -48,7 +48,8 @@ document.addEventListener("input", (ev) => {
   let i = 0, n = 0; while (i < v.length && n < before) { if (/[\d-]/.test(v[i])) n++; i++; }
   try { el.setSelectionRange(i, i); } catch (e) { /* 무시 */ }
 });
-function won(n) { return Math.round(Number(n) || 0).toLocaleString("ko-KR") + "원"; }
+function won(n) { return Math.abs(Math.round(Number(n) || 0)).toLocaleString("ko-KR") + "원"; }   // 냐냐: +/- 기호 없이 (색으로 구분). 직접 -로 적은 금액은 money.js amtText가 - 붙임
+const wonS = (n) => (Math.round(Number(n) || 0) < 0 ? "-" : "") + won(n);   // 부호가 꼭 필요한 곳 (잔액 맞추기)
 function monthLabel(m) { return m.replace("-", "."); }
 function shiftMonth(m, d) { const p = m.split("-"); const dt = new Date(+p[0], +p[1] - 1 + d, 1); return dt.getFullYear() + "-" + pad(dt.getMonth() + 1); }
 function partner() { return DEFAULTS.partner; }
@@ -241,7 +242,7 @@ bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum,
   get backend() { return backend; }, get testMode() { return false; } });
 initMoney();
 // 🧮 실제 잔액 맞추기 · 🙈 숨기기 (자산 탭)
-const bal = mountBalance($("balPanel"), { S, backend: () => backend, toast, act, esc, won, rows, balances });
+const bal = mountBalance($("balPanel"), { S, backend: () => backend, toast, act, esc, won: wonS, rows, balances });
 // 📥 편한가계부 가져오기 (가계부 설정 탭)
 mountImport($("importPanel"), { S, backend: () => backend, toast, act, esc, won, render, balances, catKey, defaultCats: (k) => (MONEY_CATS[k] || []).slice() });
 // 🔁 매월 반복 (가계부 설정 탭) — 그날이 되면 기록이 저절로
