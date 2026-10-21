@@ -92,3 +92,5 @@
 #moneyPage .st-off { display: none !important; }
 .cat-odd { margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .sub-nm { color: inherit; text-decoration: none; }
+/* 통계 분류 목록 · 설정 분류 편집의 색 동그라미 숨기기 (냐냐 요청) */
+.st-cat .cdot, .cat-row .cdot-btn { display: none; }

@@ -35,6 +35,7 @@
   - 위 제목 = 지금 탭 이름(예산·내역·달력·자산·통계·공통·설정, money.js `E.tabTitles`) + 제목 줄 높이 고정 → 탭마다 내용 시작 높이 같게 (nyanya.css `#moneyPage .page-head`)
   - 기록 창: 날짜를 위 한 줄, 금액은 아래 한 줄 통째로 (글자 크기는 그대로, index.html `.m-amt-full`, nyanya.css)
   - ✏️ 분류·소분류 이름 바꾸기 (money.js `renameCat`·`renameSub`: 목록·색·소분류·기록·예산·반복 한 번에 rootUpdate, 있는 이름이면 합침) + '목록에 없는 분류 (기록엔 있음)' 줄 — 욱진 보드는 rootUpdate가 없어서 맞게 바꿔야 함
+  - 통계 분류 목록·설정 분류 편집의 색 동그라미 숨김 (nyanya.css, 설정에서 색 바꾸기 버튼도 같이 숨음)
   - ⚙ 설정 탭 안 작은 탭 (분류·자산·반복·가져오기·화폐, index.html `#setTabs`·`data-st`, app.js `setSubTab`)
   - 🏦 자산 계좌번호(`accounts.number`)·메모(`accounts.memo`): 자산 목록 이름 옆 작은 글씨, 자산별 보기 위 한 줄 (money.js) + 가계부 설정 '🏦 자산 관리'(`docs/money/acctset.js`: 이름·계좌번호·메모·🙈 숨기기 한곳에서)
   - 💳 카드 결제예정 = 이용기간이 끝난 가장 최근 결제(저번 달 사용분), 결제일 안 정해도 지난달 1일~말일 (money.js `cardDue`) · [결제] 기록 내용 '카드정산 결제' + 메모 '기간 사용분' (`doCardPay`). 2026-10-21 냐냐 카드 3개 편한가계부와 같음 (BC 2,731,592/2,231,282 · 현대 173,661/19,800 · 롯데 0/54,870)
