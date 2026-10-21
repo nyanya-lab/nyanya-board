@@ -5,11 +5,12 @@
 // ❤️ 공통: 지출에 common: true → ../uri/uri.js setMirror로 공통 저장소(uri-board)에 저절로 복사, '❤️ 공통' 탭에서 둘 다 보기 + 반반 정산.
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
-import { mountUri } from "../uri/uri.js?v=20261021k";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml } from "./money.js?v=20261021v";
+import { mountUri } from "../uri/uri.js?v=20261022b";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName } from "./money.js?v=20261022a";
 import { mountRepeat } from "./repeat.js?v=20261021d";
 import { mountAcctSet } from "./acctset.js?v=20261021a";
 import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
+import { startVerCheck } from "../vercheck.js?v=20261022a";
 import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
 
@@ -247,6 +248,9 @@ const uri = mountUri($("uriRoot"), {
   who: "nyanya", toast, mirror: true,
   onCats: () => { if (moneyBound && backend) { renderMoneyForm(); if (!$("catEditor").contains(document.activeElement)) renderCatEditor(); } },   // 🏷 공통 분류가 바뀌면 기록 창 분류 칸도
   // 📊 공통 통계 원형: 가계부와 같은 원형 (큰 순서 8개 색 + '그 밖' 회색, 가운데 구멍 없이)
+  // 📊 공통 지출을 통계 탭과 똑같이: 기간 계산 · 흐름 그래프는 가계부 것으로, 자산·메모는 내가 ❤️로 적은 가계부 기록에서
+  stats: { range: (p, anchor, k) => stRange(p, anchor, k), chart: (el, d) => setChart(el, d),
+    rec: (id) => { const m = /^nyanya-(.+)$/.exec(id || ""), x = m && S.money.get(m[1]); return x ? { acct: acctName(x.account), note: x.note || "" } : null; } },
   pie: (list, label) => { const top = list.slice(0, 8), rest = list.slice(8), xs = rest.length ? top.concat([{ cat: "그 밖", amt: rest.reduce((t, x) => t + x.amt, 0), other: true }]) : top;
     return pieHtml(null, xs, label, { color: (x) => `var(--c${top.indexOf(x) < 0 ? 8 : top.indexOf(x)})`, legend: false, full: true }); },
   savePassword: (pw) => { if (backend) act(backend.saveUriPw(pw || null)).catch(() => {}); }
@@ -288,3 +292,5 @@ try { setSubTab(localStorage.getItem("nyanya-stab") || "cat"); } catch (e) { set
 if (location.hash === "#common") { try { localStorage.setItem("nyanya-mtab", "common"); } catch (e) { /* 무시 */ } }
 setSync();
 firebaseStart().catch(() => { $("loginView").hidden = false; $("loginMsg").textContent = "저장소에 연결하지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요."; });
+// 🔄 새 버전 알림 (욱진 보드처럼)
+startVerCheck(new URL(import.meta.url).searchParams.get("v"));

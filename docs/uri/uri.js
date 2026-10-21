@@ -77,7 +77,7 @@ export function mountUri(root, opts = {}) {
     showDone: false,           // 표에서 정산 끝난 줄도 보기
     pay: null,                 // 💸 정산하기 창: { amount: "123,000" } (null = 닫힘)
     tab: "spend",              // 공통 탭 안 작은 탭: "spend" = 📊 지출 (처음), "settle" = 💸 정산
-    stats: { mode: "month", m: today().slice(0, 7), y: today().slice(0, 4), trip: null, sel: null },   // 📊 지출: 달·해·전체·여행(trip) + 고른 대분류
+    stats: { p: "month", anchor: today(), from: "", to: "", trip: null, sel: null, sub: null },   // 📊 지출: 주간·월간·연간·기간·여행(trip) + 고른 대분류·소분류
     edit: null,                // 고치는 중인 기록 id
     form: null                 // 다시 그릴 때 입력 중이던 값 유지
   };
@@ -252,6 +252,7 @@ export function mountUri(root, opts = {}) {
     root.innerHTML = st.view && !mirrorMode ? openHtml()   // (가계부 연결 없는 보드: 예전 달 화면에서 적기)
       : `<div class="uri-tabs" role="tablist" aria-label="공통 보기"><button type="button" data-uri="tab" data-k="spend" aria-pressed="${st.tab !== "settle"}">📊 지출</button><button type="button" data-uri="tab" data-k="settle" aria-pressed="${st.tab === "settle"}">💸 정산</button></div>`
         + (st.tab === "settle" ? summaryHtml() : statsHtml());
+    if (st.tab !== "settle" && !(st.view && !mirrorMode)) drawStatsChart();
     restoreForm();
     if (keepAmt && document.activeElement === document.body) { const i = root.querySelector('[data-uri-pay]'); if (i) i.focus(); }
   }
@@ -267,11 +268,19 @@ export function mountUri(root, opts = {}) {
       ${r.left ? `<p class="uri-muted uri-small">남는 돈 <b>${won(r.left)}</b> — 미정산을 다 채우고도 남아요.</p>` : ""}
       <div class="uri-row"><button type="button" class="uri-btn" data-uri="payDo">✅ ${won(amt)} 정산 장부에 적기</button><button type="button" class="uri-btn ghost" data-uri="payClose">취소</button><span class="uri-muted uri-small">보통은 가계부에서 이체를 적을 때 '💸 공통비용 정산'을 체크하면 돼요.</span></div>`;
   }
-  // 📊 공통 지출: 가계부 '통계' 탭과 같은 모양 (보드의 st- 클래스) — 왼쪽 원형 + 분류 목록(누르면 바로 밑에 소분류), 오른쪽 합계 · 낸 사람 · 내역. 둘이 낸 것 합쳐서
+  // 📊 공통 지출: 가계부 '통계' 탭과 똑같이 (보드의 st- · tx- 클래스, 기간·그래프는 보드가 opts.stats로 줌) — 표 맨 오른쪽에 '낸 사람'
+  //   기간: 주간·월간·연간·기간 (+ 💸 정산 표에서 누른 ✈️ 여행). 자산·메모는 내가 낸 것만 (보드 가계부에서 찾아서)
+  function stCur() {
+    const sp = st.stats, R = opts.stats && opts.stats.range, t = today();
+    if (sp.p === "trip") return { from: "0000", to: "9999", name: `✈️ ${sp.trip}` };
+    if (sp.p === "range") { let f = sp.from || `${t.slice(0, 7)}-01`, e = sp.to || t; if (f > e) [f, e] = [e, f]; return { from: f, to: e, name: `${f.slice(2).replace(/-/g, ".")} ~ ${e.slice(2).replace(/-/g, ".")}` }; }
+    if (R) return R(sp.p, sp.anchor || t, 0);
+    const m = (sp.anchor || t).slice(0, 7); return { from: m + "-01", to: m + "-31", name: m };
+  }
   function statsHtml() {
-    const sp = st.stats, every = all(), trips = tripNames(every), DOWS = DOW;
-    const list = every.filter((c) => sp.mode === "all" || (sp.mode === "trip" ? groupOf(c, trips) === "trip:" + sp.trip : sp.mode === "year" ? c.date.slice(0, 4) === sp.y : c.date.slice(0, 7) === sp.m));
-    const lab = sp.mode === "all" ? "전체" : sp.mode === "trip" ? `✈️ ${sp.trip}` : sp.mode === "year" ? `${sp.y}년` : `${sp.m.slice(0, 4)}.${sp.m.slice(5)}`;
+    const sp = st.stats, every = all(), trips = tripNames(every), cur = stCur(), DOWS = DOW;
+    const inPer = (c) => sp.p === "trip" ? groupOf(c, trips) === "trip:" + sp.trip : c.date >= cur.from && c.date <= cur.to;
+    const list = every.filter(inPer);
     const sum = (arr) => arr.reduce((t, c) => t + (Number(c.amount) || 0), 0);
     const by = (arr, key) => { const g = {}; arr.forEach((c) => { const k = key(c); (g[k] ||= []).push(c); }); return Object.entries(g).map(([k, v]) => ({ k, v, amt: sum(v) })).sort((a, b) => b.amt - a.amt); };
     const cats = by(list, (c) => c.cat || "기타"), total = sum(list), pct = (v, base) => base ? Math.round(v / base * 100) : 0;
@@ -280,27 +289,44 @@ export function mountUri(root, opts = {}) {
     const subs = selCat ? by(selCat.v, (c) => c.sub || "(소분류 없음)") : [];
     const subSel = sp.sub && subs.find((x) => x.k === sp.sub) ? sp.sub : null;
     const shown = (subSel ? subs.find((x) => x.k === subSel).v : selCat ? selCat.v : list).slice().sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0));
-    const stot = sum(shown), pay = settleOf(shown);
+    const stot = sum(shown);
     const pieList = cats.filter((x) => x.amt > 0).map((x) => ({ cat: x.k, amt: x.amt }));
     const pie = typeof opts.pie === "function" && pieList.length ? opts.pie(pieList, "공통비용") : "";
     const sd = (d) => { const t = new Date(d + "T00:00:00"); return `${t.getMonth() + 1}/${t.getDate()}(${DOWS[t.getDay()]})`; };
+    const rec = (c) => (opts.stats && opts.stats.rec && opts.stats.rec(c.id)) || {};
+    const nameOf = sel ? sel + (subSel ? " › " + subSel : "") : "공통비용 전체";
     return `
-      <div class="st-top uri-st-top">
-        <div class="st-nav">${sp.mode === "trip" ? `<button class="chip" type="button" data-uri="stMonth">‹ 달로</button><b>${esc(lab)}</b>`
-          : `${sp.mode === "all" ? "" : `<button class="chip" type="button" data-uri="stPrev" aria-label="이전">‹</button>`}<b>${esc(lab)}</b>${sp.mode === "all" ? "" : `<button class="chip" type="button" data-uri="stNext" aria-label="다음">›</button>`}
-          <select data-uri-per aria-label="기간 단위"><option value="month"${sp.mode === "month" ? " selected" : ""}>월간</option><option value="year"${sp.mode === "year" ? " selected" : ""}>연간</option><option value="all"${sp.mode === "all" ? " selected" : ""}>전체</option></select>`}</div>
+      <div class="st-top">
+        <div class="st-nav">${sp.p === "trip" ? `<button class="chip" type="button" data-uri="stMonth">‹ 달로</button><b>${esc(cur.name)}</b>`
+          : `<button class="chip" type="button" data-uri="stPrev" aria-label="이전"${sp.p === "range" ? " hidden" : ""}>‹</button><b>${esc(cur.name)}</b><button class="chip" type="button" data-uri="stNext" aria-label="다음"${sp.p === "range" ? " hidden" : ""}>›</button>
+          <select data-uri-per aria-label="기간 단위">${[["week", "주간"], ["month", "월간"], ["year", "연간"], ["range", "기간"]].map(([k, l]) => `<option value="${k}"${sp.p === k ? " selected" : ""}>${l}</option>`).join("")}</select>`}</div>
+        ${sp.p === "range" ? `<div class="row st-range"><label class="f">부터<input type="date" data-uri-from value="${esc(cur.from)}"></label><label class="f">까지<input type="date" data-uri-to value="${esc(cur.to)}"></label></div>` : ""}
       </div>
       <div class="st-grid">
-        <div class="panel st-side"><div class="st-pie">${pie || `<p class="muted small" style="margin:0">${esc(lab)} 공통비용이 없어요.</p>`}</div>
+        <div class="panel st-side"><div class="st-pie">${pie || `<p class="muted small" style="margin:0">${esc(cur.name)} 공통비용 기록이 없어요.</p>`}</div>
           <div class="st-cats"><button type="button" class="st-cat all${sel ? "" : " on"}" data-uri="stSel" data-k=""><span>공통비용 전체 <small>${list.length}</small></span><b class="won">${won(total)}</b></button>${cats.map((x) => `<button type="button" class="st-cat${sel === x.k && !subSel ? " on" : ""}" data-uri="stSel" data-k="${esc(x.k)}"><i class="st-pct" style="--c:${colorOf(x.k)}">${pct(x.amt, total)}%</i><span>${esc(x.k)}</span><b class="won">${won(x.amt)}</b></button>`
             + (sel === x.k ? `<div class="st-cc">${subs.map((y) => `<button type="button" class="st-cat st-sub${subSel === y.k ? " on" : ""}" data-uri="stSub" data-k="${esc(y.k)}"><i class="st-pct">${pct(y.amt, x.amt)}%</i><span>${esc(y.k)}</span><b class="won">${won(y.amt)}</b></button>`).join("")}</div>` : "")).join("")}</div>
         </div>
         <div class="panel st-main">
-          <div class="st-head"><h3>${esc(sel ? sel + (subSel ? " › " + subSel : "") : "공통비용 전체")}</h3><b class="won">${won(stot)}</b></div>
-          <div class="uri-st-pay small"><span>냐냐 낸 돈 <b>${won(pay.paid.nyanya)}</b></span><span>욱진 낸 돈 <b>${won(pay.paid.ukjin)}</b></span>${pay.paid.joint ? `<span>공동 통장 <b>${won(pay.paid.joint)}</b></span>` : ""}<span>1인당 <b>${won(Math.round(stot / 2))}</b></span></div>
-          <div class="tx-list">${shown.length ? `<div class="tx-row tx-th no-ck"><span>날짜</span><span>낸 사람</span><span>분류</span><span>소분류</span><span class="tx-amt">금액</span><span>내용</span><span></span></div>` + shown.map((c) => `<div class="tx-row no-ck uri-tx"><span class="tx-d mono">${esc(sd(c.date))}</span><span class="tx-a">${esc(PAYER[c.payer] || "?")}</span><span class="tx-c">${esc(c.cat || "기타")}</span><span class="tx-s">${esc(c.sub || "")}</span><span class="tx-amt won">${Number(c.amount) < 0 ? "-" : ""}${won(Math.abs(Number(c.amount) || 0))}</span><span class="tx-m">${esc(c.title || "")}</span><span class="tx-n"></span></div>`).join("") : `<p class="muted small" style="margin:8px 0">${esc(lab)} 공통비용이 없어요.</p>`}</div>
+          <div class="st-head"><h3>${esc(nameOf)}</h3><b class="won">${won(stot)}</b></div>
+          <div class="st-chip"><i class="st-pct" style="--c:${sel ? colorOf(sel) : "var(--coral)"}">${sel ? pct(stot, total) : 100}%</i> ${esc(sel ? nameOf : "전체")} <b class="won">${won(stot)}</b></div>
+          ${sp.p === "trip" ? "" : `<div class="as-chart" data-uri-chart></div>`}
+          <div class="tx-list">${shown.length ? `<div class="tx-row tx-th no-ck uri-tx"><span>날짜</span><span>자산</span><span>분류</span><span>소분류</span><span class="tx-amt">금액</span><span>내용</span><span>메모</span><span>낸 사람</span></div>` + shown.map((c) => { const r = rec(c);
+            return `<div class="tx-row no-ck uri-tx"><span class="tx-d mono">${esc(sd(c.date))}</span><span class="tx-a">${esc(r.acct || "")}</span><span class="tx-c">${esc(c.cat || "기타")}</span><span class="tx-s">${esc(c.sub || "")}</span><span class="tx-amt won minus">${Number(c.amount) < 0 ? "-" : ""}${won(Math.abs(Number(c.amount) || 0))}</span><span class="tx-m">${esc(c.title || "")}</span><span class="tx-n">${esc(r.note || "")}</span><span class="tx-p p-${esc(c.payer)}">${esc(PAYER[c.payer] || "?")}</span></div>`; }).join("") : `<p class="muted small" style="margin:8px 0">${esc(cur.name)} ${esc(nameOf)} 기록이 없어요.</p>`}</div>
         </div>
       </div>`;
+  }
+  // 흐름 그래프 (통계 탭처럼 그 칸 포함 앞 12칸 · 연간 5칸 · 기간이면 그 안의 달) — 보드의 그래프 함수로 그림
+  function drawStatsChart() {
+    const el = root.querySelector("[data-uri-chart]"), S0 = opts.stats; if (!el || !S0 || !S0.chart || !S0.range) return;
+    const sp = st.stats, every = all(), t = today();
+    const want = (c) => (!sp.sel || (c.cat || "기타") === sp.sel) && (!sp.sub || (c.sub || "(소분류 없음)") === sp.sub);
+    const sumR = (from, to) => every.reduce((s, c) => s + (c.date >= from && c.date <= to && want(c) ? Number(c.amount) || 0 : 0), 0);
+    let pts;
+    if (sp.p === "range") { const cur = stCur(), ms = []; for (let mm = cur.from.slice(0, 7); mm <= cur.to.slice(0, 7) && ms.length < 24;) { ms.push(mm); const [y, m] = mm.split("-").map(Number), d = new Date(y, m, 1); mm = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; }
+      pts = ms.map((mm) => { const v = sumR(mm + "-01" < cur.from ? cur.from : mm + "-01", mm + "-31" > cur.to ? cur.to : mm + "-31"); return { lab: `${+mm.slice(5)}월`, v, on: false, tip: `${mm} ${won(v)}` }; }); }
+    else pts = Array.from({ length: sp.p === "year" ? 5 : 12 }, (_, i) => i - (sp.p === "year" ? 4 : 11)).map((k) => { const r = S0.range(sp.p, sp.anchor || t, k), v = sumR(r.from, r.to); return { lab: r.lab, v, on: k === 0, tip: `${r.name} ${won(v)}` }; });
+    S0.chart(el, { pts, label: "공통비용 흐름" });
   }
   // 📜 정산한 내역: 같은 이체(settledBy)나 같은 날 정산한 것끼리 → 날짜 · 정산한 금액 · 건수 · 어느 달들. 편한가계부 엑셀에서 가져온 정산은 '가져오기'
   function historyHtml() {
@@ -571,12 +597,12 @@ export function mountUri(root, opts = {}) {
     }
     else if (a === "view" && b.dataset.k) {
       const k = b.dataset.k;
-      if (mirrorMode) { st.tab = "spend"; st.stats = k.startsWith("trip:") ? { ...st.stats, mode: "trip", trip: k.slice(5), sel: null } : { ...st.stats, mode: "month", m: k, y: k.slice(0, 4), sel: null }; render(); }
+      if (mirrorMode) { st.tab = "spend"; st.stats = k.startsWith("trip:") ? { ...st.stats, p: "trip", trip: k.slice(5), sel: null, sub: null } : { ...st.stats, p: "month", anchor: k + "-01", sel: null, sub: null }; render(); }
       else { st.view = k; st.edit = null; render(true); }
       root.scrollIntoView({ block: "start" });
     }
     else if (a === "tab") { st.tab = b.dataset.k === "settle" ? "settle" : "spend"; st.pay = null; render(); }
-    else if (a === "stMonth") { st.stats = { ...st.stats, mode: "month", trip: null, sel: null }; render(); }
+    else if (a === "stMonth") { st.stats = { ...st.stats, p: "month", trip: null, sel: null, sub: null }; render(); }
     else if (a === "setDel" && st.settles[id]) {
       const x = st.settles[id];
       if (!confirm(`정산 장부에서 ${won(x.amount)} 줄을 지울까요? 그만큼 다시 미정산으로 돌아가요.`)) return;
@@ -586,10 +612,9 @@ export function mountUri(root, opts = {}) {
     else if (a === "stSel" && st.stats) { st.stats.sel = st.stats.sel === b.dataset.k && !st.stats.sub ? null : b.dataset.k || null; st.stats.sub = null; render(); }
     else if (a === "stSub" && st.stats) { st.stats.sub = st.stats.sub === b.dataset.k ? null : b.dataset.k; render(); }
     else if ((a === "stPrev" || a === "stNext") && st.stats) {
-      const d = a === "stNext" ? 1 : -1, sp = st.stats;
-      if (sp.mode === "year") sp.y = String(+sp.y + d);
-      else { const [y, m] = sp.m.split("-").map(Number), dt = new Date(y, m - 1 + d, 1); sp.m = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}`; }
-      sp.sel = null; sp.sub = null; render();
+      const d = a === "stNext" ? 1 : -1, sp = st.stats, an = sp.anchor || today(), [y, m, dd] = an.split("-").map(Number);
+      const dt = sp.p === "year" ? new Date(y + d, m - 1, 1) : sp.p === "week" ? new Date(y, m - 1, dd + 7 * d) : new Date(y, m - 1 + d, 1);
+      sp.anchor = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`; sp.sel = null; sp.sub = null; render();
     }
     else if ((a === "subDel" || a === "catDel") && st.cats) {
       const list = st.cats.map((c) => ({ n: c.n, s: c.s.slice() })), c = list[+b.dataset.i]; if (!c) return;
@@ -624,7 +649,12 @@ export function mountUri(root, opts = {}) {
     }
   });
 
-  root.addEventListener("change", (e) => { if (e.target.matches && e.target.matches("[data-uri-per]") && st.stats) { st.stats.mode = e.target.value; st.stats.sel = null; st.stats.sub = null; render(); } });
+  root.addEventListener("change", (e) => {
+    if (!e.target.matches || !st.stats) return;
+    if (e.target.matches("[data-uri-per]")) { st.stats.p = e.target.value; st.stats.sel = null; st.stats.sub = null; render(); }
+    else if (e.target.matches("[data-uri-from]")) { st.stats.from = e.target.value; render(); }
+    else if (e.target.matches("[data-uri-to]")) { st.stats.to = e.target.value; render(); }
+  });
   root.addEventListener("toggle", (e) => { if (e.target.classList && e.target.classList.contains("uri-cats")) st.catsOpen = e.target.open; }, true);
   root.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches && e.target.matches('tr[data-uri="view"]')) e.target.click(); });
   render();
@@ -740,9 +770,12 @@ function injectStyle() {
 .uri-tabs button { font: inherit; border: 0; background: transparent; border-radius: 7px; padding: 8px 4px; font-size: 14px; color: var(--muted); cursor: pointer; }
 .uri-tabs button[aria-pressed="true"] { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
 .uri-st-per { gap: 8px; }
-.uri-st-top { justify-content: flex-start; }
+.uri .st-top { justify-content: flex-end; }   /* 통계 탭처럼 기간 줄은 오른쪽 */
 .uri-st-pay { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); padding: 2px 0 6px; } .uri-st-pay b { color: var(--fg); font-weight: 500; margin-left: 4px; }
-.uri .st-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; } .uri-st-per b { font-family: var(--f-mono); min-width: 96px; text-align: center; }
+.uri .st-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.uri .tx-row.no-ck.uri-tx { grid-template-columns: 82px minmax(0, .75fr) minmax(0, 1fr) minmax(0, .8fr) 118px minmax(0, 1.4fr) minmax(0, 1fr) 56px; cursor: default; }
+.uri .tx-p { font-size: 12px; font-weight: 600; white-space: nowrap; } .uri .tx-p.p-nyanya { color: var(--coral); } .uri .tx-p.p-ukjin { color: var(--blue); } .uri .tx-p.p-joint { color: var(--mint); }
+@media (max-width: 720px) { .uri .tx-row.no-ck.uri-tx { grid-template-columns: 66px minmax(0, 1fr) auto; grid-template-areas: "d c amt" "d m p"; } .uri .uri-tx .tx-a, .uri .uri-tx .tx-n, .uri .uri-tx .tx-s { display: none; } .uri .uri-tx .tx-d { grid-area: d; } .uri .uri-tx .tx-c { grid-area: c; } .uri .uri-tx .tx-amt { grid-area: amt; } .uri .uri-tx .tx-m { grid-area: m; } .uri .uri-tx .tx-p { grid-area: p; justify-self: end; } .uri .tx-th.uri-tx { display: none; } } .uri-st-per b { font-family: var(--f-mono); min-width: 96px; text-align: center; }
 .uri-st-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .uri-st-list { display: grid; gap: 4px; }
 .uri-st-row { font: inherit; display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border: 0; border-radius: 10px; background: var(--sunk); color: var(--fg); text-align: left; cursor: pointer; }

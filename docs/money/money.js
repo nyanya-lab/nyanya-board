@@ -731,7 +731,7 @@ const ST_P = { week: "주간", month: "월간", year: "연간", range: "기간" 
 const addDaysS = (d, n) => { const t = new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8) + n); return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`; };
 const sundayOfS = (d) => addDaysS(d, -new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8)).getDay());
 // 기간 하나: anchor 날짜가 든 주(일~토)·달·해, k칸 앞뒤로 옮긴 것
-function stRange(p, anchor, k = 0) {
+export function stRange(p, anchor, k = 0) {   // (냐냐: 공통 탭 지출도 같은 기간 계산을 씀)
   if (p === "week") { const s = addDaysS(sundayOfS(anchor), 7 * k); return { from: s, to: addDaysS(s, 6), lab: `${+s.slice(5, 7)}/${+s.slice(8)}`, name: `${ymdDot(s)} ~ ${ymdDot(addDaysS(s, 6)).slice(3)}` }; }
   if (p === "year") { const y = +anchor.slice(0, 4) + k; return { from: `${y}-01-01`, to: `${y}-12-31`, lab: `${y}`, name: `${y}년` }; }
   const m = shiftMonth(anchor.slice(0, 7), k); return { from: `${m}-01`, to: dayInMonth(m, 31), lab: `${+m.slice(5)}월`, name: m };

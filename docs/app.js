@@ -3,8 +3,9 @@
 // 로그인 없음, 비밀번호 = 저장 위치. 항목마다 따로 저장해서 폰·PC가 서로 덮어쓰지 않음.
 
 import { firebaseConfig } from "./firebase-config.js?v=20261020l";
-import { mountUri } from "./uri/uri.js?v=20261021k";
+import { mountUri } from "./uri/uri.js?v=20261022b";
 import { createLinks, vocabToday, vocabStreak, isWatching, finishDays, watchPeriods, dayActivity } from "./links.js?v=20261020l";
+import { startVerCheck } from "./vercheck.js?v=20261022a";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -634,3 +635,5 @@ firebaseStart().catch(() => {
   $("#loginView").hidden = false;
   $("#loginMsg").textContent = "저장소에 연결하지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.";
 });
+// 🔄 새 버전 알림 (욱진 보드처럼)
+startVerCheck(new URL(import.meta.url).searchParams.get("v"));
