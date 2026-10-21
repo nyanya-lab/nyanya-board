@@ -126,3 +126,10 @@ table.bulk { min-width: 1200px; }
   #moneyPage .page-head .month-nav b { min-width: 0; }
 }
 .m-common-view { min-width: 0; }   /* 우리 탭 표가 폰 화면을 밀지 않게 */
+/* 🏷 예전 공통비용 옮기기 미리보기 (ccmigrate.js) */
+.ccm-panel { border: 1px solid color-mix(in srgb, var(--coral) 40%, transparent); }
+.ccm-tbl { display: grid; gap: 2px; font-size: 14px; }
+.ccm-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) 56px 120px; gap: 8px; padding: 6px 10px; border-radius: 8px; background: var(--sunk); }
+.ccm-row span:nth-child(n+3) { text-align: right; font-variant-numeric: tabular-nums; }
+.ccm-th { background: none; color: var(--muted); font-size: 12px; }
+@media (max-width: 720px) { .ccm-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px; } .ccm-row span:nth-child(4) { display: none; } }

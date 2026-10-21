@@ -6,9 +6,10 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261021e";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml } from "./money.js?v=20261021q";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName } from "./money.js?v=20261021q";
 import { mountRepeat } from "./repeat.js?v=20261021d";
 import { mountAcctSet } from "./acctset.js?v=20261021a";
+import { mountCcMigrate } from "./ccmigrate.js?v=20261021a";
 import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
 
@@ -138,7 +139,7 @@ function render() {
   $("todayMono").textContent = today().replace(/-/g, ".");
   renderMoney();
   bal.render();
-  rp.render(); rp.run(); ak.render();
+  rp.render(); rp.run(); ak.render(); ccm.render();
   tripList();
   mirrorCommon();
 }
@@ -263,6 +264,8 @@ mountImport($("importPanel"), { S, backend: () => backend, toast, act, esc, won,
 // 🔁 매월 반복 (가계부 설정 탭) — 그날이 되면 기록이 저절로
 const rp = mountRepeat($("repeatPanel"), { S, backend: () => backend, toast, act, esc, won, rows, today, rid,
   cats: (k) => { const c = (S.settings.moneyCats || {})[k]; return (c && c.length ? c : MONEY_CATS[k] || []).slice(); }, subs: subsOf, acctOpts: acctOptsHtml });
+// 🏷 예전 공통비용 기록 → 공통 분류로 옮기기 (가계부 설정 '분류', 다 옮기면 안 보임)
+const ccm = mountCcMigrate($("ccmPanel"), { S, backend: () => backend, toast, esc, won, ccOf, commonCatName, commonCats: () => uri.cats() });
 // 🏦 자산 관리 (가계부 설정 탭) — 이름 · 계좌번호 · 메모 · 🙈 숨기기
 const ak = mountAcctSet($("acctSetPanel"), { S, backend: () => backend, toast, act, esc, rows });
 // ⚙ 설정 탭 안 작은 탭: 분류 · 자산 · 반복 · 가져오기 · 화폐 (이 기기에 기억)
