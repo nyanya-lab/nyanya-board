@@ -125,3 +125,4 @@ table.bulk { min-width: 1200px; }
   #moneyPage .page-head .month-nav .chip[data-d="1"]::before { content: "›"; font-size: 16px; }
   #moneyPage .page-head .month-nav b { min-width: 0; }
 }
+.m-common-view { min-width: 0; }   /* 우리 탭 표가 폰 화면을 밀지 않게 */
