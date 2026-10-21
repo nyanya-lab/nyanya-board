@@ -754,24 +754,22 @@ function renderStats() {
   const total = recs.reduce((t, x) => t + cntAmt(x), 0), cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
   const sel = ui.stCat && byCat[ui.stCat] != null ? ui.stCat : null, pct = (v) => total ? Math.round(v / total * 100) : 0;
   $("stPie").innerHTML = pieHtml(kind, cats.map(([cat, amt]) => ({ cat, amt })), label, { legend: false, full: E.pieFull }) || `<p class="muted small" style="margin:0">${esc(cur.name)} ${label} 기록이 없어요.</p>`;
-  $("stCats").innerHTML = `<button type="button" class="st-cat all${sel ? "" : " on"}" data-act="stCat" data-k=""><span>${label} 전체 <small>${recs.length}</small></span><b class="won">${wonN(total)}</b></button>` +
-    cats.map(([c, v]) => `<button type="button" class="st-cat${sel === c ? " on" : ""}" data-act="stCat" data-k="${esc(c)}"><i class="st-pct" style="--c:${catVar(kind, c)}">${pct(v)}%</i><span>${catDot(kind, c)}${esc(c)}</span><b class="won">${wonN(v)}</b></button>`).join("");
   // 오른쪽: 합계 · 흐름 그래프 (그 칸 포함 앞 12칸, 기간이면 그 안의 달) · 내역
   let shown = sel ? recs.filter((x) => (x.cat || "기타") === sel) : recs, stot = sel ? byCat[sel] : total;
-  $("stHead").innerHTML = `<h3>${esc(sel || label + " 전체")}</h3><b class="won">${wonN(stot)}</b>`;
-  // 🏷 💙 공통비용을 누르면 공통 분류별로 펼치기 (냐냐): 대분류마다 % · 금액, 누르면 그 대분류 기록만
-  const ccBox = $("stCcSub");
-  if (ccBox) {
-    const isCc = !!sel && kind === "expense" && /공통비용/.test(sel) && !!E.commonCats;
-    ccBox.hidden = !isCc;
-    if (isCc) {
-      const g = {}; shown.forEach((x) => { const c = ccOf(x).c; g[c] = (g[c] || 0) + cntAmt(x); });
-      const rows = Object.entries(g).sort((a, b) => b[1] - a[1]), base = rows.reduce((t, [, v]) => t + v, 0);
-      if (ui.stCc && !(ui.stCc in g)) ui.stCc = null;
-      ccBox.innerHTML = `<div class="st-cc-h small muted">공통 분류별 · 누르면 그것만</div>` + rows.map(([c, v]) => `<button type="button" class="st-cat${ui.stCc === c ? " on" : ""}" data-act="stCc" data-k="${esc(c)}"><i class="st-pct">${base ? Math.round(v / base * 100) : 0}%</i><span>${esc(c)}</span><b class="won">${wonN(v)}</b></button>`).join("");
-      if (ui.stCc) shown = shown.filter((x) => ccOf(x).c === ui.stCc);
-    } else ui.stCc = null;
-  }
+  // 🏷 💙 공통비용을 누르면 왼쪽 목록에서 바로 밑으로 공통 분류별 펼치기 (냐냐): 대분류마다 % · 금액, 누르면 그 대분류 기록만
+  const isCc = !!sel && kind === "expense" && /공통비용/.test(sel) && !!E.commonCats;
+  let ccHtml = "";
+  if (isCc) {
+    const g = {}; shown.forEach((x) => { const c = ccOf(x).c; g[c] = (g[c] || 0) + cntAmt(x); });
+    const rows = Object.entries(g).sort((a, b) => b[1] - a[1]), base = rows.reduce((t, [, v]) => t + v, 0);
+    if (ui.stCc && !(ui.stCc in g)) ui.stCc = null;
+    ccHtml = `<div class="st-cc">` + rows.map(([c, v]) => `<button type="button" class="st-cat st-sub${ui.stCc === c ? " on" : ""}" data-act="stCc" data-k="${esc(c)}"><i class="st-pct">${base ? Math.round(v / base * 100) : 0}%</i><span>${esc(c)}</span><b class="won">${wonN(v)}</b></button>`).join("") + `</div>`;
+    if (ui.stCc) { shown = shown.filter((x) => ccOf(x).c === ui.stCc); stot = g[ui.stCc]; }
+  } else ui.stCc = null;
+  if ($("stCcSub")) $("stCcSub").hidden = true;
+  $("stCats").innerHTML = `<button type="button" class="st-cat all${sel ? "" : " on"}" data-act="stCat" data-k=""><span>${label} 전체 <small>${recs.length}</small></span><b class="won">${wonN(total)}</b></button>` +
+    cats.map(([c, v]) => `<button type="button" class="st-cat${sel === c ? " on" : ""}" data-act="stCat" data-k="${esc(c)}"><i class="st-pct" style="--c:${catVar(kind, c)}">${pct(v)}%</i><span>${catDot(kind, c)}${esc(c)}</span><b class="won">${wonN(v)}</b></button>` + (sel === c ? ccHtml : "")).join("");
+  $("stHead").innerHTML = `<h3>${esc(sel ? sel + (ui.stCc ? " › " + ui.stCc : "") : label + " 전체")}</h3><b class="won">${wonN(stot)}</b>`;
   $("stChip").innerHTML = `<i class="st-pct" style="--c:${sel ? catVar(kind, sel) : "var(--coral)"}">${sel ? pct(stot) : 100}%</i> ${esc(sel || "전체")} <b class="won">${won(stot)}</b>`;
   const sum = (from, to) => { let t = 0; S.money.forEach((x) => { if ((x.kind || "expense") === kind && isWon(x) && x.date >= from && x.date <= to && (!sel || (x.cat || "기타") === sel)) t += cntAmt(x); }); return t; };
   let pts;
