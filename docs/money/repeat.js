@@ -27,7 +27,7 @@ export function duePatch(rules, today) {
   return patch;
 }
 
-// env = { S, backend(), toast, act, esc, won, rows, today, cats(kind), subs(kind, cat), rid }
+// env = { S, backend(), toast, act, esc, won, rows, today, cats(kind), subs(kind, cat), rid, acctOpts(list, cur) = 자산 고르는 칸 (묶음·계좌번호) }
 export function mountRepeat(root, env) {
   const { esc, won } = env;
   const f = { kind: "expense", amount: "", day: "", account: "", toAccount: "", cat: "", sub: "", memo: "", from: "" };
@@ -57,8 +57,8 @@ export function mountRepeat(root, env) {
         <select data-rp="kind" aria-label="수입/지출"><option value="expense"${f.kind === "expense" ? " selected" : ""}>지출</option><option value="income"${f.kind === "income" ? " selected" : ""}>수입</option><option value="move"${move ? " selected" : ""}>이체</option></select>
         <input type="text" class="amt-in" data-neg inputmode="numeric" data-rp="amount" placeholder="금액" aria-label="금액" value="${esc(f.amount)}">
         <label class="rp-day">매월 <input type="number" min="1" max="31" data-rp="day" value="${esc(f.day)}" aria-label="며칠"> 일</label>
-        <select data-rp="account" aria-label="${move ? "보내는 곳" : "자산"}"><option value="">${move ? "보내는 곳" : "자산 고르기"}</option>${accts.map((a) => `<option value="${esc(a.id)}"${a.id === f.account ? " selected" : ""}>${esc(a.name)}</option>`).join("")}</select>
-        ${move ? `<select data-rp="toAccount" aria-label="받는 곳"><option value="">받는 곳</option>${accts.filter((a) => a.id !== f.account).map((a) => `<option value="${esc(a.id)}"${a.id === f.toAccount ? " selected" : ""}>${esc(a.name)}</option>`).join("")}</select>` : `<select data-rp="cat" aria-label="분류"><option value="">분류 고르기</option>${cats.map((c) => `<option${c === f.cat ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>
+        <select data-rp="account" aria-label="${move ? "보내는 곳" : "자산"}"><option value="">${move ? "보내는 곳" : "자산 고르기"}</option>${env.acctOpts ? env.acctOpts(accts, f.account) : accts.map((a) => `<option value="${esc(a.id)}"${a.id === f.account ? " selected" : ""}>${esc(a.name)}</option>`).join("")}</select>
+        ${move ? `<select data-rp="toAccount" aria-label="받는 곳"><option value="">받는 곳</option>${(() => { const l = accts.filter((a) => a.id !== f.account); return env.acctOpts ? env.acctOpts(l, f.toAccount) : l.map((a) => `<option value="${esc(a.id)}"${a.id === f.toAccount ? " selected" : ""}>${esc(a.name)}</option>`).join(""); })()}</select>` : `<select data-rp="cat" aria-label="분류"><option value="">분류 고르기</option>${cats.map((c) => `<option${c === f.cat ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>
         <select data-rp="sub" aria-label="소분류"${subs.length ? "" : " disabled"}><option value="">소분류 없음</option>${subs.map((s) => `<option${s === f.sub ? " selected" : ""}>${esc(s)}</option>`).join("")}</select>`}
         <input type="text" data-rp="memo" placeholder="내용 (선택)" aria-label="내용" maxlength="40" value="${esc(f.memo)}">
         <label class="rp-day">시작 <input type="month" data-rp="from" value="${esc(f.from)}" aria-label="시작 달"></label>

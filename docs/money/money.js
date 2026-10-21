@@ -4,6 +4,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
 //   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌,
 //   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — env.pieFull이면 분류 원형(통계·내역 지출·예산)에 씀 (자산 구성 원형은 그대로),
+//   자산 고르는 칸 = 자산 탭 순서로 현금·통장·카드·저축 묶음 + 이름_계좌번호 (acctOptsHtml),
 //   금액 +/- 기호 없음 (색으로만, app.js won = 부호 없음) — 직접 -로 적은 금액만 - (amtText),
 //   ✏️ 분류·소분류 이름 바꾸기(renameCat·renameSub: 기록·예산·반복도 같이, 있는 이름이면 합침) + 기록에만 남은 분류 표시,
 //   자산 계좌번호(accounts.number)·메모(accounts.memo) = 목록·자산별 보기에 보임 (고치는 곳은 acctset.js),
@@ -214,7 +215,7 @@ function showCardPay(o) {
   $("mvText").innerHTML = `<p class="small muted">${o.start ? `이용기간 ${shortDate(o.start)} ~ ${shortDate(o.end)} 사용분이에요. ` : ""}카드 앱의 실제 청구 금액과 다르면 고쳐 주세요 (할부·연회비 등). [이체 기록하기]를 눌러야 기록돼요.</p>` +
     `<div class="form"><label class="f">금액 (원)<input type="text" class="amt-in" id="cpAmt" inputmode="numeric" autocomplete="off" value="${o.amt ? commaNum(o.amt) : ""}"></label>` +
     `<div class="row"><label class="f">날짜<input type="date" id="cpDate" value="${esc(o.date || today())}"></label>` +
-    `<label class="f">빠지는 통장<select id="cpFrom">${banks.map((a) => `<option value="${esc(a.id)}"${a.id === o.from ? " selected" : ""}>${ACCT_ICON[a.type] || ""} ${esc(a.name)}</option>`).join("") || '<option value="">통장을 먼저 추가해 주세요</option>'}</select></label></div>` +
+    `<label class="f">빠지는 통장<select id="cpFrom">${acctOptsHtml(banks, o.from) || '<option value="">통장을 먼저 추가해 주세요</option>'}</select></label></div>` +
     `<p class="small muted" style="margin:0">→ 받는 곳: 💳 ${esc(card.name)}</p></div>`;
   $("mvBtns").innerHTML = '<button class="btn" type="button" data-act="cardPayDo">이체 기록하기</button><button class="btn ghost" type="button" data-act="mvClose">취소</button>';
   openDlg($("moveDlg"));
@@ -708,7 +709,7 @@ function renderStats() {
 // ---------- ▦ 다건입력: 줄마다 구분·날짜·자산·분류(이체는 받는 곳)·소분류·금액·화폐·내용·메모 → [저장]으로 한 번에 ----------
 const BULK_KINDS = ["income", "expense", "transfer", "move"];
 function bulkAcctOpts(kind, cur) {
-  return '<option value="">-</option>' + sortedAccts().filter((a) => !(kind === "income" && a.type === "card")).map((a) => `<option value="${esc(a.id)}"${a.id === cur ? " selected" : ""}>${esc(a.name)}</option>`).join("");
+  return '<option value="">-</option>' + acctOptsHtml(sortedAccts().filter((a) => !(kind === "income" && a.type === "card")), cur);
 }
 function bulkRowHtml(v) {
   const k = BULK_KINDS.includes(v.kind) ? v.kind : "expense", cats = moneyCats(k === "move" ? "expense" : k);
@@ -825,12 +826,20 @@ async function addMPics(files) {
 // 지금 기록 칸이 화면에 있는지 (서랍 창이 열렸거나 지출 탭에서 칸 안에 있을 때만 붙여넣기 받음)
 function mFormActive() { const p = $("moneyPanel"); return $("mDrawer").open || (!!p.offsetParent && p.contains(document.activeElement)); }
 
+// 자산 고르는 칸 (냐냐 쪽에서 더함, 편한가계부처럼): 자산 탭과 같은 순서로 현금 · 통장 · 카드 · 저축 묶음, 이름_계좌번호
+export const acctLabel = (a) => a.name + (a.number ? "_" + a.number : "");
+export function acctOptsHtml(list, cur) {
+  return AS_GROUPS.map(([t, label]) => {
+    const g = list.filter((a) => (ACCT_TYPES[a.type] ? a.type : "bank") === t); if (!g.length) return "";
+    return `<optgroup label="${label}">${g.map((a) => `<option value="${esc(a.id)}"${a.id === cur ? " selected" : ""}>${esc(acctLabel(a))}</option>`).join("")}</optgroup>`;
+  }).join("");
+}
 // 돈 기록 폼: 종류에 맞게 자산·분류 칸 바꾸기
 export function acctOptions(sel, cur, kind) {
   const list = sortedAccts();
   // 수입은 카드로 받을 일이 없으니 카드 빼기
   const ok = list.filter((a) => !(kind === "income" && a.type === "card"));
-  sel.innerHTML = '<option value="">선택 안 함</option>' + ok.map((a) => `<option value="${esc(a.id)}">${ACCT_ICON[a.type] || ""} ${esc(a.name)}</option>`).join("") +
+  sel.innerHTML = '<option value="">선택 안 함</option>' + acctOptsHtml(ok) +
     (cur && !ok.some((a) => a.id === cur) ? `<option value="${esc(cur)}">${esc(acctName(cur))}</option>` : "");
   sel.value = cur || "";
 }
@@ -933,7 +942,7 @@ export function openAcct(id) {
   const p = (a && a.pay) || {}, days = (max, last) => Array.from({ length: max }, (_, i) => i + 1).map((n) => `<option value="${n}">${n === 31 && last ? "말일" : n + "일"}</option>`).join("");
   $("acPayDay").innerHTML = '<option value="">아직 안 정함</option>' + days(31, true);
   $("acFromD").innerHTML = days(31, true); $("acToD").innerHTML = days(31, true);
-  $("acPayFrom").innerHTML = sortedAccts().filter((x) => x.type !== "card").map((x) => `<option value="${esc(x.id)}">${ACCT_ICON[x.type] || ""} ${esc(x.name)}</option>`).join("") || '<option value="">통장을 먼저 추가해 주세요</option>';
+  $("acPayFrom").innerHTML = acctOptsHtml(sortedAccts().filter((x) => x.type !== "card")) || '<option value="">통장을 먼저 추가해 주세요</option>';
   $("acPayDay").value = p.day || ""; if (p.from) $("acPayFrom").value = p.from;
   $("acFromM").value = String(p.fm ?? -1); $("acFromD").value = String(p.fd || 1); $("acToM").value = String(p.tm ?? -1); $("acToD").value = String(p.td || 31);
   renderAcctForm(); openDlg($("acctDlg"));
