@@ -112,3 +112,16 @@ table.bulk { min-width: 1200px; }
 #moneyPage .mc-v i.net.minus { color: var(--fg); background: color-mix(in srgb, var(--blue, #2f6feb) 16%, transparent); }
 /* 합계 줄 바탕 안쪽 여백만큼 수입·지출 줄도 같은 여백 → 숫자 오른쪽 끝이 다 맞음 */
 #moneyPage .mc-v i { padding: 0 4px; box-sizing: border-box; }
+/* 💑 내 몫으로 보기 버튼 (위 제목 줄 오른쪽) */
+#moneyPage .page-head { gap: 8px; }
+#moneyPage .page-head > div:first-child { margin-right: auto; }
+.m-mine { white-space: nowrap; }
+.m-mine .mm-s { display: none; }
+@media (max-width: 720px) {
+  .m-mine .mm-l { display: none; } .m-mine .mm-s { display: inline; }
+  #moneyPage .page-head h2 { white-space: nowrap; }
+  #moneyPage .page-head .month-nav .chip { font-size: 0; padding-left: 10px; padding-right: 10px; }
+  #moneyPage .page-head .month-nav .chip[data-d="-1"]::before { content: "‹"; font-size: 16px; }
+  #moneyPage .page-head .month-nav .chip[data-d="1"]::before { content: "›"; font-size: 16px; }
+  #moneyPage .page-head .month-nav b { min-width: 0; }
+}

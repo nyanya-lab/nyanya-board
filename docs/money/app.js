@@ -6,7 +6,7 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261020p";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml } from "./money.js?v=20261021n";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml } from "./money.js?v=20261021p";
 import { mountRepeat } from "./repeat.js?v=20261021d";
 import { mountAcctSet } from "./acctset.js?v=20261021a";
 import { mountBalance } from "./balance.js?v=20261021a";
@@ -238,6 +238,7 @@ const uri = mountUri($("uriRoot"), {
 bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum, deepMerge, esc, isAdminDevice, moneyShort, monthLabel, openDlg, pad, partner, quietly, ready, render, rid, rows, shiftMonth, shortDate, shrinkPic, statTile, toast, today, ui, viewPic, won,
   give: false,   // 💝 줄 돈(욱진 보드 전용)은 안 씀
   tabTitles: { budget: "예산", spend: "내역", cal: "달력", assets: "자산", stats: "통계", common: "공통", settings: "설정" },   // 위 제목 = 지금 탭 이름 (냐냐 요청)
+  mineView: true,   // 💑 내 몫으로 보기 버튼 (공통비용 절반·욱진입금 빼고, 기본 꺼짐 — settings.moneyMine)
   catRank: true,   // 분류 색: 원형마다 금액 큰 8개가 서로 다른 색, 9번째부터 '그 밖' (냐냐 요청)
   pieFull: true,   // 분류 원형(통계·내역 지출·예산)은 가운데 구멍 없이 꽉 찬 원형 (냐냐 요청, 자산 구성 원형은 그대로)
   get backend() { return backend; }, get testMode() { return false; } });

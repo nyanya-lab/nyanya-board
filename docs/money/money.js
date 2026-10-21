@@ -4,6 +4,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
 //   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌,
 //   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — env.pieFull이면 분류 원형(통계·내역 지출·예산)에 씀 (자산 구성 원형은 그대로),
+//   💑 내 몫으로 보기(cntAmt·mineOn: 공통비용 절반·욱진입금 빼고, 기본 꺼짐),
 //   달력 칸 합계(수입−지출) 줄은 수입·지출 하나만 있어도 보임,
 //   분류 색 = 원형마다 금액 큰 8개가 서로 다른 색(늘 쓰는 색 먼저), 9번째부터 '그 밖' (E.catRank, setCatView),
 //   ▦ 다건입력 채우기 손잡이(bulkFillInit, 엑셀처럼 끌어서 복사),
@@ -37,6 +38,16 @@ export const isWon = (x) => !x || !x.cur || x.cur === "원";
 export const currencies = () => ["원"].concat((S.settings.currencies || []).filter((c) => c && c !== "원"));
 // 합계(지출·수입·분류별)가 마이너스면 - (= 냐냐가 -로 적은 게 더 커서). 잔액·순합계(수입−지출)는 기호 없이 색으로만
 export const wonN = (n) => (Math.round(Number(n) || 0) < 0 ? "-" : "") + won(n);
+// 💑 내 몫으로 보기 (냐냐 쪽에서 더함, E.mineView + settings.moneyMine, 기본 꺼짐): 켜면 합계·통계·달력·예산에서
+//   💙 공통비용(❤️ 체크했거나 분류에 '공통비용')은 절반만, 💚 욱진입금(분류에 '욱진입금')은 수입에서 빼고 '정산 받은 돈'으로 따로. 기록·잔액은 그대로
+export const mineOn = () => !!(E && E.mineView && S.settings.moneyMine);
+export const isSettleIn = (x) => x.kind === "income" && /욱진입금/.test(x.cat || "");
+export function cntAmt(x) {
+  const a = Number(x.amount) || 0; if (!mineOn()) return a;
+  if (isSettleIn(x)) return 0;
+  if ((x.kind === "expense" || !x.kind) && (x.common || /공통비용/.test(x.cat || ""))) return a / 2;
+  return a;
+}
 export const amtText = (x) => (Number(x.amount) < 0 ? "-" : "") + (isWon(x) ? won(x.amount) : `${commaNum(Math.abs(Number(x.amount) || 0))} ${x.cur}`);   // 냐냐: 직접 -로 적은 금액만 - (won은 부호 없이)
 // 분류는 설정에서 바꿀 수 있음 (없으면 기본)
 export const moneyCats = (kind) => ((S.settings.moneyCats && S.settings.moneyCats[kind]) || MONEY_CATS[kind] || []).slice();
@@ -368,10 +379,11 @@ export function renderPlan(m, r) {
 }
 
 export function monthTotals(m, range) {   // range = {from, to} 이면 그 기간 (내역 기간 고르기)
-  const r = { inc: 0, out: 0, exp: 0, byCat: {}, items: [] };
+  const r = { inc: 0, out: 0, exp: 0, byCat: {}, items: [], settleIn: 0 };
   S.money.forEach((x, id) => {
     if (!x.date || (range ? x.date < range.from || x.date > range.to : x.date.slice(0, 7) !== m)) return;
-    const a = isWon(x) ? Number(x.amount) || 0 : 0;   // 다른 화폐는 목록엔 보이고 합계엔 안 들어감
+    const a = isWon(x) ? cntAmt(x) : 0;   // 다른 화폐는 목록엔 보이고 합계엔 안 들어감. 💑 내 몫 보기면 공통비용 절반·욱진입금 0
+    if (mineOn() && isWon(x) && isSettleIn(x)) r.settleIn += Number(x.amount) || 0;
     r.items.push({ id, ...x });
     if (x.kind === "income") r.inc += a;
     else if (x.kind === "transfer") r.out += a;
@@ -419,6 +431,7 @@ export function renderMTabs() {
   document.querySelectorAll("#moneyPage [data-mtab]").forEach((el) => { el.hidden = el.dataset.mtab !== tab; });
   // 맨 위 달 넘기기는 예산 탭만 (내역·달력·자산·통계는 자기 칸에 따로), 맨 위 요약 4칸은 관리자 보드만 (내역 탭에 요약 칸이 있어서)
   document.querySelector("#moneyPage .month-nav").hidden = !adm && tab !== "budget"; $("moneyStats").hidden = !adm;
+  const mb = $("mineBtn"); if (mb) { mb.hidden = !E.mineView || !["budget", "spend", "cal", "stats"].includes(tab); mb.setAttribute("aria-pressed", String(mineOn())); }   // 💑 내 몫으로 보기 (냐냐)
   if (tab === "settings" && !$("catEditor").contains(document.activeElement)) { renderCatEditor(); renderCurEditor(); }
 }
 export function renderMoney() {
@@ -636,6 +649,7 @@ function renderTx(m, r) {
   const sums = { all: r.inc - r.exp - r.out, income: r.inc, expense: r.exp, transfer: r.out };
   const lab = ui.txRange ? rangeLabel(ui.txRange.from, ui.txRange.to) : monthLabel(m);
   $("txMonth").textContent = lab;
+  const mn = $("mineNote"); if (mn) { mn.hidden = !mineOn(); mn.textContent = mineOn() ? `💑 내 몫으로 보는 중 — 💙 공통비용은 절반만${r.settleIn ? ` · 💚 정산 받은 돈 ${won(r.settleIn)}은 수입에서 뺐어요` : ""}` : ""; }
   $("txSum").innerHTML = TX_KINDS.map(([k, l]) => `<button type="button" class="tx-k k-${k}" role="tab" data-act="txKind" data-k="${k}" aria-selected="${f === k}"><span>${l} (${cnt[k]})</span><b class="won${k === "all" ? (sums.all < 0 ? " minus" : " plus") : ""}"><span class="tx-l">${k === "all" ? won(sums[k]) : wonN(sums[k])}</span><span class="tx-short">${k !== "all" && sums[k] < 0 ? "-" : ""}${moneyShort(Math.abs(sums[k]))}</span></b></button>`).join("");
   const items = r.items.filter((x) => f === "all" || (x.kind || "expense") === f).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
   [...txSel].forEach((id) => { if (!items.some((x) => x.id === id)) txSel.delete(id); });
@@ -670,7 +684,7 @@ function renderMCal(m, r) {
   const f = MC_KINDS.some(([k]) => k === ui.mcKind) ? ui.mcKind : "all", t = today();
   const items = r.items.filter((x) => x.kind !== "move"), isInc = (x) => x.kind === "income";
   const want = (x) => f === "all" || (f === "income" ? isInc(x) : !isInc(x));
-  const day = {}; items.forEach((x) => { if (!isWon(x)) return; const d = (day[x.date] ||= { inc: 0, out: 0 }), a = Number(x.amount) || 0; if (isInc(x)) d.inc += a; else d.out += a; });
+  const day = {}; items.forEach((x) => { if (!isWon(x)) return; const d = (day[x.date] ||= { inc: 0, out: 0 }), a = cntAmt(x); if (isInc(x)) d.inc += a; else d.out += a; });
   const cnt = { all: items.length, income: items.filter(isInc).length, expense: items.filter((x) => !isInc(x)).length }, inc = r.inc, out = r.exp + r.out;
   const sums = { all: inc - out, income: inc, expense: out };
   $("mcMonth").textContent = monthLabel(m);
@@ -720,9 +734,9 @@ function renderStats() {
   $("stLabel").textContent = cur.name; $("stPer").value = p;
   $("stPrev").hidden = $("stNext").hidden = p === "range"; $("stRangeRow").hidden = p !== "range";
   if (p === "range" && document.activeElement !== $("stFrom") && document.activeElement !== $("stTo")) { $("stFrom").value = cur.from; $("stTo").value = cur.to; }
-  const recs = []; S.money.forEach((x, id) => { if ((x.kind || "expense") === kind && isWon(x) && x.date >= cur.from && x.date <= cur.to) recs.push({ ...x, id }); });
-  const byCat = {}; recs.forEach((x) => { const c = x.cat || "기타"; byCat[c] = (byCat[c] || 0) + (Number(x.amount) || 0); });
-  const total = recs.reduce((t, x) => t + (Number(x.amount) || 0), 0), cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  const recs = []; S.money.forEach((x, id) => { if ((x.kind || "expense") === kind && isWon(x) && x.date >= cur.from && x.date <= cur.to && !(mineOn() && isSettleIn(x))) recs.push({ ...x, id }); });   // 💑 내 몫 보기면 욱진입금 빼고
+  const byCat = {}; recs.forEach((x) => { const c = x.cat || "기타"; byCat[c] = (byCat[c] || 0) + cntAmt(x); });
+  const total = recs.reduce((t, x) => t + cntAmt(x), 0), cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
   const sel = ui.stCat && byCat[ui.stCat] != null ? ui.stCat : null, pct = (v) => total ? Math.round(v / total * 100) : 0;
   $("stPie").innerHTML = pieHtml(kind, cats.map(([cat, amt]) => ({ cat, amt })), label, { legend: false, full: E.pieFull }) || `<p class="muted small" style="margin:0">${esc(cur.name)} ${label} 기록이 없어요.</p>`;
   $("stCats").innerHTML = `<button type="button" class="st-cat all${sel ? "" : " on"}" data-act="stCat" data-k=""><span>${label} 전체 <small>${recs.length}</small></span><b class="won">${wonN(total)}</b></button>` +
@@ -731,7 +745,7 @@ function renderStats() {
   const shown = sel ? recs.filter((x) => (x.cat || "기타") === sel) : recs, stot = sel ? byCat[sel] : total;
   $("stHead").innerHTML = `<h3>${esc(sel || label + " 전체")}</h3><b class="won">${wonN(stot)}</b>`;
   $("stChip").innerHTML = `<i class="st-pct" style="--c:${sel ? catVar(kind, sel) : "var(--coral)"}">${sel ? pct(stot) : 100}%</i> ${esc(sel || "전체")} <b class="won">${won(stot)}</b>`;
-  const sum = (from, to) => { let t = 0; S.money.forEach((x) => { if ((x.kind || "expense") === kind && isWon(x) && x.date >= from && x.date <= to && (!sel || (x.cat || "기타") === sel)) t += Number(x.amount) || 0; }); return t; };
+  const sum = (from, to) => { let t = 0; S.money.forEach((x) => { if ((x.kind || "expense") === kind && isWon(x) && x.date >= from && x.date <= to && (!sel || (x.cat || "기타") === sel)) t += cntAmt(x); }); return t; };
   let pts;
   if (p === "range") { const ms = []; for (let mm = cur.from.slice(0, 7); mm <= cur.to.slice(0, 7) && ms.length < 24; mm = shiftMonth(mm, 1)) ms.push(mm); pts = ms.map((mm) => { const v = sum(mm + "-01" < cur.from ? cur.from : mm + "-01", dayInMonth(mm, 31) > cur.to ? cur.to : dayInMonth(mm, 31)); return { lab: `${+mm.slice(5)}월`, v, on: false, tip: `${mm} ${won(v)}` }; }); }
   else pts = Array.from({ length: p === "year" ? 5 : 12 }, (_, i) => i - (p === "year" ? 4 : 11)).map((k) => { const r = stRange(p, st.anchor, k), v = sum(r.from, r.to); return { lab: r.lab, v, on: k === 0, tip: `${r.name} ${won(v)}` }; });
@@ -1335,6 +1349,7 @@ export function moneyAction(a, el, id, t) {
   if (a === "bulkSave") { bulkSave(); return true; }
   if (a === "bulkDel") { const tr = el.closest("tr"); tr.replaceWith(Object.assign(document.createElement("tbody"), { innerHTML: bulkRowHtml({ acct: lastAcct("expense") }) }).firstElementChild); bulkNumber(); return true; }
   if (a === "monthNow") { ui.month = today().slice(0, 7); renderMoney(); return true; }
+  if (a === "mineToggle") { if (!ready()) return true; const on = !mineOn(); act(E.backend.saveSettings({ moneyMine: on || null }), on ? "💑 내 몫으로 보기: 공통비용은 절반, 욱진입금은 수입에서 빼고 봐요." : "실제로 오간 돈 그대로 봐요.").catch(() => {}); return true; }
   // 🧾 내역 기간: 달 이름·[이번 달] → 기간 고르기 창, ‹ › → 한 달이면 한 달씩, 아니면 같은 날 수만큼
   if (a === "txPick") {
     const cur = ui.txRange || { from: ui.month + "-01", to: `${ui.month}-${String(new Date(+ui.month.slice(0, 4), +ui.month.slice(5, 7), 0).getDate()).padStart(2, "0")}` };
