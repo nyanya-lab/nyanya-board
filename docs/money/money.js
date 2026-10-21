@@ -6,7 +6,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — env.pieFull이면 분류 원형(통계·내역 지출·예산)에 씀 (자산 구성 원형은 그대로),
 //   ▦ 다건입력 채우기 손잡이(bulkFillInit, 엑셀처럼 끌어서 복사),
 //   자산 고르는 칸 = 자산 탭 순서로 현금·통장·카드·저축 묶음 + 이름_계좌번호 (acctOptsHtml),
-//   금액 +/- 기호 없음 (색으로만, app.js won = 부호 없음) — 직접 -로 적은 금액만 - (amtText),
+//   금액 +/- 기호 없음 (색으로만, app.js won = 부호 없음) — 직접 -로 적은 금액만 - (amtText), 지출·수입·분류 합계가 마이너스면 - (wonN),
 //   ✏️ 분류·소분류 이름 바꾸기(renameCat·renameSub: 기록·예산·반복도 같이, 있는 이름이면 합침) + 기록에만 남은 분류 표시,
 //   자산 계좌번호(accounts.number)·메모(accounts.memo) = 목록·자산별 보기에 보임 (고치는 곳은 acctset.js),
 //   제목 = env.tabTitles[탭] (냐냐: 예산·내역·달력…), 💳 cardDue = 이용기간 끝난 최근 결제(저번 달 사용분, 결제일 없어도) · 결제 기록 내용 '카드정산 결제',
@@ -33,6 +33,8 @@ export const KIND_LABEL = { income: "수입", expense: "지출", transfer: "보�
 // 💱 화폐: 기본 원 (cur 없음). settings.currencies에 더한 화폐(달러·엔…)도 고를 수 있고, 원이 아닌 기록은 합계·잔액에서 빼고 금액만 그 화폐로 보여 줌
 export const isWon = (x) => !x || !x.cur || x.cur === "원";
 export const currencies = () => ["원"].concat((S.settings.currencies || []).filter((c) => c && c !== "원"));
+// 합계(지출·수입·분류별)가 마이너스면 - (= 냐냐가 -로 적은 게 더 커서). 잔액·순합계(수입−지출)는 기호 없이 색으로만
+export const wonN = (n) => (Math.round(Number(n) || 0) < 0 ? "-" : "") + won(n);
 export const amtText = (x) => (Number(x.amount) < 0 ? "-" : "") + (isWon(x) ? won(x.amount) : `${commaNum(Math.abs(Number(x.amount) || 0))} ${x.cur}`);   // 냐냐: 직접 -로 적은 금액만 - (won은 부호 없이)
 // 분류는 설정에서 바꿀 수 있음 (없으면 기본)
 export const moneyCats = (kind) => ((S.settings.moneyCats && S.settings.moneyCats[kind]) || MONEY_CATS[kind] || []).slice();
@@ -419,9 +421,9 @@ export function renderMoney() {
   const bar = $("budgetBar"); bar.hidden = !!rng;
   bar.classList.toggle("over", budget > 0 && rs.exp > budget);
   bar.firstElementChild.style.width = (budget ? Math.min(100, Math.round(rs.exp / budget * 100)) : 0) + "%";
-  $("budgetLeft").innerHTML = rng ? `${esc(rangeLabel(rng.from, rng.to))} 지출 <span class="won">${won(rs.exp)}</span>`
+  $("budgetLeft").innerHTML = rng ? `${esc(rangeLabel(rng.from, rng.to))} 지출 <span class="won">${wonN(rs.exp)}</span>`
     : budget
-    ? `예산 ${won(budget)} 중 <span class="won">${won(rs.exp)}</span> 씀 · ` + (rs.exp > budget ? `<span class="won minus">${won(rs.exp - budget)} 초과</span>` : `<span class="won plus">${won(budget - rs.exp)} 남음</span>`)
+    ? `예산 ${won(budget)} 중 <span class="won">${wonN(rs.exp)}</span> 씀 · ` + (rs.exp > budget ? `<span class="won minus">${won(rs.exp - budget)} 초과</span>` : `<span class="won plus">${won(budget - rs.exp)} 남음</span>`)
     : "예산을 넣으면 남은 금액이 보여요";
   if (document.activeElement !== $("budgetIn")) $("budgetIn").value = commaNum(planTotal || Number(S.settings.budget) || "");
   $("catBars").innerHTML = pieHtml("expense", Object.entries(rs.byCat).map(([cat, amt]) => ({ cat, amt })), "지출", { full: E.pieFull }) || `<div class="muted small">${rng ? "이 기간" : "이번 달"} 지출 기록이 아직 없어요.</div>`;
@@ -603,7 +605,7 @@ function renderTx(m, r) {
   const sums = { all: r.inc - r.exp - r.out, income: r.inc, expense: r.exp, transfer: r.out };
   const lab = ui.txRange ? rangeLabel(ui.txRange.from, ui.txRange.to) : monthLabel(m);
   $("txMonth").textContent = lab;
-  $("txSum").innerHTML = TX_KINDS.map(([k, l]) => `<button type="button" class="tx-k k-${k}" role="tab" data-act="txKind" data-k="${k}" aria-selected="${f === k}"><span>${l} (${cnt[k]})</span><b class="won${k === "all" ? (sums.all < 0 ? " minus" : " plus") : ""}"><span class="tx-l">${won(Math.abs(sums[k]))}</span><span class="tx-short">${moneyShort(Math.abs(sums[k]))}</span></b></button>`).join("");
+  $("txSum").innerHTML = TX_KINDS.map(([k, l]) => `<button type="button" class="tx-k k-${k}" role="tab" data-act="txKind" data-k="${k}" aria-selected="${f === k}"><span>${l} (${cnt[k]})</span><b class="won${k === "all" ? (sums.all < 0 ? " minus" : " plus") : ""}"><span class="tx-l">${k === "all" ? won(sums[k]) : wonN(sums[k])}</span><span class="tx-short">${k !== "all" && sums[k] < 0 ? "-" : ""}${moneyShort(Math.abs(sums[k]))}</span></b></button>`).join("");
   const items = r.items.filter((x) => f === "all" || (x.kind || "expense") === f).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
   [...txSel].forEach((id) => { if (!items.some((x) => x.id === id)) txSel.delete(id); });
   $("txSel").hidden = !txSel.size;
@@ -641,7 +643,7 @@ function renderMCal(m, r) {
   const cnt = { all: items.length, income: items.filter(isInc).length, expense: items.filter((x) => !isInc(x)).length }, inc = r.inc, out = r.exp + r.out;
   const sums = { all: inc - out, income: inc, expense: out };
   $("mcMonth").textContent = monthLabel(m);
-  $("mcSum").innerHTML = MC_KINDS.map(([k, l]) => `<button type="button" class="tx-k k-${k}" role="tab" data-act="mcKind" data-k="${k}" aria-selected="${f === k}"><span>${l} (${cnt[k]})</span><b class="won${k === "all" ? (sums.all < 0 ? " minus" : " plus") : ""}"><span class="tx-l">${won(Math.abs(sums[k]))}</span><span class="tx-short">${moneyShort(Math.abs(sums[k]))}</span></b></button>`).join("");
+  $("mcSum").innerHTML = MC_KINDS.map(([k, l]) => `<button type="button" class="tx-k k-${k}" role="tab" data-act="mcKind" data-k="${k}" aria-selected="${f === k}"><span>${l} (${cnt[k]})</span><b class="won${k === "all" ? (sums.all < 0 ? " minus" : " plus") : ""}"><span class="tx-l">${k === "all" ? won(sums[k]) : wonN(sums[k])}</span><span class="tx-short">${k !== "all" && sums[k] < 0 ? "-" : ""}${moneyShort(Math.abs(sums[k]))}</span></b></button>`).join("");
   const first = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1), last = new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate(), lead = first.getDay();
   const sel = ui.mcDay && ui.mcDay.slice(0, 7) === m ? ui.mcDay : t.slice(0, 7) === m ? t : `${m}-01`;
   const short = (v) => v >= 1e5 ? Math.round(v / 1e4) + "만" : v >= 1e4 ? +(v / 1e4).toFixed(1) + "만" : commaNum(v);   // 폰 칸: 160만 · 4.4만 · 8,700
@@ -649,7 +651,7 @@ function renderMCal(m, r) {
   let h = WDS.map((w, i) => `<div class="mc-wd${i === 0 ? " sun" : i === 6 ? " sat" : ""}">${w}</div>`).join("");
   for (let i = 0; i < Math.ceil((lead + last) / 7) * 7; i++) {
     const dt = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1 - lead + i), d = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`, v = day[d] || { inc: 0, out: 0 }, dow = dt.getDay();
-    const lines = (f !== "expense" && v.inc ? num(v.inc, "plus", "") : "") + (f !== "income" && v.out ? num(Math.abs(v.out), "minus", "") : "") + (f === "all" && v.inc && v.out ? num(Math.abs(v.inc - v.out), v.inc - v.out < 0 ? "net minus" : "net plus", "") : "");   // 냐냐: 기호 없이 색으로만
+    const lines = (f !== "expense" && v.inc ? num(Math.abs(v.inc), "plus", v.inc < 0 ? "-" : "") : "") + (f !== "income" && v.out ? num(Math.abs(v.out), "minus", v.out < 0 ? "-" : "") : "") + (f === "all" && v.inc && v.out ? num(Math.abs(v.inc - v.out), v.inc - v.out < 0 ? "net minus" : "net plus", "") : "");   // 냐냐: 기호 없이 색으로만
     h += `<button type="button" class="mc-d${d.slice(0, 7) !== m ? " out" : ""}${d === t ? " today" : ""}${d === sel ? " on" : ""}${dow === 0 ? " sun" : dow === 6 ? " sat" : ""}" data-act="mcDay" data-day="${d}" aria-label="${shortDate(d)}"><span class="mc-n">${d.slice(0, 7) !== m ? `${dt.getMonth() + 1}/` : ""}${dt.getDate()}</span><span class="mc-v">${lines}</span></button>`;
   }
   $("mcCal").innerHTML = h;
@@ -692,11 +694,11 @@ function renderStats() {
   const total = recs.reduce((t, x) => t + (Number(x.amount) || 0), 0), cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
   const sel = ui.stCat && byCat[ui.stCat] != null ? ui.stCat : null, pct = (v) => total ? Math.round(v / total * 100) : 0;
   $("stPie").innerHTML = pieHtml(kind, cats.map(([cat, amt]) => ({ cat, amt })), label, { legend: false, full: E.pieFull }) || `<p class="muted small" style="margin:0">${esc(cur.name)} ${label} 기록이 없어요.</p>`;
-  $("stCats").innerHTML = `<button type="button" class="st-cat all${sel ? "" : " on"}" data-act="stCat" data-k=""><span>${label} 전체 <small>${recs.length}</small></span><b class="won">${won(total)}</b></button>` +
-    cats.map(([c, v]) => `<button type="button" class="st-cat${sel === c ? " on" : ""}" data-act="stCat" data-k="${esc(c)}"><i class="st-pct" style="--c:${catVar(kind, c)}">${pct(v)}%</i><span>${catDot(kind, c)}${esc(c)}</span><b class="won">${won(v)}</b></button>`).join("");
+  $("stCats").innerHTML = `<button type="button" class="st-cat all${sel ? "" : " on"}" data-act="stCat" data-k=""><span>${label} 전체 <small>${recs.length}</small></span><b class="won">${wonN(total)}</b></button>` +
+    cats.map(([c, v]) => `<button type="button" class="st-cat${sel === c ? " on" : ""}" data-act="stCat" data-k="${esc(c)}"><i class="st-pct" style="--c:${catVar(kind, c)}">${pct(v)}%</i><span>${catDot(kind, c)}${esc(c)}</span><b class="won">${wonN(v)}</b></button>`).join("");
   // 오른쪽: 합계 · 흐름 그래프 (그 칸 포함 앞 12칸, 기간이면 그 안의 달) · 내역
   const shown = sel ? recs.filter((x) => (x.cat || "기타") === sel) : recs, stot = sel ? byCat[sel] : total;
-  $("stHead").innerHTML = `<h3>${esc(sel || label + " 전체")}</h3><b class="won">${won(stot)}</b>`;
+  $("stHead").innerHTML = `<h3>${esc(sel || label + " 전체")}</h3><b class="won">${wonN(stot)}</b>`;
   $("stChip").innerHTML = `<i class="st-pct" style="--c:${sel ? catVar(kind, sel) : "var(--coral)"}">${sel ? pct(stot) : 100}%</i> ${esc(sel || "전체")} <b class="won">${won(stot)}</b>`;
   const sum = (from, to) => { let t = 0; S.money.forEach((x) => { if ((x.kind || "expense") === kind && isWon(x) && x.date >= from && x.date <= to && (!sel || (x.cat || "기타") === sel)) t += Number(x.amount) || 0; }); return t; };
   let pts;
