@@ -4,6 +4,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
 //   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌,
 //   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — env.pieFull이면 분류 원형(통계·내역 지출·예산)에 씀 (자산 구성 원형은 그대로),
+//   제목 = env.tabTitles[탭] (냐냐: 예산·내역·달력…),
 //   🧾 내역 기간 고르기(ui.txRange, ./range.js 창 — 달 이름·[이번 달]을 누르면 열림, txPick·txShift) — 내역 표·요약 칸·아래 '지출' 칸이 그 기간을 따라감.
 // (원래 설명) 보드(index.html)와 가계부 모드(money.html → index.html?app=money)가 같이 쓰는 코드
 // 한 달 예산 · 지출 기록 · 자산(통장·카드·현금, 카드 결제일) · 분류·색·원형 그래프 · 줄 돈 15일 자동 · 카드값 할 일 · 연습 데이터
@@ -367,7 +368,7 @@ export function renderMTabs() {
   $("mTabs").hidden = adm;
   // 가계부 모드: 옆 메뉴(PC)·아래 메뉴(폰)의 예산·지출·자산·통계 / 제목: 관리자 보드는 '예산', 그 외 '가계부'
   document.querySelectorAll('.m-nav, #mBottom button').forEach((b) => { const on = b.dataset.k === tab; b.setAttribute(b.tagName === "A" ? "aria-current" : "aria-pressed", on ? (b.tagName === "A" ? "page" : "true") : (b.tagName === "A" ? "" : "false")); if (b.tagName === "A" && !on) b.removeAttribute("aria-current"); });
-  $("moneyTitle").textContent = adm ? "예산" : "가계부";
+  $("moneyTitle").textContent = adm ? "예산" : (E.tabTitles && E.tabTitles[tab]) || "가계부";   // 냐냐: 탭 이름을 제목으로 (env.tabTitles)
   document.querySelectorAll("#mTabs button").forEach((b) => {
     b.setAttribute("aria-pressed", String(b.dataset.k === tab));
     b.hidden = adm && b.dataset.k === "assets";
