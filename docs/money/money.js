@@ -4,6 +4,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   냐냐 쪽에서 바꾼 곳: localStorage 키 ukjin- → nyanya-, 💝 줄 돈은 env.give === false면 안 보임, ❤️ 공통(common) 표시,
 //   내역 줄 마이너스 금액(환불) 부호 (txRow), 탭에 common, 🙈 숨긴 자산(accounts.hidden)은 sortedAccts에서 뺌,
 //   pieHtml o.full(가운데 구멍·글자 없이 꽉 찬 원형) — env.pieFull이면 분류 원형(통계·내역 지출·예산)에 씀 (자산 구성 원형은 그대로),
+//   분류 색 = 원형마다 금액 큰 8개가 서로 다른 색(늘 쓰는 색 먼저), 9번째부터 '그 밖' (E.catRank, setCatView),
 //   ▦ 다건입력 채우기 손잡이(bulkFillInit, 엑셀처럼 끌어서 복사),
 //   자산 고르는 칸 = 자산 탭 순서로 현금·통장·카드·저축 묶음 + 이름_계좌번호 (acctOptsHtml),
 //   금액 +/- 기호 없음 (색으로만, app.js won = 부호 없음) — 직접 -로 적은 금액만 - (amtText), 지출·수입·분류 합계가 마이너스면 - (wonN),
@@ -42,8 +43,30 @@ export const moneyCats = (kind) => ((S.settings.moneyCats && S.settings.moneyCat
 // 분류 설정에서 바꾼 색은 settings.catColors[kind][키] = 0~8 (키 = 분류 이름을 Firebase 키로 쓸 수 있게 바꾼 것)
 export const CAT_N = 8;
 export const catKey = (c) => encodeURIComponent(c).replace(/\./g, "%2E");
+// 냐냐 쪽 (E.catRank): 분류 색 8가지가 한 원형 안에서 안 겹치게.
+//   원형마다 금액 큰 8개 분류가 서로 다른 색: 각 분류의 '늘 쓰는 색'(지금까지 쓴 돈 순위 1~8)이 비어 있으면 그 색, 아니면 남은 색.
+//   9번째부터는 회색 '그 밖' 한 조각. 통계 목록 색 동그라미는 바로 그 원형과 같은 색 (viewMap)
+let rankCache = null, viewMap = {};
+function setCatView(k, cats) {   // cats = 금액 큰 순서
+  const m = {}, used = new Set(), top = cats.slice(0, CAT_N);
+  top.forEach((c) => { const p = catRankIdx(k, c); if (p < CAT_N && !used.has(p)) { m[c] = p; used.add(p); } });
+  top.forEach((c) => { if (c in m) return; for (let j = 0; j < CAT_N; j++) if (!used.has(j)) { m[c] = j; used.add(j); break; } });
+  viewMap[k] = m;
+}
+export function resetCatRank() { rankCache = null; }
+function catRankIdx(k, cat) {
+  if (!rankCache) {
+    const sum = { expense: {}, income: {}, transfer: {} };
+    S.money.forEach((x) => { if (!x || x.kind === "move" || !x.cat || !isWon(x)) return; const kk = x.kind || "expense", a = Number(x.amount) || 0; if (sum[kk] && a > 0) sum[kk][x.cat] = (sum[kk][x.cat] || 0) + a; });
+    rankCache = {};
+    for (const [kk, m] of Object.entries(sum)) { rankCache[kk] = {}; Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, CAT_N).forEach(([c], i) => { rankCache[kk][c] = i; }); }
+  }
+  const m = rankCache[k] || {}; return cat in m ? m[cat] : CAT_N;
+}
 export function catIdx(kind, cat) {
-  const k = kind === "move" ? "expense" : kind || "expense", set = ((S.settings.catColors || {})[k] || {})[catKey(cat || "")];
+  const k = kind === "move" ? "expense" : kind || "expense";
+  if (E.catRank) return viewMap[k] ? (cat in viewMap[k] ? viewMap[k][cat] : CAT_N) : catRankIdx(k, cat);   // 원형에 없는 분류(마이너스·9번째부터)는 회색
+  const set = ((S.settings.catColors || {})[k] || {})[catKey(cat || "")];
   if (Number.isInteger(set) && set >= 0 && set <= CAT_N) return set;
   if (!cat || /^기타/.test(cat)) return CAT_N;
   if (k === "expense" && catMap && cat in catMap) return catMap[cat];
@@ -53,7 +76,8 @@ export function catIdx(kind, cat) {
 // 보고 있는 달에 쓰는 지출 분류끼리는 색이 안 겹치게 (분류는 14개, 색은 8개). 직접 고른 색은 그대로, 나머지는 기본 색이 이미 쓰였으면 다음 빈 색
 export let catMap = null;
 export function setCatMap(cats) {
-  catMap = null;
+  catMap = null; rankCache = null;
+  if (E.catRank) return;
   const set = (S.settings.catColors || {}).expense || {}, list = moneyCats("expense"), used = new Set(), map = {};
   const mine = (c) => Number.isInteger(set[catKey(c)]) ? set[catKey(c)] : null;
   const todo = [...new Set(cats)].filter((c) => c && !/^기타/.test(c));
@@ -75,6 +99,12 @@ export function pieHtml(kind, list, label, o = {}) {
   let xs = list.filter((x) => x.amt > 0).sort((a, b) => b.amt - a.amt);
   const total = xs.reduce((t, x) => t + x.amt, 0);
   if (!total) return "";
+  if (E.catRank && kind && !o.color) {   // 냐냐: 금액 큰 8개는 서로 다른 색, 9번째부터 '그 밖' 한 조각
+    const kk = kind === "move" ? "expense" : kind;
+    setCatView(kk, xs.map((x) => x.cat));
+    const keep = xs.slice(0, CAT_N), rest = xs.slice(CAT_N);
+    xs = rest.length ? keep.concat([{ cat: rest.length === 1 ? rest[0].cat : "그 밖", amt: rest.reduce((t, x) => t + x.amt, 0), other: true }]) : keep;
+  }
   if (xs.length > 10) xs = xs.slice(0, 9).concat([{ cat: "그 밖", amt: xs.slice(9).reduce((t, x) => t + x.amt, 0), other: true }]);
   const col = (x) => x.other ? `var(--c${CAT_N})` : o.color ? o.color(x) : catVar(kind, x.cat), pctS = (x) => (x.amt / total * 100).toFixed(1).replace(/\.0$/, "");
   const W = 460, H = 280, cx = W / 2, cy = H / 2, R = 92, r0 = o.full ? 0 : 58, f = (v) => v.toFixed(1);

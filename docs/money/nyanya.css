@@ -100,3 +100,9 @@ table.bulk { min-width: 1200px; }
 .bk-fill { position: absolute; width: 9px; height: 9px; background: var(--coral, #f0604d); border: 2px solid var(--surface, #fff); border-radius: 2px; cursor: ns-resize; z-index: 3; touch-action: none; }
 .bulk td.bk-fill-on { background: color-mix(in srgb, var(--coral, #f0604d) 14%, transparent); outline: 1px dashed var(--coral, #f0604d); outline-offset: -2px; }
 .bk-fill::after { content: ""; position: absolute; inset: -9px; }   /* 손가락으로도 잡기 쉽게 */
+/* 🎨 분류 색 8가지 (그래프 색 가이드의 검증된 팔레트: 파랑·주황·청록·노랑·분홍·초록·보라·빨강, 붙어 있어도 색약에도 구분됨) + 회색(그 밖)
+   원형마다 금액 큰 8개 분류가 서로 다른 색 (money.js setCatView) — 냐냐 요청 "밤티 말고, 겹치는 색 없게" */
+:root { --c0: #2a78d6; --c1: #eb6834; --c2: #1baf7a; --c3: #eda100; --c4: #e87ba4; --c5: #008300; --c6: #4a3aa7; --c7: #e34948; --c8: #a3a29c; }
+:root[data-theme="dark"] { --c0: #3987e5; --c1: #d95926; --c2: #199e70; --c3: #c98500; --c4: #d55181; --c5: #008300; --c6: #9085e9; --c7: #e66767; --c8: #77766f; }
+/* 🧾 내역 아래 '지출' 칸의 분류 원형 빼기 (예산 막대·합계는 그대로) */
+#catBars { display: none; }
