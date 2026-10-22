@@ -286,7 +286,7 @@ export function mountUri(root, opts = {}) {
     const cats = by(list, (c) => c.cat || "기타"), total = sum(list), pct = (v, base) => base ? Math.round(v / base * 100) : 0;
     const colorOf = (k) => { const i = cats.filter((x) => x.amt > 0).slice(0, 8).findIndex((x) => x.k === k); return `var(--c${i < 0 ? 8 : i})`; };
     const sel = sp.sel && cats.find((x) => x.k === sp.sel) ? sp.sel : null, selCat = sel ? cats.find((x) => x.k === sel) : null;
-    const subs = selCat ? by(selCat.v, (c) => c.sub || "(소분류 없음)") : [];
+    const subs = selCat ? by(selCat.v, (c) => c.sub || "기타") : [];
     const subSel = sp.sub && subs.find((x) => x.k === sp.sub) ? sp.sub : null;
     const shown = (subSel ? subs.find((x) => x.k === subSel).v : selCat ? selCat.v : list).slice().sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0));
     const stot = sum(shown);
@@ -320,7 +320,7 @@ export function mountUri(root, opts = {}) {
   function drawStatsChart() {
     const el = root.querySelector("[data-uri-chart]"), S0 = opts.stats; if (!el || !S0 || !S0.chart || !S0.range) return;
     const sp = st.stats, every = all(), t = today();
-    const want = (c) => (!sp.sel || (c.cat || "기타") === sp.sel) && (!sp.sub || (c.sub || "(소분류 없음)") === sp.sub);
+    const want = (c) => (!sp.sel || (c.cat || "기타") === sp.sel) && (!sp.sub || (c.sub || "기타") === sp.sub);
     const sumR = (from, to) => every.reduce((s, c) => s + (c.date >= from && c.date <= to && want(c) ? Number(c.amount) || 0 : 0), 0);
     let pts;
     if (sp.p === "range") { const cur = stCur(), ms = []; for (let mm = cur.from.slice(0, 7); mm <= cur.to.slice(0, 7) && ms.length < 24;) { ms.push(mm); const [y, m] = mm.split("-").map(Number), d = new Date(y, m, 1); mm = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; }
