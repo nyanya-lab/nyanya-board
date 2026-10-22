@@ -33,7 +33,7 @@ export const COMMON_CATS = [   // 2026-10-22 대분류 앞에 그림 (냐냐 요
 const catsOf = (v) => (Array.isArray(v) ? v : v && typeof v === "object" ? Object.values(v) : []).filter((c) => c && c.n).map((c) => ({ n: c.n, s: Array.isArray(c.s) ? c.s.filter(Boolean) : c.s && typeof c.s === "object" ? Object.values(c.s).filter(Boolean) : [] }));
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 // ⏸ 욱진 보드에선 잠깐 '준비 중'만 (냐냐 요청 2026-10-20: 가계부 ❤️ 공통까지 다 만든 뒤 한꺼번에 공개). 공개할 때 false로
-const HOLD_UKJIN = true;
+const HOLD_UKJIN = false;   // 2026-10-22 공개 (욱진 보드 PR #159·#160)
 
 const pad = (n) => String(n).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;

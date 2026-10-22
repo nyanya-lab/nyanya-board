@@ -48,7 +48,7 @@
 - 🧮 실제 잔액 맞추기 · 🙈 숨기기 (`docs/money/balance.js`, 자산 탭 아래, 냐냐 전용): 실제 잔액(카드는 갚을 카드값) → `accounts.initial`을 (실제 − 계산된 잔액)만큼 고침. 숨기기 = `accounts.hidden` → money.js `sortedAccts`에서 빠짐(목록·합계·고르는 칸), 기록은 그대로.
 - ❤️ 공통비용: 지출 기록 칸의 **❤️ 공통비용** 체크 → `money.common = true` → `app.js mirrorCommon` → `uri.setMirror` → 공통 저장소 `costs/nyanya-{가계부 id}`(src "money", by·payer "nyanya")에 저절로 복사(고치면 고쳐지고, ❤️ 빼거나 지우면 지워짐, 원화만). '❤️ 공통' 탭(가계부 안)에서 둘 다 보기 + 반반 정산. ✅ 정산: 공통비용마다 `settled`(정산한 날, 가져오기면 "가져오기") — 맨 위 '💸 아직 정산 안 된 돈(전체)', 달마다 [✅ M월 정산 완료로]/[↩ 정산 취소]. 가계부 → 공통 복사는 처음 만들 때만 settled를 가져가고 그 뒤엔 공통 쪽 정산 표시를 안 건드림. 분류가 '공통비용'이면 공통 쪽엔 소분류로. 우리 탭(`mirror: true`)은 보기만, 직접 적는 칸 없음.
 - (원래 계획) 냐냐 보드 가계부는 욱진 보드 `docs/money.js`를 가져와서 쓸 예정. 두 프로젝트 모두 이 컴퓨터에 있음.
-- ⏸ **욱진 보드 가계부엔 당분간 안 넣음** (2026-10-21 냐냐: "냐냐 가계부 다 개발하면 한번에 넣자"). → 2026-10-22 냐냐: 이제 공통 열면서 아래 목록 **한꺼번에 다** 넣기로 (카드 엑셀 업로드만 빼고). 그때 욱진 방에 한꺼번에 넘길 목록 (PR #158까지는 이미 넣음):
+- ✅ **욱진 보드 가계부에 넣음 (2026-10-22, 욱진 보드 PR #159·#160, BC카드 엑셀 업로드만 뺌)** — 원래 '당분간 안 넣음'(2026-10-21 냐냐: "냐냐 가계부 다 개발하면 한번에 넣자")이었던 목록. 이 뒤로 냐냐 가계부를 고치면 욱진 보드에도 넣을지 다시 물어보기. → 2026-10-22 냐냐: 이제 공통 열면서 아래 목록 **한꺼번에 다** 넣기로 (카드 엑셀 업로드만 빼고). 그때 욱진 방에 한꺼번에 넘길 목록 (PR #158까지는 이미 넣음):
   - 위 제목 = 지금 탭 이름(예산·내역·달력·자산·통계·공통·설정, money.js `E.tabTitles`) + 제목 줄 높이 고정 → 탭마다 내용 시작 높이 같게 (nyanya.css `#moneyPage .page-head`)
   - 기록 창: 날짜를 위 한 줄, 금액은 아래 한 줄 통째로 (글자 크기는 그대로, index.html `.m-amt-full`, nyanya.css)
   - ✏️ 분류·소분류 이름 바꾸기 (money.js `renameCat`·`renameSub`: 목록·색·소분류·기록·예산·반복 한 번에 rootUpdate, 있는 이름이면 합침) + '목록에 없는 분류 (기록엔 있음)' 줄 — 욱진 보드는 rootUpdate가 없어서 맞게 바꿔야 함
@@ -101,7 +101,8 @@ docs/manifest.webmanifest, *.png  홈 화면 앱 아이콘 = 냐냐 캐릭터(�
 - 공통비용·공통 목표·같이 할 일·공통 상 등 둘이 같이 쓰는 것. 사이트는 따로 없고 냐냐 보드·욱진 보드 안의 🤝 우리 탭에서 봄. 지금은 공통비용만.
 - 공통비용 `costs/{id}` = {date, title, amount, cat(`URI_CATS`), payer nyanya|ukjin|joint(공동 통장), memo, by(적은 사람), at, updBy, updAt}. 정산 = (냐냐 낸 돈 − 욱진 낸 돈) / 2, 공동 통장은 합계에만 (`settleOf`). `_backup/{prev,daily}` 자동 백업(되돌리기 화면은 아직 없음).
 - 공통 비밀번호는 이 기기 `localStorage["uri-board-pw"]` + 냐냐 보드 `settings.uriPw`(한 번 넣으면 보드가 기억 → 다른 기기에선 보드 비밀번호만 넣으면 우리 탭도 열림, `mountUri`의 `savePassword` / 돌려받은 `usePassword`). 욱진 보드는 아직 savePassword를 안 넘겨서 기기마다 넣어야 함 (원하면 욱진 보드 app.js에 같은 연결 추가). 두 보드가 같은 주소(nyanya-lab.github.io)라서 같은 브라우저면 한쪽에서 열면 다른 보드도 열림.
-- ⏸ **욱진 보드엔 아직 비공개** (냐냐 요청: 다 만든 뒤 한꺼번에): `uri.js` `HOLD_UKJIN = true` → 욱진 보드 우리 탭은 '준비 중'만, `uri/changes.js`도 비워 둠.
+- ✅ **2026-10-22 욱진 보드에 공개** (냐냐 OK): `uri.js` `HOLD_UKJIN = false`, `uri/changes.js` `URI_HOLD = false`(욱진 보드가 읽어서 ❤️ 칸·공통 탭·우리 메뉴 보임) + 그날 소개 줄. 욱진 보드 쪽은 PR #159(목록 전부)·#160(❤️ 공통, who "ukjin", 욱진이 기기에서만 mirror). 욱진이는 공통 탭에서 공통 비밀번호를 한 번 넣어야 함. (아래는 공개 전 기록)
+- (지난 기록) ⏸ 욱진 보드엔 아직 비공개였음: `uri.js` `HOLD_UKJIN = true` → 욱진 보드 우리 탭은 '준비 중'만, `uri/changes.js`도 비워 둠.
   욱진 보드의 '우리' 메뉴·설명서 주제도 숨김: `uri/changes.js`의 `URI_HOLD` 코드(욱진 보드가 열 때 이 파일을 불러와서 숨김, 2026-10-20 실제 사이트에서 확인).
   공개할 때 할 일: ⓪ `uri/changes.js` URI_HOLD 코드 지우기 ① 욱진 보드 money.js에 ❤️ 체크 + 기록 칸 `#mCommonWrap` + `mirrorCommon`(who "ukjin") + '❤️ 공통' 탭(여기 money/app.js 참고) — 욱진 보드 PR ② `HOLD_UKJIN = false` ③ `uri/changes.js`에 그날 소개 줄 ④ 욱진 보드도 `savePassword` 연결(공통 비밀번호 기억).
 - **uri.js를 고치면 욱진 보드에도 바로 적용됨** → 욱진 보드 화면에서도 확인하기. 욱진이가 보는 게 바뀌면 `docs/uri/changes.js`(`URI_CHANGES`) 맨 위에 쉬운 말로 한 줄 추가 → 욱진 보드 업데이트 내역·새 버전 알림에 자동으로 섞여 나옴 (욱진 보드 changes.js는 안 건드림). 욱진 보드는 10분 단위 `?v=`로 불러와서 고친 뒤 최대 10분+GitHub Pages 반영 시간 뒤에 바뀜.
