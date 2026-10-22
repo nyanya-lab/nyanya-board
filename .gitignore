@@ -6,3 +6,6 @@ docs/money/_tmp_import/
 
 # 이 컴퓨터에만: 보드 비밀번호 (Claude가 서버 데이터 읽고 고칠 때 tools/db.py가 씀) — 절대 올리지 않기
 dev-local.json
+
+# 🔒 로컬 확인 모드 사본 (tools/snapshot.py, 진짜 가계부 데이터) — 절대 올리지 않기
+docs/money/_local/

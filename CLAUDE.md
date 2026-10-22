@@ -13,6 +13,7 @@
   (모듈이라 파일을 더블클릭해서 열면 안 됨)
 - 비밀번호·API 키 같은 비밀값은 저장소(공개)에 절대 넣지 않기.
 - 🔑 **서버 데이터(가계부·공통 저장소) 보기·고치기 = `python tools/db.py get|patch|put board|uri <경로> [body.json]`** — 냐냐에게 비밀번호 묻지 않기. 보드 비밀번호는 저장소 맨 위 `dev-local.json`(이 컴퓨터에만, .gitignore), 공통 비밀번호는 보드 settings.uriPw에서 꺼냄. 해시·비밀번호는 출력·커밋에 찍지 않기. (파일이 없는 클라우드 방이면 "이 컴퓨터 방에서 해야 해요") 화면 확인은 냐냐 크롬(Claude in Chrome)도 됨.
+- 🔒 **화면 확인 = 로컬 확인 모드**: `python tools/snapshot.py`(진짜 데이터 사본 → `docs/money/_local/snapshot.json`, .gitignore, uriPw·links는 뺌) → 내 브라우저에서 http://localhost:8010/money/?local (로그인 없이 진짜 숫자, 보기 전용 — 저장 안 됨, 공통 탭도 사본으로). 데이터를 고친 뒤엔 사본 다시 받기. 비밀번호를 브라우저에 넣는 건 안 함 → 실제 사이트 확인이 꼭 필요할 때만 냐냐 크롬.
 - `gh`(GitHub CLI)는 `C:\Program Files\GitHub CLI\gh.exe`, nyanya-lab 계정으로 로그인돼 있음.
 
 ## 💰 가계부 (`docs/money/`) — 욱진 보드 가계부와 짝 (2026-10-20 만듦)

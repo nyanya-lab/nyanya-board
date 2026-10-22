@@ -5,7 +5,7 @@
 // ❤️ 공통: 지출에 common: true → ../uri/uri.js setMirror로 공통 저장소(uri-board)에 저절로 복사, '❤️ 공통' 탭에서 둘 다 보기 + 반반 정산.
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
-import { mountUri } from "../uri/uri.js?v=20261022c";
+import { mountUri } from "../uri/uri.js?v=20261022d";
 import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName } from "./money.js?v=20261022c";
 import { mountRepeat } from "./repeat.js?v=20261021d";
 import { mountAcctSet } from "./acctset.js?v=20261021a";
@@ -162,8 +162,28 @@ function mirrorCommon() {
   uri.setMirror(docs);
 }
 
+// ---------- 🔒 로컬 확인 모드 (이 컴퓨터에서만: http://localhost:8010/money/?local) ----------
+// 로그인 없이 _local/snapshot.json(= python tools/snapshot.py 로 받은 진짜 데이터 사본, 깃에 안 올라감)을 띄움. 보기 전용 — 뭘 눌러도 서버에 안 씀.
+// Claude가 화면을 진짜 숫자로 확인할 때 씀 (비밀번호를 브라우저에 넣지 않으려고). 실제 사이트에선 절대 안 켜짐.
+const LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && new URLSearchParams(location.search).has("local");
+let localSnap = null;
+if (LOCAL) { try { localSnap = await (await fetch("_local/snapshot.json", { cache: "no-store" })).json(); } catch (e) { localSnap = null; } }
+function localStart() {
+  const d = localSnap;
+  if (!d) { $("loginView").hidden = false; $("mainView").hidden = true; $("loginMsg").textContent = "로컬 사본이 없어요. python tools/snapshot.py 로 먼저 받아 주세요."; return; }
+  let said = 0; const no = () => { if (Date.now() - said > 4000) { said = Date.now(); toast("🔒 로컬 확인 모드라 저장 안 돼요 (보기 전용)"); } return Promise.resolve(null); };
+  backend = { add: no, update: no, remove: no, set: no, saveSettings: no, saveSettingsDeep: no, putPic: no, saveUriPw: no, rootUpdate: no, async getPic() { return null; } };
+  $("loginView").hidden = true; $("mainView").hidden = false;
+  S.money = new Map(Object.entries(d.money || {})); S.accounts = new Map(Object.entries(d.accounts || {})); S.tasks = new Map(Object.entries(d.tasks || {}));
+  S.settings = { ...DEFAULTS, ...(d.settings || {}) }; S.loaded = true;
+  document.body.insertAdjacentHTML("afterbegin", `<div style="position:sticky;top:0;z-index:100;background:#1f2937;color:#fff;font-size:12px;padding:4px 12px;text-align:center">🔒 로컬 확인 모드 · 보기 전용 · 사본 ${esc(d.at || "")}</div>`);
+  sync.connected = true; setSync(); $("syncText").textContent = "로컬 사본";
+  render();
+}
+
 // ---------- 연결 ----------
 async function firebaseStart() {
+  if (LOCAL) { localStart(); return; }
   const base = `https://www.gstatic.com/firebasejs/${FB_VER}/`;
   const [{ initializeApp }, rt] = await Promise.all([import(base + "firebase-app.js"), import(base + "firebase-database.js")]);
   const db = rt.getDatabase(initializeApp(firebaseConfig));
@@ -246,7 +266,7 @@ document.addEventListener("click", (ev) => {
 // ❤️ 공통 탭: 둘이 ❤️로 표시한 지출 + 반반 정산. 공통 비밀번호는 보드 설정 uriPw에 기억 (보드와 같이)
 let moneyBound = false;
 const uri = mountUri($("uriRoot"), {
-  who: "nyanya", toast, mirror: true,
+  who: "nyanya", toast, mirror: true, local: LOCAL && localSnap ? localSnap.uri || {} : null,
   onCats: () => { if (moneyBound && backend) { renderMoneyForm(); if (!$("catEditor").contains(document.activeElement)) renderCatEditor(); } },   // 🏷 공통 분류가 바뀌면 기록 창 분류 칸도
   // 📊 공통 통계 원형: 가계부와 같은 원형 (큰 순서 8개 색 + '그 밖' 회색, 가운데 구멍 없이)
   // 📊 공통 지출을 통계 탭과 똑같이: 기간 계산 · 흐름 그래프는 가계부 것으로, 자산·메모는 내가 ❤️로 적은 가계부 기록에서

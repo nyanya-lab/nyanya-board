@@ -150,7 +150,7 @@ export function mountUri(root, opts = {}) {
   // ❤️ 내 가계부의 공통 지출 → 공통 저장소 costs/{who}-{가계부 id} (src "money"). 바뀐 것만 한 번에 고치고, 가계부에서 지웠거나 ❤️를 뺀 건 지움
   function setMirror(docs) { mirror = docs || {}; reconcile(); }
   async function reconcile() {
-    if (!mirror || !room || !st.loaded || mirroring) return;
+    if (!mirror || !room || !st.loaded || mirroring || opts.local) return;
     const want = {};
     for (const [id, d] of Object.entries(mirror)) {
       if (!d || !d.date || !Number(d.amount)) continue;   // 마이너스(환불·취소)도 같이 — 합계·정산에서 빠지게
@@ -658,7 +658,13 @@ export function mountUri(root, opts = {}) {
   root.addEventListener("toggle", (e) => { if (e.target.classList && e.target.classList.contains("uri-cats")) st.catsOpen = e.target.open; }, true);
   root.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches && e.target.matches('tr[data-uri="view"]')) e.target.click(); });
   render();
-  start();
+  // 🔒 로컬 확인 모드 (냐냐 가계부가 localhost?local 일 때 opts.local = 사본 {costs, cats, settles}): 서버에 안 붙고 사본만 보여 줌, 저장 안 함
+  if (opts.local) setTimeout(() => {   // 보드가 연결 코드를 다 붙인 뒤에 (바로 그리면 통계 도우미가 아직 없음)
+    room = "local"; st.phase = "open"; st.costs = opts.local.costs || {}; st.loaded = true; st.settles = opts.local.settles || {}; st.settlesLoaded = true;
+    st.cats = opts.local.cats ? catsOf(opts.local.cats) : COMMON_CATS.map((c) => ({ n: c.n, s: c.s.slice() }));
+    if (typeof opts.onCats === "function") opts.onCats(st.cats);
+    summary(); render();
+  }, 0); else start();
   // 🏷 공통 분류 저장 (냐냐 가계부 설정 '분류'에서만 부름 — 고치는 건 냐냐만, 욱진 보드는 보기만)
   const setCats = (list) => room ? rt.set(path(room, "settings", "cats"), list) : Promise.reject(new Error("공통 공간이 안 열렸어요"));
   // 💸 이체로 정산 (가계부 이체 기록의 '공통비용 정산' 체크): 장부 settles/{이체 id}에 금액 한 줄. preview = 확인 창 글
