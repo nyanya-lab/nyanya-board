@@ -117,7 +117,7 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 #moneyPage .mc-v i.net.minus { color: var(--fg); background: color-mix(in srgb, var(--blue, #2f6feb) 16%, transparent); }
 /* 합계 줄 바탕 안쪽 여백만큼 수입·지출 줄도 같은 여백 → 숫자 오른쪽 끝이 다 맞음 */
 #moneyPage .mc-v i { padding: 0 4px; box-sizing: border-box; }
-/* 💑 내 몫으로 보기 버튼 (위 제목 줄 오른쪽) */
+/* 💑 내 몫으로 보기 버튼 (2026-10-22부터 왼쪽 메뉴 아래, 서버에 저장됨 위) */
 #moneyPage .page-head { gap: 8px; }
 #moneyPage .page-head > div:first-child { margin-right: auto; }
 .m-mine { white-space: nowrap; }
@@ -198,3 +198,12 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
   #moneyPage .st-grid > .st-side { overflow-y: auto; overscroll-behavior: contain; }
   #txList > .tx-th, #stList > .tx-th, #asDetail .as-tx > .tx-th { position: sticky; top: 0; z-index: 2; background: var(--surface); }
 }
+/* 🧹 위 제목 없애기 (냐냐 요청 2026-10-22): 탭 이름은 왼쪽 메뉴·아래 메뉴에 보이니까 제목 글자는 숨기고,
+   제목 줄은 달 넘기기(예산 탭)가 있을 때만 남김 → 내용이 화면 위에서 바로 시작 */
+#moneyPage .page-head > div:first-child { display: none; }
+#moneyPage .page-head:not(:has(.month-nav:not([hidden]))) { display: none; }
+#moneyPage .page-head { justify-content: flex-end; min-height: 0; }
+.wrap { padding-top: 16px; }
+.side .m-mine:not([hidden]) { display: flex; justify-content: center; margin-top: auto; margin-bottom: -8px; }
+.side .m-mine:not([hidden]) + .side-settings { margin-top: 0; }
+.side .m-mine .mm-l { display: inline; } .side .m-mine .mm-s { display: none; }
