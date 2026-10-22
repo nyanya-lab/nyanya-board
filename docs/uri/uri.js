@@ -215,7 +215,9 @@ export function mountUri(root, opts = {}) {
   function alloc(extra = 0) {
     const list = all().sort((a, b) => a.date.localeCompare(b.date) || (a.at || 0) - (b.at || 0) || a.id.localeCompare(b.id));
     let rem = settledSum() + extra; const m = {};
-    for (const c of list) { const a = Number(c.amount) || 0; let d; if (a <= 0 || rem >= a) { d = a; rem -= a; } else { d = rem; rem = 0; } m[c.id] = d; }
+    // 환불·취소(마이너스)는 정산이 아직 닿은 곳(rem > 0)에서만 정산된 셈. 그 뒤에 있으면 자기 달(여행)의 미정산을 줄이기만 함
+    //   (예전엔 3/30 환불 -11,900이 '정산 -11,900'으로 잡히고 그만큼이 다음 날 상해 기록에 '정산 11,900'으로 넘어가 보였음)
+    for (const c of list) { const a = Number(c.amount) || 0; let d; if (a <= 0) { if (rem > 0) { d = a; rem -= a; } else d = 0; } else if (rem >= a) { d = a; rem -= a; } else { d = rem; rem = 0; } m[c.id] = d; }
     return { m, left: rem };
   }
   const openOf = (c, al) => (Number(c.amount) || 0) - (al.m[c.id] ?? 0);
@@ -363,7 +365,7 @@ export function mountUri(root, opts = {}) {
   const saveCats = (list, msg) => save(rt.set(path(room, "settings", "cats"), list), msg).catch(() => {});
   // 📊 첫 화면: 냐냐 엑셀 첫 시트처럼 묶음(달·여행)마다 합계 · 정산 · 미정산 · 1인당 미정산
   function summaryHtml() {
-    const gs = groups(), al = alloc(), open = all().map((c) => ({ ...c, amount: openOf(c, al) })).filter((c) => c.amount > 0), os = settleOf(open), now = today().slice(0, 7);
+    const gs = groups(), al = alloc(), open = all().map((c) => ({ ...c, amount: openOf(c, al) })).filter((c) => c.amount !== 0), os = settleOf(open)   /* 환불(마이너스)도 미정산에서 빼게 */, now = today().slice(0, 7);
     const shown = gs.filter((x) => st.showDone || x.open || x.key === now), hid = gs.length - shown.length;
     const sum = gs.reduce((t, x) => ({ total: t.total + x.total, done: t.done + x.done, open: t.open + x.open }), { total: 0, done: 0, open: 0 });
     const w = (n) => n ? Math.round(n).toLocaleString("ko-KR") : "-", W = (n) => Math.round(n).toLocaleString("ko-KR");   // 표 안 숫자는 '원' 없이 (엑셀처럼)
