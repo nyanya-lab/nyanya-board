@@ -309,7 +309,7 @@ export function mountUri(root, opts = {}) {
         ${sp.p === "range" ? `<div class="row st-range"><label class="f">부터<input type="date" data-uri-from value="${esc(cur.from)}"></label><label class="f">까지<input type="date" data-uri-to value="${esc(cur.to)}"></label></div>` : ""}
       </div>
       <div class="st-grid">
-        <div class="panel st-side"><div class="st-pie">${pie || `<p class="muted small" style="margin:0">${esc(cur.name)} 공통비용 기록이 없어요.</p>`}</div>
+        <div class="panel st-side">${pie ? `<div class="st-pie">${pie}</div>` : pieList.length ? "" : `<div class="st-pie"><p class="muted small" style="margin:0">${esc(cur.name)} 공통비용 기록이 없어요.</p></div>`}
           <div class="st-cats"><button type="button" class="st-cat all${sel ? "" : " on"}" data-uri="stSel" data-k=""><span>공통비용 전체 <small>${list.length}</small></span><b class="won">${won(total)}</b></button>${cats.map((x) => `<button type="button" class="st-cat${sel === x.k && !subSel ? " on" : ""}" data-uri="stSel" data-k="${esc(x.k)}"><i class="st-pct" style="--c:${colorOf(x.k)}">${pct(x.amt, total)}%</i><span>${esc(x.k)}</span><b class="won">${won(x.amt)}</b></button>`
             + (sel === x.k ? `<div class="st-cc">${subs.map((y) => `<button type="button" class="st-cat st-sub${subSel === y.k ? " on" : ""}" data-uri="stSub" data-k="${esc(y.k)}"><i class="st-pct">${pct(y.amt, x.amt)}%</i><span>${esc(y.k)}</span><b class="won">${won(y.amt)}</b></button>`).join("")}</div>` : "")).join("")}</div>
         </div>
