@@ -136,6 +136,17 @@ async function roomOf(pw) {
 }
 
 // ---------- 그리기 ----------
+// 📌 PC: 내역 · 통계 · 자산 칸 높이를 화면 아래 끝까지 → 위(요약·그래프·표 머리줄)는 그대로, 목록만 스크롤 (nyanya.css)
+function fitPanels() {
+  const els = document.querySelectorAll("#moneyPage .tx-panel, #moneyPage .st-grid, #asGrid");
+  els.forEach((el) => {
+    if (innerWidth <= 720 || !el.offsetParent) { el.style.height = ""; return; }
+    const top = el.getBoundingClientRect().top + scrollY;
+    el.style.height = Math.max(360, Math.round(innerHeight - top - 16)) + "px";
+  });
+}
+window.addEventListener("resize", fitPanels);
+document.addEventListener("click", () => setTimeout(fitPanels, 0));   // 탭을 바꾸면
 function render() {
   if (!backend) return;
   $("todayMono").textContent = today().replace(/-/g, ".");
@@ -144,6 +155,7 @@ function render() {
   rp.render(); rp.run(); ak.render(); ccm.render(); ci.render();
   tripList();
   mirrorCommon();
+  fitPanels();
 }
 // ✈️ 내용 칸 자동완성: 예전에 쓴 여행 이름 (소분류가 '여행…'이고 숫자로 시작하는 내용 — '2026 상해'처럼, 최근 것 먼저) — 공통 탭 여행 묶음이 같은 이름으로 묶여서
 let tripKey = "";

@@ -188,3 +188,13 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 ::-webkit-scrollbar-corner { background: transparent; }
 @supports not selector(::-webkit-scrollbar) { * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted, #8a93a6) 35%, transparent) transparent; } }
+/* 📌 내역 · 통계(지출 전체) · 자산 상세: 위부터 표 머리줄까지 고정, 아래 목록만 스크롤 (PC만, 높이는 app.js fitPanels가 화면에 맞춤) */
+@media (min-width: 721px) {
+  #moneyPage .tx-panel, #moneyPage .st-main, #asDetail { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  #moneyPage .tx-panel > *, #moneyPage .st-main > *, #asDetail > * { flex: none; }
+  #txList, #stList, #asDetail .as-tx { flex: 1 1 auto !important; min-height: 0; overflow-y: auto; overscroll-behavior: contain; align-content: start; }
+  #moneyPage .st-grid { align-items: stretch; }
+  #moneyPage .st-grid > .panel { min-height: 0; max-height: 100%; }
+  #moneyPage .st-grid > .st-side { overflow-y: auto; overscroll-behavior: contain; }
+  #txList > .tx-th, #stList > .tx-th, #asDetail .as-tx > .tx-th { position: sticky; top: 0; z-index: 2; background: var(--surface); }
+}
