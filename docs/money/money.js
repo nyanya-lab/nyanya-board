@@ -134,7 +134,8 @@ export function pieHtml(kind, list, label, o = {}) {
   }
   if (xs.length > 10) xs = xs.slice(0, 9).concat([{ cat: "그 밖", amt: xs.slice(9).reduce((t, x) => t + x.amt, 0), other: true }]);
   const col = (x) => x.other ? `var(--c${CAT_N})` : o.color ? o.color(x) : catVar(kind, x.cat), pctS = (x) => (x.amt / total * 100).toFixed(1).replace(/\.0$/, "");
-  const W = 460, H = 280, cx = W / 2, cy = H / 2, R = 92, r0 = o.full ? 0 : 58, f = (v) => v.toFixed(1);
+  // 냐냐: 꽉 찬 원형(o.full, 통계·공통)은 크게 — 옆 여백을 줄이고 반지름을 키움 (이름표는 칸 여백까지 넘쳐도 보이게 nyanya.css)
+  const W = o.full ? 400 : 460, H = o.full ? 300 : 280, cx = W / 2, cy = H / 2, R = o.full ? 118 : 92, r0 = o.full ? 0 : 58, f = (v) => v.toFixed(1);
   const pt = (a, rr) => `${f(cx + rr * Math.cos(a))} ${f(cy + rr * Math.sin(a))}`;
   const arc = (a1, a2, ro, ri) => {
     if (a2 - a1 > Math.PI * 2 - 0.01) { const h = a1 + Math.PI; return `M${pt(a1, ro)}A${ro} ${ro} 0 1 1 ${pt(h, ro)}A${ro} ${ro} 0 1 1 ${pt(a1, ro)}Z` + (ri ? `M${pt(a1, ri)}A${ri} ${ri} 0 1 0 ${pt(h, ri)}A${ri} ${ri} 0 1 0 ${pt(a1, ri)}Z` : ""); }   // 한 조각 = 고리 전체
@@ -150,7 +151,7 @@ export function pieHtml(kind, list, label, o = {}) {
     side.forEach((p) => { if (p.ly < 14) p.ly = 14; p.right = right; });
   });
   const g = sl.map((p) => {
-    const ex = p.right ? cx + R + 34 : cx - R - 34, name = p.x.cat.length > 14 ? p.x.cat.slice(0, 13) + "…" : p.x.cat;
+    const gap = o.full ? 22 : 34, cut = o.full ? 7 : 14, ex = p.right ? cx + R + gap : cx - R - gap, name = p.x.cat.length > cut ? p.x.cat.slice(0, cut - 1) + "…" : p.x.cat;
     return `<g class="sl" tabindex="0" data-n="${esc(p.x.cat)}" data-p="${pctS(p.x)}" data-v="${esc(won(p.x.amt))}" data-c="${esc(p.c)}">` +
       `<path class="halo" d="${arc(p.a1, p.a2, R + 9, R)}" fill="${p.c}"/><path class="seg" d="${arc(p.a1, p.a2, R, r0)}" fill="${p.c}"/>` +
       `<polyline class="pl-l" points="${pt(p.mid, R + 3)} ${pt(p.mid, R + 13)} ${f(ex)} ${f(p.ly)}" stroke="${p.c}"/>` +

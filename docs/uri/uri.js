@@ -250,8 +250,11 @@ export function mountUri(root, opts = {}) {
     if (st.phase === "locked") { root.innerHTML = lockHtml(); return; }
     const keepAmt = st.pay && root.querySelector('[data-uri-pay]');
     root.innerHTML = st.view && !mirrorMode ? openHtml()   // (가계부 연결 없는 보드: 예전 달 화면에서 적기)
-      : `<div class="uri-tabs" role="tablist" aria-label="공통 보기"><button type="button" data-uri="tab" data-k="spend" aria-pressed="${st.tab !== "settle"}">📊 지출</button><button type="button" data-uri="tab" data-k="settle" aria-pressed="${st.tab === "settle"}">💸 정산</button></div>`
+      : `<div class="uri-tabs" role="tablist" aria-label="공통 보기"><button type="button" data-uri="tab" data-k="spend" aria-pressed="${st.tab !== "settle"}">📊 공통지출</button><button type="button" data-uri="tab" data-k="settle" aria-pressed="${st.tab === "settle"}">💸 정산</button></div>`
         + (st.tab === "settle" ? summaryHtml() : statsHtml());
+    // 작은 탭 [공통지출 | 정산]과 기간 줄(‹ 2026-10 › 월간)을 한 줄로 → 위 공백 줄이기 (냐냐 요청 2026-10-22)
+    const tabs = root.querySelector(":scope > .uri-tabs"), top = root.querySelector(":scope > .st-top");
+    if (tabs) { const bar = document.createElement("div"); bar.className = "uri-bar"; tabs.before(bar); bar.append(tabs); if (top) bar.append(top); }
     if (st.tab !== "settle" && !(st.view && !mirrorMode)) drawStatsChart();
     restoreForm();
     if (keepAmt && document.activeElement === document.body) { const i = root.querySelector('[data-uri-pay]'); if (i) i.focus(); }
@@ -374,7 +377,7 @@ export function mountUri(root, opts = {}) {
         <label class="uri-f"><span>공통 통장에서 뺀 총액</span><input class="uri-input" type="text" inputmode="numeric" data-uri-pay value="${esc(st.pay.amount || "")}" placeholder="예: 2,412,560" autocomplete="off"></label>
         <div id="uri-pay-prev">${payPreview()}</div></div>` : ""}
       <div class="uri-card">
-        <h4>한눈에 보기 <span class="uri-muted uri-small">줄을 누르면 📊 지출에서 그 달(여행)</span></h4>
+        <h4>한눈에 보기 <span class="uri-muted uri-small">줄을 누르면 📊 공통지출에서 그 달(여행)</span></h4>
         ${!st.loaded ? `<p class="uri-muted">불러오는 중…</p>` : `<div class="uri-tbl-wrap"><table class="uri-tbl">
           <thead><tr><th>달 <span class="uri-muted">(원)</span></th><th>합계</th><th class="c-done">정산</th><th>미정산</th><th>1인당 미정산</th></tr></thead>
           <tbody>${shown.map((x) => `<tr class="${x.open ? "" : "done"}${x.trip ? " trip" : ""}" data-uri="view" data-k="${esc(x.key)}" tabindex="0"><td>${esc(groupLabel(x))}</td><td>${w(x.total)}</td><td class="c-done">${w(x.done)}</td><td class="op">${w(x.open)}</td><td class="op">${w(Math.round(x.open / 2))}</td></tr>`).join("")}</tbody>
@@ -776,7 +779,10 @@ function injectStyle() {
 .uri-tabs button { font: inherit; border: 0; background: transparent; border-radius: 7px; padding: 8px 4px; font-size: 14px; color: var(--muted); cursor: pointer; }
 .uri-tabs button[aria-pressed="true"] { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
 .uri-st-per { gap: 8px; }
-.uri .st-top { justify-content: flex-end; }   /* 통계 탭처럼 기간 줄은 오른쪽 */
+.uri .st-top { justify-content: flex-end; }
+.uri-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.uri-bar .uri-tabs { flex: 0 1 360px; }
+.uri-bar .st-top { margin-left: auto; }   /* 통계 탭처럼 기간 줄은 오른쪽 */
 .uri-st-pay { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); padding: 2px 0 6px; } .uri-st-pay b { color: var(--fg); font-weight: 500; margin-left: 4px; }
 .uri .st-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .uri .tx-row.no-ck.uri-tx { grid-template-columns: 82px minmax(0, .75fr) minmax(0, 1fr) minmax(0, .8fr) 118px minmax(0, 1.4fr) minmax(0, 1fr) 56px; cursor: default; }

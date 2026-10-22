@@ -207,3 +207,6 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 .side .m-mine:not([hidden]) { display: flex; justify-content: center; margin-top: auto; margin-bottom: -8px; }
 .side .m-mine:not([hidden]) + .side-settings { margin-top: 0; }
 .side .m-mine .mm-l { display: inline; } .side .m-mine .mm-s { display: none; }
+/* 통계·공통 왼쪽 칸: 칸이 화면 높이로 늘어나도 원형·분류 목록은 위에 붙게 (남는 공간은 아래로) · 원형 이름표는 칸 여백까지 보이게 */
+#moneyPage .st-side, #moneyPage .st-cats { align-content: start; }
+#moneyPage .st-pie .pie2 svg { overflow: visible; }
