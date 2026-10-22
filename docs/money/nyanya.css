@@ -96,7 +96,12 @@
 .st-cat .cdot, .cat-row .cdot-btn { display: none; }
 /* ▦ 다건입력: 창을 옆으로 넓게 + 채우기 손잡이 (엑셀처럼) */
 .dlg.bulk-dlg { width: calc(100vw - 24px); max-width: 1800px; }
-table.bulk { min-width: 1200px; }
+table.bulk { min-width: 1200px; table-layout: fixed; }
+/* 칸 너비는 머리줄에서 정하고, 입력칸은 칸을 꽉 채움 → 남는 너비는 내용·메모로 (예전엔 입력칸이 고정 너비라 칸만 넓어져 빈 곳이 생겼음) */
+.bulk-dlg .bulk [data-c] { width: 100%; }
+.bulk th:nth-child(1) { width: 34px; } .bulk th:nth-child(2) { width: 80px; } .bulk th:nth-child(3) { width: 140px; }
+.bulk th:nth-child(4), .bulk th:nth-child(5) { width: 180px; } .bulk th:nth-child(6) { width: 130px; }
+.bulk th:nth-child(7) { width: 120px; } .bulk th:nth-child(8) { width: 64px; } .bulk th:nth-child(11) { width: 40px; }
 .bk-fill { position: absolute; width: 9px; height: 9px; background: var(--coral, #f0604d); border: 2px solid var(--surface, #fff); border-radius: 2px; cursor: ns-resize; z-index: 3; touch-action: none; }
 .bulk td.bk-fill-on { background: color-mix(in srgb, var(--coral, #f0604d) 14%, transparent); outline: 1px dashed var(--coral, #f0604d); outline-offset: -2px; }
 .bk-fill::after { content: ""; position: absolute; inset: -9px; }   /* 손가락으로도 잡기 쉽게 */

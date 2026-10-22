@@ -10,7 +10,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   💸 이체 '공통비용 정산' 체크(#mSettle → 공통 저장소 정산 장부 settles/{이체 id}에 금액, 기록 settle: true, 메모 비면 '2511 잔액 …', 체크 빼거나 지우면 장부에서도 뺌),
 //   달력 칸 합계(수입−지출) 줄은 수입·지출 하나만 있어도 보임,
 //   분류 색 = 원형마다 금액 큰 8개가 서로 다른 색(늘 쓰는 색 먼저), 9번째부터 '그 밖' (E.catRank, setCatView),
-//   ▦ 다건입력 채우기 손잡이(bulkFillInit, 엑셀처럼 끌어서 복사),
+//   ▦ 다건입력 채우기 손잡이(bulkFillInit, 엑셀처럼 끌어서 복사) · 자산·분류는 안 고르면 빈칸(꼭 골라야 저장) · 날짜·고르는 칸에서도 Ctrl+V 붙여넣기(bulkPasteKey),
 //   자산 고르는 칸 = 자산 탭 순서로 현금·통장·카드·저축 묶음 + 이름_계좌번호 (acctOptsHtml),
 //   금액 +/- 기호 없음 (색으로만, app.js won = 부호 없음) — 직접 -로 적은 금액만 - (amtText), 지출·수입·분류 합계가 마이너스면 - (wonN),
 //   ✏️ 분류·소분류 이름 바꾸기(renameCat·renameSub: 기록·예산·반복도 같이, 있는 이름이면 합침) + 기록에만 남은 분류 표시,
@@ -787,13 +787,13 @@ function bulkAcctOpts(kind, cur) {
 }
 function bulkRowHtml(v) {
   const k = BULK_KINDS.includes(v.kind) ? v.kind : "expense", cats = moneyCats(k === "move" ? "expense" : k);
-  const cat = k === "move" ? bulkAcctOpts(k, v.cat) : cats.map((c) => `<option${c === v.cat ? " selected" : ""}>${esc(c)}</option>`).join("");
+  const cat = k === "move" ? bulkAcctOpts(k, v.cat) : '<option value="">-</option>' + cats.map((c) => `<option${c === v.cat ? " selected" : ""}>${esc(c)}</option>`).join("");   // 냐냐: 안 고르면 비어 있게 (첫 분류 자동 X)
   return `<tr class="k-${k}"><td class="bk-n"></td>` +
     `<td><select data-c="kind" aria-label="구분">${BULK_KINDS.map((x) => `<option value="${x}"${x === k ? " selected" : ""}>${KIND_LABEL[x]}</option>`).join("")}</select></td>` +
     `<td><input type="date" data-c="date" value="${esc(v.date || today())}" aria-label="날짜"></td>` +
     `<td><select data-c="acct" aria-label="자산">${bulkAcctOpts(k, v.acct)}</select></td>` +
     `<td><select data-c="cat" aria-label="${k === "move" ? "받는 곳" : "분류"}">${cat}</select></td>` +
-    `<td><select data-c="sub" aria-label="소분류"${k === "move" ? " disabled" : ""}>${k === "move" ? "" : subOptions(k, v.cat && cats.includes(v.cat) ? v.cat : cats[0], v.sub && v.sub !== "__add" ? v.sub : "")}</select></td>` +
+    `<td><select data-c="sub" aria-label="소분류"${k === "move" ? " disabled" : ""}>${k === "move" ? "" : subOptions(k, v.cat && cats.includes(v.cat) ? v.cat : "", v.sub && v.sub !== "__add" ? v.sub : "", !!(v.cat && cats.includes(v.cat)))}</select></td>` +
     `<td><input type="text" data-c="amt" class="amt-in" inputmode="numeric" value="${esc(v.amt || "")}" aria-label="금액"></td>` +
     `<td><select data-c="cur" aria-label="화폐">${currencies().map((c) => `<option${c === (v.cur || "원") ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></td>` +
     `<td><input type="text" data-c="memo" maxlength="80" value="${esc(v.memo || "")}" aria-label="내용"></td>` +
@@ -803,7 +803,7 @@ function bulkRowHtml(v) {
 const bulkRead = (tr) => { const v = {}; tr.querySelectorAll("[data-c]").forEach((el) => { v[el.dataset.c] = el.value; }); return v; };
 function bulkNumber() { [...$("bulkBody").rows].forEach((tr, i) => { tr.cells[0].textContent = i + 1; }); bulkCount(); }
 function bulkCount() { const n = [...$("bulkBody").rows].filter((tr) => amtVal(tr.querySelector('[data-c="amt"]')) > 0).length; $("bulkCount").textContent = n ? `${n}줄 저장할 거예요` : ""; }
-function bulkAdd(n) { const acct = lastAcct("expense"); $("bulkBody").insertAdjacentHTML("beforeend", Array.from({ length: n }, () => bulkRowHtml({ acct })).join("")); bulkNumber(); }
+function bulkAdd(n) { $("bulkBody").insertAdjacentHTML("beforeend", Array.from({ length: n }, () => bulkRowHtml({})).join("")); bulkNumber(); }   // 냐냐: 자산도 안 고르면 비어 있게 (마지막 자산 자동 X)
 function bulkOpen() {
   if (!$("bulkBody").rows.length) bulkAdd(10);
   openDlg($("bulkDlg"));
@@ -819,11 +819,11 @@ function bulkSave() {
     tr.classList.remove("bad");
     if (v.sub === "__add") v.sub = "";
     if (!(amount > 0)) { if (v.memo.trim() || v.note.trim()) { bad.push(i + 1); tr.classList.add("bad"); } return; }
-    if (k === "move" && (!v.acct || !v.cat || v.acct === v.cat)) { bad.push(i + 1); tr.classList.add("bad"); return; }
+    if (!v.acct || !v.cat || (k === "move" && v.acct === v.cat)) { bad.push(i + 1); tr.classList.add("bad"); return; }   // 자산·분류(이체는 받는 곳) 꼭 고르기
     const base = { kind: k, amount, date: v.date || today(), cur: v.cur && v.cur !== "원" ? v.cur : null, memo: v.memo.trim(), note: v.note.trim() || null, account: v.acct || null };
     docs.push(k === "move" ? { ...base, cat: null, sub: null, toAccount: v.cat } : { ...base, cat: v.cat, sub: v.sub || null, toAccount: null });
   });
-  if (bad.length) { toast(`${bad.join(", ")}번 줄을 확인해 주세요 (금액, 이체는 보내는 곳·받는 곳).`); return; }
+  if (bad.length) { toast(`${bad.join(", ")}번 줄을 확인해 주세요 (금액·자산·분류, 이체는 보내는 곳·받는 곳).`); return; }
   if (!docs.length) { toast("금액을 적은 줄이 없어요."); return; }
   const t0 = Date.now();
   act((async () => { for (let i = 0; i < docs.length; i++) await E.backend.add("money", { ...docs[i], createdAt: t0 + i }); })(), `▦ ${docs.length}건을 한 번에 기록했어요.`)
@@ -844,6 +844,19 @@ function bulkPaste(ev) {
   const text = (ev.clipboardData && ev.clipboardData.getData("text")) || "", start = ev.target.closest && ev.target.closest("[data-c]");
   if (!start || !/[\t\n]/.test(text.replace(/\s+$/, ""))) return;
   ev.preventDefault();
+  bulkPasteText(start, text);
+}
+// 날짜·고르는 칸에선 브라우저가 붙여넣기(paste)를 안 보내줘서, Ctrl+V를 직접 받아 클립보드를 읽음 (냐냐 쪽에서 더함)
+function bulkPasteKey(ev) {
+  const start = ev.target.closest && ev.target.closest("[data-c]");
+  if (!start || !(ev.ctrlKey || ev.metaKey) || ev.altKey || String(ev.key).toLowerCase() !== "v") return;
+  if (!(start.tagName === "SELECT" || start.type === "date")) return;
+  if (!navigator.clipboard || !navigator.clipboard.readText) return;
+  ev.preventDefault();
+  navigator.clipboard.readText().then((text) => { if (text.trim()) bulkPasteText(start, text); })
+    .catch(() => toast("클립보드를 못 읽었어요. 브라우저가 물어보면 '허용'을 눌러 주세요."));
+}
+function bulkPasteText(start, text) {
   const lines = text.replace(/\r/g, "").replace(/\n+$/, "").split("\n").map((l) => l.split("\t"));
   const body = $("bulkBody"), cols = [...start.closest("tr").querySelectorAll("[data-c]")].map((x) => x.dataset.c);
   let r0 = [...body.rows].indexOf(start.closest("tr")); const c0 = cols.indexOf(start.dataset.c);
@@ -854,7 +867,7 @@ function bulkPaste(ev) {
       const col = cols[c0 + c]; if (!col) return;
       bulkCell(tr.querySelector(`[data-c="${col}"]`), v);
       if (col === "kind") tr = bulkRekind(tr);
-      if (col === "cat" && tr.querySelector('[data-c="kind"]').value !== "move") tr.querySelector('[data-c="sub"]').innerHTML = subOptions(tr.querySelector('[data-c="kind"]').value, tr.querySelector('[data-c="cat"]').value, "");
+      if (col === "cat" && tr.querySelector('[data-c="kind"]').value !== "move") tr.querySelector('[data-c="sub"]').innerHTML = subOptions(tr.querySelector('[data-c="kind"]').value, tr.querySelector('[data-c="cat"]').value, "", !!tr.querySelector('[data-c="cat"]').value);
     });
   });
   bulkCount();
@@ -1244,12 +1257,13 @@ export function initMoney() {
   $("bulkBody").addEventListener("change", (ev) => {
     const t = ev.target, tr = t.closest("tr"), kind = tr && tr.querySelector('[data-c="kind"]').value;
     if (t.dataset.c === "kind") { const nt = bulkRekind(tr); nt.querySelector('[data-c="kind"]').focus(); }
-    else if (t.dataset.c === "cat" && kind !== "move") tr.querySelector('[data-c="sub"]').innerHTML = subOptions(kind, t.value, "");
+    else if (t.dataset.c === "cat" && kind !== "move") tr.querySelector('[data-c="sub"]').innerHTML = subOptions(kind, t.value, "", !!t.value);
     else if (t.dataset.c === "sub" && t.value === "__add") askNewSub(kind, tr.querySelector('[data-c="cat"]').value, t);
     bulkCount();
   });
   $("bulkBody").addEventListener("input", bulkCount);
   $("bulkBody").addEventListener("paste", bulkPaste);
+  $("bulkBody").addEventListener("keydown", bulkPasteKey);
   bulkFillInit();   // ⬛ 채우기 손잡이 (냐냐)
   $("bulkBody").addEventListener("keydown", (ev) => {
     if (ev.key !== "Enter" || ev.isComposing || !ev.target.dataset.c) return;
@@ -1435,7 +1449,7 @@ export function moneyAction(a, el, id, t) {
   if (a === "bulkClose") { closeDlg($("bulkDlg")); return true; }
   if (a === "bulkMore") { bulkAdd(5); return true; }
   if (a === "bulkSave") { bulkSave(); return true; }
-  if (a === "bulkDel") { const tr = el.closest("tr"); tr.replaceWith(Object.assign(document.createElement("tbody"), { innerHTML: bulkRowHtml({ acct: lastAcct("expense") }) }).firstElementChild); bulkNumber(); return true; }
+  if (a === "bulkDel") { const tr = el.closest("tr"); tr.replaceWith(Object.assign(document.createElement("tbody"), { innerHTML: bulkRowHtml({}) }).firstElementChild); bulkNumber(); return true; }
   if (a === "monthNow") { ui.month = today().slice(0, 7); renderMoney(); return true; }
   if (a === "mineToggle") { if (!ready()) return true; const on = !mineOn(); act(E.backend.saveSettings({ moneyMine: on || null }), on ? "💑 내 몫으로 보기: 공통비용은 절반, 욱진입금은 수입에서 빼고 봐요." : "실제로 오간 돈 그대로 봐요.").catch(() => {}); return true; }
   // 🧾 내역 기간: 달 이름·[이번 달] → 기간 고르기 창, ‹ › → 한 달이면 한 달씩, 아니면 같은 날 수만큼
