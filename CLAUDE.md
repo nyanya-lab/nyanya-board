@@ -102,6 +102,7 @@ docs/manifest.webmanifest, *.png  홈 화면 앱 아이콘 = 냐냐 캐릭터(�
 - 공통비용 `costs/{id}` = {date, title, amount, cat(`URI_CATS`), payer nyanya|ukjin|joint(공동 통장), memo, by(적은 사람), at, updBy, updAt}. 정산 = (냐냐 낸 돈 − 욱진 낸 돈) / 2, 공동 통장은 합계에만 (`settleOf`). `_backup/{prev,daily}` 자동 백업(되돌리기 화면은 아직 없음).
 - 공통 비밀번호는 이 기기 `localStorage["uri-board-pw"]` + 냐냐 보드 `settings.uriPw`(한 번 넣으면 보드가 기억 → 다른 기기에선 보드 비밀번호만 넣으면 우리 탭도 열림, `mountUri`의 `savePassword` / 돌려받은 `usePassword`). 욱진 보드는 아직 savePassword를 안 넘겨서 기기마다 넣어야 함 (원하면 욱진 보드 app.js에 같은 연결 추가). 두 보드가 같은 주소(nyanya-lab.github.io)라서 같은 브라우저면 한쪽에서 열면 다른 보드도 열림.
 - ✅ **2026-10-22 욱진 보드에 공개** (냐냐 OK): `uri.js` `HOLD_UKJIN = false`, `uri/changes.js` `URI_HOLD = false`(욱진 보드가 읽어서 ❤️ 칸·공통 탭·우리 메뉴 보임) + 그날 소개 줄. 욱진 보드 쪽은 PR #159(목록 전부)·#160(❤️ 공통, who "ukjin", 욱진이 기기에서만 mirror). 욱진이는 공통 탭에서 공통 비밀번호를 한 번 넣어야 함. (아래는 공개 전 기록)
+- 🎯 **보드의 🤝 우리 탭 = 나중에 '우리 목표' 자리** (2026-10-22 냐냐: 지출은 여기 안 씀): 냐냐 보드는 uri.js `boardMode`(#page-uri 안이면 '🎯 우리 목표 (준비 중)' 안내 + 가계부 ❤️ 공통 링크만, 첫 화면 공통비용 칸은 그대로), 욱진 보드는 PR #162로 우리 탭이 uri.js를 안 불러옴. 공통비용은 가계부 ❤️ 공통 탭에서만.
 - (지난 기록) ⏸ 욱진 보드엔 아직 비공개였음: `uri.js` `HOLD_UKJIN = true` → 욱진 보드 우리 탭은 '준비 중'만, `uri/changes.js`도 비워 둠.
   욱진 보드의 '우리' 메뉴·설명서 주제도 숨김: `uri/changes.js`의 `URI_HOLD` 코드(욱진 보드가 열 때 이 파일을 불러와서 숨김, 2026-10-20 실제 사이트에서 확인).
   공개할 때 할 일: ⓪ `uri/changes.js` URI_HOLD 코드 지우기 ① 욱진 보드 money.js에 ❤️ 체크 + 기록 칸 `#mCommonWrap` + `mirrorCommon`(who "ukjin") + '❤️ 공통' 탭(여기 money/app.js 참고) — 욱진 보드 PR ② `HOLD_UKJIN = false` ③ `uri/changes.js`에 그날 소개 줄 ④ 욱진 보드도 `savePassword` 연결(공통 비밀번호 기억).

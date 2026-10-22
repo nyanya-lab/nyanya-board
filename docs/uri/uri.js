@@ -246,7 +246,16 @@ export function mountUri(root, opts = {}) {
 
   // ── 그리기 ──
   // fresh = 입력 칸을 비우고 새로 (적기·고치기·달 바꾸기 뒤). 아니면 입력 중이던 값 유지 (다른 기기에서 바뀌어 다시 그릴 때)
+  // 🎯 보드의 🤝 우리 탭 (가계부 말고): 공통비용은 안 보여 주고 '우리 목표' 자리만 (냐냐 요청 2026-10-22 — 지출은 가계부 ❤️ 공통 탭에서)
+  //   보드는 #page-uri(냐냐 보드) · section[data-page="uri"](욱진 보드) 안에 붙어서 그걸로 알아봄. 저장소 연결은 그대로 (보드 첫 화면 공통비용 칸에 씀)
+  const boardMode = opts.board ?? !!root.closest('#page-uri, section[data-page="uri"]');
   function render(fresh) {
+    if (boardMode) {
+      const link = location.pathname.startsWith("/nyanya-board") ? "money/#common" : "#money";
+      root.innerHTML = `<div class="uri-card"><h3>🎯 우리 목표</h3><p class="uri-muted">둘이 같이 정한 목표·같이 할 일을 여기에 적을 거예요. (준비 중)</p>
+        <p class="uri-muted uri-small">공통비용(같이 쓴 돈·정산)은 <a href="${link}">💰 가계부 → ❤️ 공통</a>에서 봐요.</p></div>`;
+      return;
+    }
     if (fresh) st.form = null; else keepForm();
     if (st.phase === "start") { root.innerHTML = `<p class="uri-muted">공통 공간을 여는 중…</p>`; return; }
     if (st.phase === "error") { root.innerHTML = `<div class="uri-card"><p class="uri-err">${esc(st.msg)}</p></div>`; return; }
