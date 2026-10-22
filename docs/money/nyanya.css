@@ -171,3 +171,12 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 .ci-body { display: flex; flex-direction: column; gap: 10px; }
 .ci-dlg .ci-tbl { max-height: none; overflow: visible; }   /* 팝업 창이 스크롤 → 표 안에 따로 스크롤 안 생기게 */
 .ci-dlg .ci-go { position: sticky; bottom: 0; z-index: 2; background: var(--surface); padding: 10px 0; margin-bottom: -12px; border-top: 1px solid var(--line); }   /* [기록하기]는 늘 아래에 보이게 */
+/* 🏦 자산 탭 (냐냐 요청): PC에선 왼쪽 목록 · 오른쪽 자세히를 따로 스크롤 / 💳 결제는 ＋ 왼쪽에 작게 */
+@media (min-width: 721px) {
+  #asGrid { height: calc(100dvh - 112px); }
+  #asGrid > .panel { max-height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+}
+.as-fabs { position: fixed; right: 28px; bottom: 28px; z-index: 30; display: flex; align-items: center; gap: 10px; }
+.as-fabs .fab { position: static; }
+.as-fabs .as-pay { width: 44px; height: 44px; font-size: 12.5px; font-weight: 700; padding: 0; }
+@media (max-width: 720px) { .as-fabs { right: 16px; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); } }

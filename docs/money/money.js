@@ -10,7 +10,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   💸 이체 '공통비용 정산' 체크(#mSettle → 공통 저장소 정산 장부 settles/{이체 id}에 금액, 기록 settle: true, 메모 비면 '2511 잔액 …', 체크 빼거나 지우면 장부에서도 뺌),
 //   달력 칸 합계(수입−지출) 줄은 수입·지출 하나만 있어도 보임,
 //   분류 색 = 원형마다 금액 큰 8개가 서로 다른 색(늘 쓰는 색 먼저), 9번째부터 '그 밖' (E.catRank, setCatView),
-//   ▦ 다건입력 채우기 손잡이(bulkFillInit, 엑셀처럼 끌어서 복사) · 자산·분류는 안 고르면 빈칸(꼭 골라야 저장) · 날짜·고르는 칸에서도 Ctrl+V 붙여넣기(bulkPasteKey),
+//   자산 탭: 💳 결제 버튼은 오른쪽 아래 ＋ 왼쪽(.as-fabs), 양쪽 칸 따로 스크롤(nyanya.css) · ▦ 다건입력 채우기 손잡이(bulkFillInit, 엑셀처럼 끌어서 복사) · 자산·분류는 안 고르면 빈칸(꼭 골라야 저장) · 날짜·고르는 칸에서도 Ctrl+V 붙여넣기(bulkPasteKey),
 //   자산 고르는 칸 = 자산 탭 순서로 현금·통장·카드·저축 묶음 + 이름_계좌번호 (acctOptsHtml),
 //   금액 +/- 기호 없음 (색으로만, app.js won = 부호 없음) — 직접 -로 적은 금액만 - (amtText), 지출·수입·분류 합계가 마이너스면 - (wonN),
 //   ✏️ 분류·소분류 이름 바꾸기(renameCat·renameSub: 기록·예산·반복도 같이, 있는 이름이면 합침) + 기록에만 남은 분류 표시,
@@ -609,7 +609,6 @@ function renderAssetDetail(id) {
   box.innerHTML =
     `<div class="as-head"><button class="icon-btn as-back" type="button" data-act="asBack">‹ 목록</button>` +
     `<h3><span aria-hidden="true">${ACCT_ICON[a.type] || "🏦"}</span><span class="as-title">${esc(a.name)}</span><button class="icon-btn" type="button" data-act="editAcct" data-id="${esc(id)}" aria-label="${esc(a.name)} 고치기" title="이름·잔액${card ? "·결제일" : ""} 고치기">✏️</button></h3>` +
-    (card ? `<button class="btn small as-pay" type="button" data-act="cardPayNow" data-id="${esc(id)}">💳 결제</button>` : "") +
     `<div class="as-month"><button class="chip" type="button" data-act="month" data-d="-1" aria-label="이전 달">‹</button><b>${monthLabel(m)}</b><button class="chip" type="button" data-act="month" data-d="1" aria-label="다음 달">›</button></div></div>` +
     `<p class="small muted as-period">${payCard ? `<b>${+m.slice(5)}월 ${+p.date.slice(8)}일 결제</b> · 이용기간 ${ymdDot(p.from)} ~ ${ymdDot(p.to)}`
       : `기간 ${ymdDot(p.from)} ~ ${ymdDot(p.to)}${card ? ` · <button class="link-btn" type="button" data-act="editAcct" data-id="${esc(id)}">결제일을 정하면</button> 결제일 기준으로 보여요` : ""}`}</p>` +
@@ -622,7 +621,10 @@ function renderAssetDetail(id) {
     // 내역: 내역 탭과 같은 표 (날짜 · 자산 · 분류 · 소분류 · 금액 · 내용 · 메모), 금액은 이 자산 쪽에서 본 +/−, 밑에 그때 잔액
     `<div class="tx-list as-tx">${shown.length ? `<div class="tx-row tx-th no-ck"><span>날짜</span><span>자산</span><span>분류</span><span>소분류</span><span class="tx-amt">금액</span><span>내용</span><span>메모</span></div>` +
       shown.reverse().map((x) => txRow(x, false, { d: x.d, bal: balTxt(x.bal) })).join("") : `<p class="muted small" style="margin:8px 0 0">${monthLabel(m)}에 이 자산 기록이 없어요.</p>`}</div>` +
-    `<button class="fab" type="button" data-act="asAdd" data-id="${esc(id)}" aria-label="${esc(a.name)}(으)로 기록하기" title="${esc(a.name)}(으)로 기록하기">＋</button>`;
+    // 냐냐: 💳 결제 버튼은 카드 이름 옆 대신 오른쪽 아래 ＋ 왼쪽에 작게
+    `<div class="as-fabs">${card ? `<button class="fab fab-sub as-pay" type="button" data-act="cardPayNow" data-id="${esc(id)}" aria-label="${esc(a.name)} 결제" title="${esc(a.name)} 카드값 결제">결제</button>` : ""}` +
+    `<button class="fab" type="button" data-act="asAdd" data-id="${esc(id)}" aria-label="${esc(a.name)}(으)로 기록하기" title="${esc(a.name)}(으)로 기록하기">＋</button></div>`;
+  if (box.dataset.acct !== id) { box.scrollTop = 0; box.dataset.acct = id; }   // 냐냐: 자산 탭 양쪽 따로 스크롤 — 다른 자산을 고르면 오른쪽은 맨 위부터
   setChart($("asChart"), { bars: card, pts: asPts, label: card ? "달마다 쓴 돈" : "달마다 잔액" });
 }
 // 📈 그래프: 칸 너비 그대로 그림 (글자가 안 줄어들게), 너비가 바뀌면 다시 그림 (ResizeObserver)
