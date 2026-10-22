@@ -210,3 +210,6 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 /* 통계·공통 왼쪽 칸: 칸이 화면 높이로 늘어나도 원형·분류 목록은 위에 붙게 (남는 공간은 아래로) · 원형 이름표는 칸 여백까지 보이게 */
 #moneyPage .st-side, #moneyPage .st-cats { align-content: start; }
 #moneyPage .st-pie .pie2 svg { overflow: visible; }
+/* 📗 BC카드 엑셀 업로드 버튼 (내역 탭, 다건입력 왼쪽): 엑셀 그림 + 'BC' 딱지 */
+#cardOpen { position: relative; color: #1d7a46; border-color: #1d7a46; }
+#cardOpen .fab-badge { position: absolute; right: -6px; bottom: -4px; background: #1d7a46; color: #fff; font-size: 9.5px; font-weight: 800; line-height: 1; padding: 2px 4px; border-radius: 6px; border: 1.5px solid var(--surface, #fff); }
