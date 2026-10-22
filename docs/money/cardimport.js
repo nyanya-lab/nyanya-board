@@ -132,8 +132,16 @@ export function mountCardImport(root, env) {
     return '<option value="">-</option>' + list.map((s) => `<option${s === r.sub ? " selected" : ""}>${esc(s)}</option>`).join("");
   }
   function render() {
+    // 다시 그려도 보던 자리·고르던 칸 그대로 (예전엔 맨 위로 튀었음)
+    const tbl = root.querySelector(".ci-tbl"), dlg = root.closest("dialog"), keep = { t: tbl ? tbl.scrollTop : 0, d: dlg ? dlg.scrollTop : 0, w: window.scrollY };
+    const fa = document.activeElement, focus = fa && root.contains(fa) && fa.dataset.ci ? [fa.dataset.ci, fa.dataset.i] : null;
+    draw();
+    const t2 = root.querySelector(".ci-tbl"); if (t2) t2.scrollTop = keep.t; if (dlg) dlg.scrollTop = keep.d; if (!dlg) window.scrollTo(0, keep.w);
+    if (focus) { const el = [...root.querySelectorAll(`[data-ci="${focus[0]}"]`)].find((x) => x.dataset.i === focus[1]); if (el) el.focus({ preventScroll: true }); }
+  }
+  function draw() {
     const v = view();
-    let h = `<div class="panel-head"><div><h3>💳 카드 승인내역 올리기</h3><span class="muted small">BC카드 홈페이지·앱의 <b>승인내역</b> 엑셀을 올리면 승인취소는 빼고, 가계부에 아직 없는 것만 지출로 넣어요. 분류는 전에 같은 가게를 적은 대로 골라 둬요.</span></div></div>
+    let h = `<div class="panel-head"><div>${env.dialog ? "" : "<h3>💳 카드 승인내역 올리기</h3>"}<span class="muted small">BC카드 홈페이지·앱의 <b>승인내역</b> 엑셀을 올리면 승인취소는 빼고, 가계부에 아직 없는 것만 지출로 넣어요. 분류는 전에 같은 가게를 적은 대로 골라 둬요.</span></div></div>
       <label class="btn ghost" style="align-self:flex-start;cursor:pointer">📂 승인내역 엑셀 고르기<input type="file" accept=".xls,.xlsx" data-ci="file" hidden></label>`;
     if (v) {
       const cs = cards(), ready = v.news.filter((r) => r.on && r.cat), noCat = v.news.filter((r) => r.on && !r.cat).length;
@@ -151,7 +159,7 @@ export function mountCardImport(root, env) {
             <select data-ci="sub" data-i="${esc(r.i)}" aria-label="소분류"${r.cat ? "" : " disabled"}>${subOpts(r)}</select>
             <input type="text" data-ci="memo" data-i="${esc(r.i)}" value="${esc(r.memo)}" maxlength="80" placeholder="내용" aria-label="내용">
             <input type="text" data-ci="note" data-i="${esc(r.i)}" value="${esc(r.note)}" maxlength="500" placeholder="메모" aria-label="메모"></div>`).join("")}</div>
-          <div class="row" style="flex:0 0 auto;align-items:center;gap:10px"><button class="btn" type="button" data-ci="go"${st.busy || !ready.length ? " disabled" : ""}>${st.busy ? "기록하는 중…" : `💳 ${ready.length}건 기록하기`}</button>
+          <div class="row ci-go" style="flex:0 0 auto;align-items:center;gap:10px"><button class="btn" type="button" data-ci="go"${st.busy || !ready.length ? " disabled" : ""}>${st.busy ? "기록하는 중…" : `💳 ${ready.length}건 기록하기`}</button>
           ${noCat ? `<span class="small" style="color:var(--danger)">분류를 안 고른 ${noCat}건은 빼고 넣어요</span>` : ""}</div>`;
       } else h += `<p class="small" style="margin:0">✅ 새로 넣을 게 없어요. 다 가계부에 있어요.</p>`;
       if (v.haves.length) h += `<details class="small"><summary>이미 있어서 건너뛰는 ${v.haves.length}건 보기</summary><div class="ci-tbl" style="margin-top:6px">${v.haves.map((r) => `<div class="ci-row ci-have"><span></span><span class="mono">${esc(r.date.slice(5))}</span><span class="ci-shop">${esc(r.shop)}</span><span class="ci-amt">${esc(won(r.amount))}</span><span class="muted">${r.have === "id" ? "전에 올림" : r.have === "same" ? "같은 날 같은 금액" : r.have.startsWith("sum") ? `가계부에 ${r.have.slice(4)}건으로 나눠 적음` : `가계부에 ${r.have.slice(7)}건 합쳐 적음`}</span><span></span></div>`).join("")}</div></details>`;
@@ -170,6 +178,28 @@ export function mountCardImport(root, env) {
     else if (k === "memo" || k === "note") { (st.pick[i] ||= {})[k] = t.value; return; }   // 적는 칸은 다시 그리지 않음 (다음 칸으로 넘어갈 때 안 끊기게)
     else return;
     render();
+  });
+  // 📋 분류 복사·붙여넣기: 분류·소분류 칸에서 Ctrl+C → 그 줄의 분류+소분류를 기억, 다른 줄 분류·소분류 칸에서 Ctrl+V
+  //   (클립보드에 '분류 / 소분류' 글자도 넣어 둠. 기억한 게 없으면 클립보드 글자로 같은 이름 분류를 찾음)
+  let clip = null;
+  root.addEventListener("keydown", (e) => {
+    const t = e.target, k = t.dataset && t.dataset.ci;
+    if (!(k === "cat" || k === "sub") || !(e.ctrlKey || e.metaKey) || e.altKey) return;
+    const key = String(e.key).toLowerCase(), i = t.dataset.i;
+    const rowOf = (el) => el.closest(".ci-row"), val = (el, c) => (rowOf(el).querySelector(`[data-ci="${c}"]`) || {}).value || "";
+    if (key === "c") {
+      e.preventDefault(); clip = { cat: val(t, "cat"), sub: val(t, "sub") };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(clip.cat + (clip.sub ? " / " + clip.sub.replace("|", " · ") : "")).catch(() => {});
+      env.toast(clip.cat ? `📋 분류 복사: ${clip.cat}` : "이 줄은 분류가 비어 있어요."); return;
+    }
+    if (key !== "v") return;
+    e.preventDefault();
+    const put = (c) => { if (!c || !c.cat) return; (st.pick[i] ||= {}).cat = c.cat; st.pick[i].sub = c.sub || ""; render(); };
+    if (clip) { put(clip); return; }
+    if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then((txt) => {
+      const [c0] = String(txt).split(/\s*\/\s*|\t/), cat = env.cats("expense").find((c) => c === c0.trim() || c.replace(/^\S+\s/, "") === c0.trim());
+      if (cat) put({ cat, sub: "" }); else env.toast("붙여넣을 분류를 못 찾았어요. 먼저 다른 줄 분류 칸에서 Ctrl+C를 눌러 주세요.");
+    }).catch(() => {});
   });
   root.addEventListener("click", async (e) => {
     const mg = e.target.closest('[data-ci="join"], [data-ci="split"]');

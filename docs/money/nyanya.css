@@ -166,3 +166,8 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
   .ci-row > select[data-ci="cat"], .ci-row > input[data-ci="memo"] { grid-column: 2 / 4; } .ci-row > select[data-ci="sub"], .ci-row > input[data-ci="note"] { grid-column: 4 / 6; }
   .ci-th span:nth-child(n+5) { display: none; } .ci-have span:nth-child(5) { grid-column: 2 / 6; } }
 .ci-mg { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; font-size: 11px; padding: 1px 8px; margin-left: 4px; cursor: pointer; color: var(--muted); }
+/* 💳 카드 승인내역 팝업 (내역 탭 💳 버튼) */
+.dlg.ci-dlg { max-width: 1500px; }
+.ci-body { display: flex; flex-direction: column; gap: 10px; }
+.ci-dlg .ci-tbl { max-height: none; overflow: visible; }   /* 팝업 창이 스크롤 → 표 안에 따로 스크롤 안 생기게 */
+.ci-dlg .ci-go { position: sticky; bottom: 0; z-index: 2; background: var(--surface); padding: 10px 0; margin-bottom: -12px; border-top: 1px solid var(--line); }   /* [기록하기]는 늘 아래에 보이게 */

@@ -13,7 +13,7 @@ import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
 import { startVerCheck } from "../vercheck.js?v=20261022a";
 import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
-import { mountCardImport } from "./cardimport.js?v=20261022c";
+import { mountCardImport } from "./cardimport.js?v=20261022d";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -271,8 +271,10 @@ bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum,
 initMoney(); moneyBound = true;
 // 🧮 실제 잔액 맞추기 · 🙈 숨기기 (자산 탭)
 const bal = mountBalance($("balPanel"), { S, backend: () => backend, toast, act, esc, won: wonS, rows, balances });
-// 💳 카드 승인내역 올리기 (가계부 설정 '가져오기' 탭) — 승인취소 빼고, 이미 있는 건 건너뛰고
-const ci = mountCardImport($("cardImpPanel"), { S, backend: () => backend, toast, esc, won, render, commonCatName, commonCats: () => uri.cats(), subs: subsOf,
+// 💳 카드 승인내역 올리기 (내역 탭 💳 버튼 → 팝업) — 승인취소 빼고, 이미 있는 건 건너뛰고
+$("cardOpen").addEventListener("click", () => { openDlg($("cardDlg")); ci.render(); });
+$("cardClose").addEventListener("click", () => closeDlg($("cardDlg")));
+const ci = mountCardImport($("cardImpPanel"), { S, backend: () => backend, toast, esc, won, render, commonCatName, commonCats: () => uri.cats(), subs: subsOf, dialog: true,
   cats: (k) => { const c = (S.settings.moneyCats || {})[k]; return (c && c.length ? c : MONEY_CATS[k] || []).slice(); } });
 // 📥 편한가계부 가져오기 (가계부 설정 탭)
 mountImport($("importPanel"), { S, backend: () => backend, toast, act, esc, won, render, balances, catKey, defaultCats: (k) => (MONEY_CATS[k] || []).slice() });
