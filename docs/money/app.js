@@ -10,7 +10,6 @@ import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, render
 import { mountRepeat } from "./repeat.js?v=20261021d";
 import { mountAcctSet } from "./acctset.js?v=20261021a";
 import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
-import { mountCcSplit } from "./ccsplit.js?v=20261022a";
 import { startVerCheck } from "../vercheck.js?v=20261022a";
 import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
@@ -141,7 +140,7 @@ function render() {
   $("todayMono").textContent = today().replace(/-/g, ".");
   renderMoney();
   bal.render();
-  rp.render(); rp.run(); ak.render(); ccm.render(); ccs.render();
+  rp.render(); rp.run(); ak.render(); ccm.render();
   tripList();
   mirrorCommon();
 }
@@ -247,7 +246,7 @@ document.addEventListener("click", (ev) => {
 let moneyBound = false;
 const uri = mountUri($("uriRoot"), {
   who: "nyanya", toast, mirror: true,
-  onCats: () => { if (moneyBound && backend) { renderMoneyForm(); if (!$("catEditor").contains(document.activeElement)) renderCatEditor(); ccs.render(); } },   // 🏷 공통 분류가 바뀌면 기록 창 분류 칸도
+  onCats: () => { if (moneyBound && backend) { renderMoneyForm(); if (!$("catEditor").contains(document.activeElement)) renderCatEditor(); } },   // 🏷 공통 분류가 바뀌면 기록 창 분류 칸도
   // 📊 공통 통계 원형: 가계부와 같은 원형 (큰 순서 8개 색 + '그 밖' 회색, 가운데 구멍 없이)
   // 📊 공통 지출을 통계 탭과 똑같이: 기간 계산 · 흐름 그래프는 가계부 것으로, 자산·메모는 내가 ❤️로 적은 가계부 기록에서
   stats: { range: (p, anchor, k) => stRange(p, anchor, k), chart: (el, d) => setChart(el, d),
@@ -278,8 +277,6 @@ const rp = mountRepeat($("repeatPanel"), { S, backend: () => backend, toast, act
   cats: (k) => { const c = (S.settings.moneyCats || {})[k]; return (c && c.length ? c : MONEY_CATS[k] || []).slice(); }, subs: subsOf, acctOpts: acctOptsHtml });
 // 🏷 예전 공통비용 기록 → 공통 분류로 옮기기 (가계부 설정 '분류', 다 옮기면 안 보임)
 const ccm = mountCcMigrate($("ccmPanel"), { S, backend: () => backend, toast, esc, won, ccOf, commonCatName, commonCats: () => uri.cats() });
-// 🏷 공통 문화생활 소분류 나누기 (가계부 설정 '분류', 다 나누면 안 보임)
-const ccs = mountCcSplit($("ccsPanel"), { S, backend: () => backend, toast, esc, won, commonCats: () => uri.cats(), saveCommonCats: (list) => uri.setCats(list) });
 // 🏦 자산 관리 (가계부 설정 탭) — 이름 · 계좌번호 · 메모 · 🙈 숨기기
 const ak = mountAcctSet($("acctSetPanel"), { S, backend: () => backend, toast, act, esc, rows });
 // ⚙ 설정 탭 안 작은 탭: 분류 · 자산 · 반복 · 가져오기 · 화폐 (이 기기에 기억)
