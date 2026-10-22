@@ -4,6 +4,7 @@
 //   → 이미 가계부에 있는 건 건너뜀: ① 전에 올린 것(기록 id = bc-승인번호-날짜) ② 같은 날 · 같은 자산 · 같은 금액 기록
 //      ③ 같은 날 같은 자산 기록 몇 개를 합친 금액이 같음 (예: 이마트 55,860원을 3건으로 나눠 적은 것)
 //      ④ 반대로 그날 승인 몇 개를 가계부에 한 건으로 합쳐 적은 것 (예: 인형뽑기 5,000+1,000+1,000 → 7,000원 한 건)
+//   → 같은 날 같은 가게 여러 번(인형뽑기·노래방)은 한 건으로 합침 (문화생활·오락 같은 곳은 기본으로, 줄마다 [합치기]/[나누기]) → bcNo = "승인번호1,승인번호2…"
 //   → 분류는 전에 같은 가게(메모 note)를 적은 분류로 미리 골라 둠 (❤️ 공통비용이었으면 공통 분류까지). 미리보기에서 바꾸고 [기록하기].
 //   기록 = { kind expense, amount, date, account, cat, sub, memo "", note 가맹점명, src "BC카드", bcNo 승인번호 } (공통이면 cat '💙 공통비용' + common·ccat·csub)
 // 파일은 이 브라우저에서만 읽고 저장소에 안 올라감.
@@ -42,7 +43,7 @@ export async function readCardFile(file) {
 
 export function mountCardImport(root, env) {
   const { esc, won } = env;
-  const st = { rows: null, acct: null, pick: {}, busy: false };   // pick[i] = { on, cat, sub } (사람이 바꾼 것)
+  const st = { rows: null, acct: null, pick: {}, merge: {}, busy: false };   // pick[i] = { on, cat, sub } (사람이 바꾼 것), merge[묶음] = 합치기 켬/끔
   const cards = () => [...env.S.accounts.entries()].filter(([, a]) => a && a.type === "card" && !a.hidden);
   const defAcct = () => { const cs = cards(); return (cs.find(([, a]) => /^bc/i.test(a.name || "")) || cs[0] || [null])[0]; };
   // 가게별로 마지막에 적은 분류 (같은 이름 → 꼬리 뗀 이름)
@@ -59,7 +60,8 @@ export function mountCardImport(root, env) {
     const live = st.rows.map((r, i) => ({ ...r, i })).filter((r) => !r.canceled);
     const used = new Set(), byDay = {};
     S.money.forEach((x, id) => { if (x && x.account === acct && (x.kind === "expense" || !x.kind) && !x.bcNo) (byDay[x.date] ||= []).push({ id, amt: Number(x.amount) || 0 }); });
-    live.forEach((r) => { r.id = `bc-${r.no || r.time.replace(/\D/g, "")}-${r.date.replace(/-/g, "")}`; if (S.money.has(r.id)) r.have = "id"; });
+    const nos = new Set(); S.money.forEach((x) => { if (x && x.bcNo) String(x.bcNo).split(",").forEach((n) => nos.add(n)); });   // 전에 올린 승인번호 (합친 건 "1,2,3")
+    live.forEach((r) => { r.id = `bc-${r.no || r.time.replace(/\D/g, "")}-${r.date.replace(/-/g, "")}`; if (S.money.has(r.id) || (r.no && nos.has(r.no))) r.have = "id"; });
     live.forEach((r) => { if (r.have) return; const c = (byDay[r.date] || []).find((x) => !used.has(x.id) && x.amt === r.amount); if (c) { used.add(c.id); r.have = "same"; } });
     live.forEach((r) => {   // 나눠 적은 것: 그날 남은 기록 중 2~6개 합이 같은 것
       if (r.have) return;
@@ -92,8 +94,23 @@ export function mountCardImport(root, env) {
       r.sub = p.sub ?? (g.common ? (g.ccat ? `${g.ccat}|${g.csub}` : "") : g.sub || "");
       r.on = p.on ?? true;
     });
+    // 🧸 같은 날 같은 가게에서 여러 번 = 한 건으로 합치기 (인형뽑기·노래방처럼). 기본: 문화생활·오락 같은 곳만 켬, 줄마다 [합치기]/[나누기]
+    const fresh = live.filter((r) => !r.have), grp = {};
+    fresh.forEach((r) => { (grp[`g:${r.date}:${norm(r.shop)}`] ||= []).push(r); });
+    const fun = (r) => /문화/.test(r.cat) || /^문화생활\|/.test(r.sub) || /인형|뽑기|오락|노래|코인|게임|포토|사진/.test(r.shop);
+    const news = [];
+    fresh.forEach((r) => {
+      const gk = `g:${r.date}:${norm(r.shop)}`, items = grp[gk];
+      if (items.length < 2) { news.push(r); return; }
+      r.grp = gk; r.first = items[0] === r;
+      if (!(st.merge[gk] ?? items.every(fun))) { news.push(r); return; }
+      if (!r.first) return;
+      const p = st.pick[gk] || {};
+      news.push({ ...r, i: gk, amount: items.reduce((a, x) => a + x.amount, 0), nos: items.map((x) => x.no).filter(Boolean), parts: items.length, partial: items.some((x) => x.partial),
+        cat: p.cat ?? r.cat, sub: p.sub ?? r.sub, on: p.on ?? true });
+    });
     const dates = st.rows.map((r) => r.date).sort();
-    return { acct, live, news: live.filter((r) => !r.have), haves: live.filter((r) => r.have), canceled: st.rows.filter((r) => r.canceled).length, from: dates[0], to: dates[dates.length - 1] };
+    return { acct, live, news, haves: live.filter((r) => r.have), canceled: st.rows.filter((r) => r.canceled).length, from: dates[0], to: dates[dates.length - 1] };
   }
   const isCc = (cat) => cat && cat === env.commonCatName();
   function subOpts(r) {
@@ -114,10 +131,10 @@ export function mountCardImport(root, env) {
         <label class="small">카드 자산 <select data-ci="acct">${cs.map(([id, a]) => `<option value="${esc(id)}"${id === v.acct ? " selected" : ""}>${esc(a.name)}</option>`).join("")}</select></label>`;
       if (v.news.length) {
         h += `<div class="ci-tbl"><div class="ci-row ci-th"><span></span><span>날짜</span><span>가게</span><span>금액</span><span>분류</span><span>소분류</span></div>
-          ${v.news.map((r) => `<div class="ci-row${r.on && !r.cat ? " bad" : ""}${r.on ? "" : " off"}"><input type="checkbox" data-ci="on" data-i="${r.i}"${r.on ? " checked" : ""} aria-label="넣기">
-            <span class="mono">${esc(r.date.slice(5))}</span><span class="ci-shop">${esc(r.shop)}${r.partial ? ' <span class="muted small">(부분취소)</span>' : ""}</span><span class="ci-amt">${esc(won(r.amount))}</span>
-            <select data-ci="cat" data-i="${r.i}" aria-label="분류"><option value="">-</option>${env.cats("expense").map((c) => `<option${c === r.cat ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>
-            <select data-ci="sub" data-i="${r.i}" aria-label="소분류"${r.cat ? "" : " disabled"}>${subOpts(r)}</select></div>`).join("")}</div>
+          ${v.news.map((r) => `<div class="ci-row${r.on && !r.cat ? " bad" : ""}${r.on ? "" : " off"}"><input type="checkbox" data-ci="on" data-i="${esc(r.i)}"${r.on ? " checked" : ""} aria-label="넣기">
+            <span class="mono">${esc(r.date.slice(5))}</span><span class="ci-shop">${esc(r.shop)}${r.parts ? ` <span class="muted small">(${r.parts}건 합)</span> <button type="button" class="ci-mg" data-ci="split" data-g="${esc(r.i)}">나누기</button>` : r.grp && r.first ? ` <button type="button" class="ci-mg" data-ci="join" data-g="${esc(r.grp)}">합치기</button>` : ""}${r.partial ? ' <span class="muted small">(부분취소)</span>' : ""}</span><span class="ci-amt">${esc(won(r.amount))}</span>
+            <select data-ci="cat" data-i="${esc(r.i)}" aria-label="분류"><option value="">-</option>${env.cats("expense").map((c) => `<option${c === r.cat ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>
+            <select data-ci="sub" data-i="${esc(r.i)}" aria-label="소분류"${r.cat ? "" : " disabled"}>${subOpts(r)}</select></div>`).join("")}</div>
           <div class="row" style="flex:0 0 auto;align-items:center;gap:10px"><button class="btn" type="button" data-ci="go"${st.busy || !ready.length ? " disabled" : ""}>${st.busy ? "기록하는 중…" : `💳 ${ready.length}건 기록하기`}</button>
           ${noCat ? `<span class="small" style="color:var(--danger)">분류를 안 고른 ${noCat}건은 빼고 넣어요</span>` : ""}</div>`;
       } else h += `<p class="small" style="margin:0">✅ 새로 넣을 게 없어요. 다 가계부에 있어요.</p>`;
@@ -128,7 +145,7 @@ export function mountCardImport(root, env) {
   root.addEventListener("change", async (e) => {
     const t = e.target, k = t.dataset.ci, i = t.dataset.i;
     if (k === "file" && t.files[0]) {
-      try { st.rows = await readCardFile(t.files[0]); st.pick = {}; env.toast("승인내역을 읽었어요. 아래에서 확인해 주세요."); }
+      try { st.rows = await readCardFile(t.files[0]); st.pick = {}; st.merge = {}; env.toast("승인내역을 읽었어요. 아래에서 확인해 주세요."); }
       catch (err) { env.toast(err.message || "엑셀을 읽지 못했어요."); }
     } else if (k === "acct") st.acct = t.value;
     else if (k === "on") (st.pick[i] ||= {}).on = t.checked;
@@ -138,6 +155,8 @@ export function mountCardImport(root, env) {
     render();
   });
   root.addEventListener("click", async (e) => {
+    const mg = e.target.closest('[data-ci="join"], [data-ci="split"]');
+    if (mg) { st.merge[mg.dataset.g] = mg.dataset.ci === "join"; render(); return; }
     if (!e.target.closest('[data-ci="go"]') || st.busy) return;
     const be = env.backend(), v = view(); if (!be || !v) return;
     const list = v.news.filter((r) => r.on && r.cat); if (!list.length) return;
@@ -146,7 +165,7 @@ export function mountCardImport(root, env) {
     try {
       const p = {}, t0 = Date.now();
       list.slice().sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).forEach((r, n) => {
-        const doc = { kind: "expense", amount: r.amount, date: r.date, account: v.acct, cat: r.cat, sub: r.sub || null, memo: "", note: r.shop, cur: null, toAccount: null, createdAt: t0 + n, src: "BC카드", bcNo: r.no || null, common: null, ccat: null, csub: null };
+        const doc = { kind: "expense", amount: r.amount, date: r.date, account: v.acct, cat: r.cat, sub: r.sub || null, memo: "", note: r.shop, cur: null, toAccount: null, createdAt: t0 + n, src: "BC카드", bcNo: (r.nos ? r.nos.join(",") : r.no) || null, common: null, ccat: null, csub: null };
         if (isCc(r.cat)) { const [cc, cs] = (r.sub || "").split("|"); Object.assign(doc, { sub: null, common: true, ccat: cc || null, csub: cs || null }); }
         p[`money/${r.id}`] = doc;
       });

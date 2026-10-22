@@ -160,3 +160,4 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
   .ci-row .ci-shop, .ci-th span:nth-child(3) { grid-column: span 2; }
   .ci-row > select[data-ci="cat"] { grid-column: 2 / 4; } .ci-row > select[data-ci="sub"] { grid-column: 4 / 6; }
   .ci-th span:nth-child(n+5) { display: none; } .ci-have span:nth-child(5) { grid-column: 2 / 6; } }
+.ci-mg { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; font-size: 11px; padding: 1px 8px; margin-left: 4px; cursor: pointer; color: var(--muted); }
