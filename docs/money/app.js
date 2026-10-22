@@ -5,7 +5,7 @@
 // ❤️ 공통: 지출에 common: true → ../uri/uri.js setMirror로 공통 저장소(uri-board)에 저절로 복사, '❤️ 공통' 탭에서 둘 다 보기 + 반반 정산.
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
-import { mountUri } from "../uri/uri.js?v=20261022e";
+import { mountUri } from "../uri/uri.js?v=20261022f";
 import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName } from "./money.js?v=20261022d";
 import { mountRepeat } from "./repeat.js?v=20261021d";
 import { mountAcctSet } from "./acctset.js?v=20261021a";
@@ -160,7 +160,7 @@ function render() {
 // ✈️ 내용 칸 자동완성: 예전에 쓴 여행 이름 (소분류가 '여행…'이고 숫자로 시작하는 내용 — '2026 상해'처럼, 최근 것 먼저) — 공통 탭 여행 묶음이 같은 이름으로 묶여서
 let tripKey = "";
 function tripList() {
-  const seen = new Map(); S.money.forEach((x) => { if (x && x.memo && (/^여행/.test(x.sub || "") || x.ccat === "여행") && /^\d/.test(x.memo)) { const d = seen.get(x.memo); if (!d || x.date > d) seen.set(x.memo, x.date); } });
+  const seen = new Map(); S.money.forEach((x) => { if (x && x.memo && (/^여행/.test(x.sub || "") || /^(\S+\s)?여행$/.test(x.ccat || "")) && /^\d/.test(x.memo)) { const d = seen.get(x.memo); if (!d || x.date > d) seen.set(x.memo, x.date); } });
   const names = [...seen].sort((a, b) => b[1].localeCompare(a[1])).map(([n]) => n), key = names.join("|");
   if (key === tripKey) return; tripKey = key;
   $("tripNames").innerHTML = names.map((n) => `<option value="${esc(n)}">`).join("");

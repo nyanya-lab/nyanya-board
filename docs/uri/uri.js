@@ -22,12 +22,13 @@ const NAME = { nyanya: "냐냐", ukjin: "욱진" };
 const PAYER = { nyanya: "냐냐", ukjin: "욱진", joint: "공동 통장" };
 export const URI_CATS = ["식비", "카페·간식", "장보기", "생활용품", "주거·공과금", "데이트", "여행", "선물", "기타"];
 // 🏷 공통 분류 (공통 저장소 settings/cats, 둘이 같이 씀): [{ n: 대분류, s: [소분류…] }] — 처음 열 때 없으면 이걸로 만듦 (냐냐가 정함 2026-10-21)
-export const COMMON_CATS = [
-  { n: "식비", s: ["외식", "배달", "장보기"] },
-  { n: "문화생활", s: ["영화", "인형뽑기", "노래방", "야구", "콘서트"] },
-  { n: "여행", s: ["식비", "숙소", "체험 및 기타", "교통 및 비행기"] },
-  { n: "쇼핑", s: ["기타"] },
-  { n: "기타", s: [] }
+export const COMMON_CATS = [   // 2026-10-22 대분류 앞에 그림 (냐냐 요청)
+  { n: "🍽️ 식비", s: ["외식", "배달", "장보기"] },
+  { n: "🖼 문화생활", s: ["영화", "오락실", "노래방", "공연 및 스포츠", "게임", "방탈출", "사진", "나들이", "힐링"] },
+  { n: "✈️ 여행", s: ["식비", "숙소", "체험 및 기타", "교통 및 비행기"] },
+  { n: "🛍️ 쇼핑", s: ["기타", "복권"] },
+  { n: "🎞️ 구독", s: ["쇼츠드라마"] },
+  { n: "📦 기타", s: [] }
 ];
 const catsOf = (v) => (Array.isArray(v) ? v : v && typeof v === "object" ? Object.values(v) : []).filter((c) => c && c.n).map((c) => ({ n: c.n, s: Array.isArray(c.s) ? c.s.filter(Boolean) : c.s && typeof c.s === "object" ? Object.values(c.s).filter(Boolean) : [] }));
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
@@ -193,7 +194,7 @@ export function mountUri(root, opts = {}) {
   // ✈️ 여행 묶음 (냐냐 엑셀처럼): 분류(가계부 소분류)가 '여행…'이고 내용이 숫자로 시작하는 기록 ('2026 상해', '2608 강릉', '25/6/13-23 발리')
   //   → 그 내용 이름이 여행 이름. 같은 내용이 적힌 다른 기록도 그 여행에 같이 묶음. 나머지('양갈비' 같은 여행 분류 한 건)는 날짜의 달로
   const all = () => Object.entries(st.costs).map(([id, c]) => ({ id, ...c })).filter((c) => c && typeof c.date === "string");
-  function tripNames(list) { const t = new Set(); list.forEach((c) => { if (/^여행/.test(c.cat || "") && /^\d/.test(c.title || "")) t.add(c.title); }); return t; }
+  function tripNames(list) { const t = new Set(); list.forEach((c) => { if (/^(\S+\s)?여행/.test(c.cat || "") && /^\d/.test(c.title || "")) t.add(c.title); }); return t; }   // '✈️ 여행'처럼 앞에 그림이 붙어도
   function groupOf(c, trips) { return c.title && trips.has(c.title) ? "trip:" + c.title : c.date.slice(0, 7); }
   // 묶음마다 합계·정산·미정산 (정렬: 달 = 그 달, 여행 = 그 여행의 마지막 날짜 달 — 엑셀처럼 그 달 바로 뒤)
   function groups(extra = 0) {
