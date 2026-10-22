@@ -13,6 +13,7 @@ import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
 import { startVerCheck } from "../vercheck.js?v=20261022a";
 import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
+import { mountCardImport } from "./cardimport.js?v=20261022a";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -140,7 +141,7 @@ function render() {
   $("todayMono").textContent = today().replace(/-/g, ".");
   renderMoney();
   bal.render();
-  rp.render(); rp.run(); ak.render(); ccm.render();
+  rp.render(); rp.run(); ak.render(); ccm.render(); ci.render();
   tripList();
   mirrorCommon();
 }
@@ -270,6 +271,9 @@ bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum,
 initMoney(); moneyBound = true;
 // 🧮 실제 잔액 맞추기 · 🙈 숨기기 (자산 탭)
 const bal = mountBalance($("balPanel"), { S, backend: () => backend, toast, act, esc, won: wonS, rows, balances });
+// 💳 카드 승인내역 올리기 (가계부 설정 '가져오기' 탭) — 승인취소 빼고, 이미 있는 건 건너뛰고
+const ci = mountCardImport($("cardImpPanel"), { S, backend: () => backend, toast, esc, won, render, commonCatName, commonCats: () => uri.cats(), subs: subsOf,
+  cats: (k) => { const c = (S.settings.moneyCats || {})[k]; return (c && c.length ? c : MONEY_CATS[k] || []).slice(); } });
 // 📥 편한가계부 가져오기 (가계부 설정 탭)
 mountImport($("importPanel"), { S, backend: () => backend, toast, act, esc, won, render, balances, catKey, defaultCats: (k) => (MONEY_CATS[k] || []).slice() });
 // 🔁 매월 반복 (가계부 설정 탭) — 그날이 되면 기록이 저절로
