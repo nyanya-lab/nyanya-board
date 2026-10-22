@@ -13,7 +13,7 @@ import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
 import { startVerCheck } from "../vercheck.js?v=20261022a";
 import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
-import { mountCardImport } from "./cardimport.js?v=20261022b";
+import { mountCardImport } from "./cardimport.js?v=20261022c";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
