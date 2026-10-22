@@ -180,3 +180,11 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 .as-fabs .fab { position: static; }
 .as-fabs .as-pay { width: 44px; height: 44px; font-size: 12.5px; font-weight: 700; padding: 0; }
 @media (max-width: 720px) { .as-fabs { right: 16px; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); } }
+/* 스크롤바: 얇고 연하게, 위아래 화살표 없이 (냐냐 요청, 가계부 전체) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted, #8a93a6) 30%, transparent); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--muted, #8a93a6) 55%, transparent); }
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+::-webkit-scrollbar-corner { background: transparent; }
+@supports not selector(::-webkit-scrollbar) { * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted, #8a93a6) 35%, transparent) transparent; } }
