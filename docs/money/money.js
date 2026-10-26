@@ -581,7 +581,10 @@ function renderAssetAll() {
   if (!accts.length) { box.innerHTML = '<p class="muted small" style="margin:0">자산을 추가하면 여기에 자산·부채·합계가 보여요.</p>'; return; }
   const part = (sign) => accts.map((a) => ({ cat: a.name, amt: sign * (bal[a.id] || 0) })).filter((x) => x.amt > 0).sort((x1, x2) => x2.amt - x1.amt).map((x, i) => ({ ...x, col: (sign > 0 ? PIE_WARM : PIE_COOL)[i % PIE_WARM.length] }));
   const plus = part(1), minus = part(-1), A = plus.reduce((t, x) => t + x.amt, 0), D = minus.reduce((t, x) => t + x.amt, 0);
-  const pts = Array.from({ length: 12 }, (_, i) => shiftMonth(m, i - 11)).map((mm) => { const b = balances(dayInMonth(mm, 31)), v = accts.reduce((t, a) => t + (b[a.id] || 0), 0); return { lab: `${+mm.slice(5)}월`, v, on: mm === m, tip: `${monthLabel(mm)} 끝 합계 ${won(v)}` }; });
+  const pts = Array.from({ length: 12 }, (_, i) => shiftMonth(m, i - 11)).map((mm) => { const b = balances(dayInMonth(mm, 31)), v = accts.reduce((t, a) => t + (b[a.id] || 0), 0);
+    const pA = accts.reduce((t, a) => t + Math.max(0, b[a.id] || 0), 0), pD = accts.reduce((t, a) => t + Math.max(0, -(b[a.id] || 0)), 0);
+    return { lab: `${+mm.slice(5)}월`, v, on: mm === m, tip: `${monthLabel(mm)} 끝 합계 ${won(v)}`,
+      box: [`${monthLabel(mm)} 끝`, `합계 <span class="won${v < 0 ? " minus" : " plus"}">${v < 0 ? "-" : ""}${won(v)}</span>`, `자산 <span class="won plus">${won(pA)}</span>`, `부채 <span class="won minus">${won(pD)}</span>`] }; });   // 냐냐: 점 누르면 합계·자산·부채
   const tile = (label, v, cls) => `<div><span>${label}</span><b class="won${cls ? " " + cls : ""}">${v}</b></div>`;
   const sec = (cls, label, sum, list, name) => `<div class="as-sec ${cls}"><span>${label}</span><b class="won">${won(sum)}</b></div>` + (list.length ? pieHtml(null, list, name, { color: (x) => x.col, legend: false, amount: false, center: name === "부채" ? "var(--blue)" : "var(--coral)" }) : `<p class="muted small" style="margin:0">${name === "부채" ? "갚을 카드값·빚이 없어요." : "잔액이 있는 자산이 없어요."}</p>`);
   box.innerHTML =
@@ -665,7 +668,22 @@ function drawChart(el) {
   else s += `<polyline points="${pts.map((p, i) => f(x(i)) + "," + f(y(p.v))).join(" ")}" class="ln"/>` + pts.map((p, i) => `<circle cx="${f(x(i))}" cy="${f(y(p.v))}" r="${p.on ? 4.5 : 3}" class="dot"><title>${esc(p.tip || "")}</title></circle>`).join("");
   const every = Math.max(1, Math.ceil(34 / cw));
   s += pts.map((p, i) => (n - 1 - i) % every ? "" : `<text x="${f(x(i))}" y="${H - 7}" class="xl${p.on ? " on" : ""}">${esc(p.lab)}</text>`).join("");
-  el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(d.label || "그래프")}">${s}</svg>`;
+  // 냐냐: 점마다 p.box(줄 목록)가 있으면 그 칸을 누르면 위에 작은 상자 (예: 자산 전체 = 합계·자산·부채)
+  const boxed = pts.some((p) => p.box);
+  if (boxed) s += pts.map((p, i) => `<rect class="hit" x="${f(L + cw * i)}" y="${T}" width="${f(cw)}" height="${ph}" data-i="${i}"><title>${esc(p.tip || "")}</title></rect>`).join("");
+  el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(d.label || "그래프")}">${s}</svg>` + (boxed ? '<div class="ch-box" hidden></div>' : "");
+  if (boxed && !el._boxBound) {
+    el._boxBound = true;
+    el.addEventListener("click", (ev) => {
+      const r = ev.target.closest && ev.target.closest("rect.hit"), box = el.querySelector(".ch-box"), dd = el._chart; if (!box || !dd) return;
+      if (!r) { box.hidden = true; return; }
+      const i = +r.dataset.i, p = dd.pts[i]; if (!p || !p.box) return;
+      if (!box.hidden && box.dataset.i === String(i)) { box.hidden = true; return; }
+      box.dataset.i = String(i); box.innerHTML = p.box.map((l, k) => k ? `<div>${l}</div>` : `<b>${l}</b>`).join(""); box.hidden = false;
+      const cx = (+r.getAttribute("x")) + (+r.getAttribute("width")) / 2, w = box.offsetWidth || 160;
+      box.style.left = Math.max(4, Math.min(el.clientWidth - w - 4, cx - w / 2)) + "px";
+    });
+  }
 }
 
 // ---------- 🧾 내역 (지출 탭): 요약 칸 = 전체 · 수입 · 지출 · 💝 준 돈 (누르면 그것만), 표 = ☐ 날짜 · 자산 · 분류 · 소분류 · 금액 · 내용 · 메모 ----------

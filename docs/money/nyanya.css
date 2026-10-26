@@ -263,3 +263,10 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
   .rpt-li > .rpt-a, .rpt-li > .rpt-s, .rpt-li > .rpt-nt { display: none; }
 }
 .nav a.m-nav[hidden] { display: none !important; }   /* 숨긴 메뉴 (📑 보고서, 2026-10-26) */
+/* 📈 그래프 점(칸)을 누르면 뜨는 상자 (자산 전체: 그 달 합계·자산·부채) */
+.as-chart { position: relative; }
+.as-chart rect.hit { fill: transparent; cursor: pointer; }
+.as-chart rect.hit:hover { fill: var(--muted); fill-opacity: .06; }
+.ch-box { position: absolute; top: 4px; z-index: 3; min-width: 150px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 6px 18px rgba(10, 16, 28, .14); font-size: 13px; display: grid; gap: 2px; pointer-events: none; }
+.ch-box b { font-size: 12px; color: var(--muted); font-weight: 600; }
+.ch-box div { display: flex; justify-content: space-between; gap: 12px; white-space: nowrap; }
