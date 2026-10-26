@@ -216,3 +216,49 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 /* 🤝 공동 자산 묶음 (자산 탭 맨 아래, 내 합계에 안 들어감) */
 .as-group.t-joint { border-style: dashed; }
 .as-jnote { margin: 0; padding: 6px 12px; border-top: 1px solid var(--line); background: var(--surface); }
+/* 📑 보고서 탭 (report.js) */
+.rpt-view { display: grid; gap: 16px; }
+.rpt-filter { display: grid; gap: 10px; }
+.rpt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rpt-l { font-size: 13px; font-weight: 600; color: var(--muted); min-width: 40px; }
+.rpt-chip { border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 4px 11px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.rpt-chip.on { background: var(--coral, #f0604d); border-color: var(--coral, #f0604d); color: #fff; font-weight: 600; }
+.rpt-dates { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; font-size: 13px; }
+.rpt-dates input { font-size: 13px; padding: 4px 6px; }
+.rpt-q { flex: 1 1 260px; min-width: 0; padding: 7px 10px; }
+.rpt-cats summary { cursor: pointer; display: flex; align-items: center; gap: 6px; list-style: none; }
+.rpt-cats summary::-webkit-details-marker { display: none; }
+.rpt-cats[open] { display: grid; gap: 8px; }
+.rpt-cg, .rpt-subs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rpt-subs { padding-left: 12px; border-left: 2px solid var(--line); }
+.rpt-saved { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.rpt-sv { display: inline-flex; align-items: center; }
+.rpt-x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 0 4px; }
+.rpt-sum { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.rpt-sum .stat b { font-size: 18px; }
+.rpt-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.rpt-h { margin: 0 0 8px; font-size: 15px; }
+.rpt-tbl { display: grid; gap: 2px; font-size: 14px; }
+.rpt-tr { display: grid; grid-template-columns: 40px minmax(0, 1fr) 54px 120px; gap: 8px; align-items: center; padding: 5px 8px; border-radius: 8px; background: var(--sunk); }
+.rpt-tr.sub { background: none; font-size: 13px; color: var(--muted); padding-top: 1px; padding-bottom: 1px; }
+.rpt-tr.mon { grid-template-columns: 70px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); }
+.rpt-tr > :last-child, .rpt-tr.mon > span.won { text-align: right; font-variant-numeric: tabular-nums; }
+.rpt-k { font-size: 11px; border-radius: 6px; padding: 1px 4px; text-align: center; background: var(--surface); color: var(--muted); }
+.rpt-k.k-income { color: var(--danger, #d4483b); } .rpt-k.k-expense { color: var(--blue, #3b6fd4); }
+.rpt-c { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rpt-n { font-size: 12px; color: var(--muted); text-align: right; }
+.rpt-chart { margin-bottom: 8px; }
+.rpt-tx { display: grid; gap: 0; }
+.rpt-li { display: grid; grid-template-columns: 96px minmax(0, .9fr) minmax(0, 1fr) minmax(0, .9fr) 110px minmax(0, 1.2fr) minmax(0, 1fr); gap: 8px; align-items: center; width: 100%; padding: 8px 6px; border: 0; border-bottom: 1px solid var(--line); background: none; font: inherit; font-size: 13.5px; color: inherit; text-align: left; cursor: pointer; }
+.rpt-li:hover { background: var(--sunk); }
+.rpt-li > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rpt-li > b { text-align: right; }
+.rpt-a, .rpt-s, .rpt-nt { color: var(--muted); font-size: 12.5px; }
+@media (max-width: 900px) { .rpt-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 720px) {
+  .rpt-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rpt-dates { margin-left: 0; width: 100%; } .rpt-dates input { flex: 1; }
+  .rpt-li { grid-template-columns: 74px minmax(0, 1fr) auto; grid-template-areas: "d c b" "d m m"; row-gap: 2px; }
+  .rpt-li > .mono { grid-area: d; font-size: 12px; } .rpt-li > .rpt-c { grid-area: c; } .rpt-li > b { grid-area: b; } .rpt-li > .rpt-m { grid-area: m; color: var(--muted); font-size: 12.5px; }
+  .rpt-li > .rpt-a, .rpt-li > .rpt-s, .rpt-li > .rpt-nt { display: none; }
+}
