@@ -5,10 +5,10 @@
 // ❤️ 공통: 지출에 common: true → ../uri/uri.js setMirror로 공통 저장소(uri-board)에 저절로 복사, '❤️ 공통' 탭에서 둘 다 보기 + 반반 정산.
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
-import { mountUri } from "../uri/uri.js?v=20261022j";
+import { mountUri } from "../uri/uri.js?v=20261026a";
 import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName } from "./money.js?v=20261022d";
 import { mountRepeat } from "./repeat.js?v=20261021d";
-import { mountAcctSet } from "./acctset.js?v=20261021a";
+import { mountAcctSet } from "./acctset.js?v=20261026a";
 import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
 import { startVerCheck } from "../vercheck.js?v=20261022a";
 import { mountBalance } from "./balance.js?v=20261021a";
@@ -166,11 +166,15 @@ function tripList() {
   $("tripNames").innerHTML = names.map((n) => `<option value="${esc(n)}">`).join("");
 }
 // ❤️ 공통으로 표시한 지출(원화)만 공통 저장소로
+// 🤝 공동 자산(accounts.joint, 데이트통장 등)으로 낸 건 payer "joint" = 둘이 같이 냄 → 합계엔 들어가고 정산할 돈엔 안 들어감.
+//   예전 기록(데이트통장 78건, 2025.3~7, 이미 정산 끝)은 숫자가 흔들리지 않게 그대로 → 2026-10-26부터 적은 것만 (냐냐와 정함)
+const JOINT_FROM = Date.UTC(2026, 9, 25, 15);   // 2026-10-26 00:00 (한국)
 function mirrorCommon() {
   if (!S.loaded) return;
   const docs = {};
-  S.money.forEach((x, id) => { if (x && x.common && (x.kind === "expense" || !x.kind) && isWon(x)) docs[id] = x.ccat ? { date: x.date, amount: x.amount, cat: x.ccat, sub: x.csub || null, memo: x.memo, settled: !!x.settled }   // 🏷 공통 분류로 적은 것
-    : { date: x.date, amount: x.amount, cat: /공통/.test(x.cat || "") && x.sub ? x.sub : x.cat, sub: null, memo: x.memo, settled: !!x.settled }; });   // 예전 방식: 분류가 '공통비용'이면 소분류(식비(외식) 등)로
+  const jointOf = (x) => { const a = S.accounts.get(x.account); return a && a.joint && (Number(x.createdAt) || 0) >= JOINT_FROM ? "joint" : null; };
+  S.money.forEach((x, id) => { if (x && x.common && (x.kind === "expense" || !x.kind) && isWon(x)) docs[id] = x.ccat ? { date: x.date, amount: x.amount, cat: x.ccat, sub: x.csub || null, memo: x.memo, settled: !!x.settled, payer: jointOf(x) }   // 🏷 공통 분류로 적은 것
+    : { date: x.date, amount: x.amount, cat: /공통/.test(x.cat || "") && x.sub ? x.sub : x.cat, sub: null, memo: x.memo, settled: !!x.settled, payer: jointOf(x) }; });   // 예전 방식: 분류가 '공통비용'이면 소분류(식비(외식) 등)로
   uri.setMirror(docs);
 }
 

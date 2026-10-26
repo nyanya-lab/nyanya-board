@@ -75,15 +75,16 @@
 .as-info .as-memo { color: var(--fg); }
 /* ⚙ 가계부 설정 '자산 관리' (acctset.js) */
 .ak-list { display: grid; gap: 6px; }
-.ak-row { display: grid; grid-template-columns: 24px minmax(90px, 1fr) minmax(120px, 1.1fr) minmax(120px, 1.6fr) auto; gap: 6px; align-items: center; padding: 6px 8px; border-radius: 10px; background: var(--sunk); font-size: 14px; }
+.ak-row { display: grid; grid-template-columns: 24px minmax(90px, 1fr) minmax(120px, 1.1fr) minmax(120px, 1.6fr) auto auto; gap: 6px; align-items: center; padding: 6px 8px; border-radius: 10px; background: var(--sunk); font-size: 14px; }
 .ak-row input[type=text] { min-width: 0; }
 .ak-row.hid { opacity: .55; }
 .ak-row .ak-hide { display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
 .ak-gh { margin: 8px 0 2px; font-size: 13px; color: var(--muted); }
 .ak-row input[type=text] { padding: 6px 8px; font-size: 14px; }
 @media (max-width: 720px) {
-  .ak-row { grid-template-columns: 22px minmax(0, 1fr) auto; grid-template-areas: "i n h" "i u u" "i m m"; gap: 4px 6px; }
-  .ak-row > span { grid-area: i; align-self: start; padding-top: 6px; } .ak-row [data-ak="name"] { grid-area: n; } .ak-row .ak-hide { grid-area: h; }
+  .ak-row { grid-template-columns: 22px minmax(0, 1fr) auto auto; grid-template-areas: "i n j h" "i u u u" "i m m m"; gap: 4px 6px; }
+  .ak-row .ak-hide:has([data-ak="joint"]) { grid-area: j; }
+  .ak-row > span { grid-area: i; align-self: start; padding-top: 6px; } .ak-row [data-ak="name"] { grid-area: n; } .ak-row .ak-hide:has([data-ak="hidden"]) { grid-area: h; }
   .ak-row .ak-num { grid-area: u; } .ak-row .ak-memo { grid-area: m; }
 }
 /* ⚙ 설정 탭 안 작은 탭 (분류·자산·반복·가져오기·화폐) */

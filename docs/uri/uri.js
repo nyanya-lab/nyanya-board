@@ -155,7 +155,7 @@ export function mountUri(root, opts = {}) {
     const want = {};
     for (const [id, d] of Object.entries(mirror)) {
       if (!d || !d.date || !Number(d.amount)) continue;   // 마이너스(환불·취소)도 같이 — 합계·정산에서 빠지게
-      want[`${who}-${id}`] = { date: d.date, title: d.memo || d.cat || "공통비용", amount: Number(d.amount), cat: d.cat || "기타", sub: d.sub || null, payer: who, by: who, src: "money", memo: null, _settled: !!d.settled };
+      want[`${who}-${id}`] = { date: d.date, title: d.memo || d.cat || "공통비용", amount: Number(d.amount), cat: d.cat || "기타", sub: d.sub || null, payer: d.payer === "joint" ? "joint" : who, by: who, src: "money", memo: null, _settled: !!d.settled };   // 🤝 공동 자산으로 낸 건 '같이 냄'
     }
     const patch = {};
     for (const [k, v] of Object.entries(want)) {
@@ -200,10 +200,12 @@ export function mountUri(root, opts = {}) {
   function groups(extra = 0) {
     const list = all(), trips = tripNames(list), g = {}, al = alloc(extra);
     for (const c of list) {
-      const k = groupOf(c, trips), x = (g[k] ||= { key: k, trip: k.startsWith("trip:"), name: k.startsWith("trip:") ? k.slice(5) : k, total: 0, done: 0, open: 0, n: 0, nOpen: 0, last: "" });
-      const a = Number(c.amount) || 0, d = al.m[c.id] ?? 0; x.total += a; x.n++; x.done += d; x.open += a - d; if (a - d > 0) x.nOpen++;
+      const k = groupOf(c, trips), x = (g[k] ||= { key: k, trip: k.startsWith("trip:"), name: k.startsWith("trip:") ? k.slice(5) : k, total: 0, done: 0, open: 0, uk: 0, jt: 0, n: 0, nOpen: 0, last: "" });
+      const a = Number(c.amount) || 0, d = al.m[c.id] ?? 0, p = c.payer || "nyanya"; x.total += a; x.n++;
+      if (p === "nyanya") { x.done += d; x.open += a - d; if (a - d > 0) x.nOpen++; } else if (p === "ukjin") x.uk += a; else x.jt += a;   // open = 냐냐가 낸 것 중 아직 못 받은 돈
       if (c.date > x.last) x.last = c.date;
     }
+    Object.values(g).forEach((x) => { x.owe = (x.open - x.uk) / 2; });   // 욱진 → 냐냐 줄 돈 (마이너스면 냐냐 → 욱진)
     return Object.values(g).sort((a, b) => (a.trip ? a.last.slice(0, 7) + "~" : a.key).localeCompare(b.trip ? b.last.slice(0, 7) + "~" : b.key));
   }
   const viewKey = () => st.view || st.month;
@@ -217,7 +219,9 @@ export function mountUri(root, opts = {}) {
     let rem = settledSum() + extra; const m = {};
     // 환불·취소(마이너스)는 정산이 아직 닿은 곳(rem > 0)에서만 정산된 셈. 그 뒤에 있으면 자기 달(여행)의 미정산을 줄이기만 함
     //   (예전엔 3/30 환불 -11,900이 '정산 -11,900'으로 잡히고 그만큼이 다음 날 상해 기록에 '정산 11,900'으로 넘어가 보였음)
-    for (const c of list) { const a = Number(c.amount) || 0; let d; if (a <= 0) { if (rem > 0) { d = a; rem -= a; } else d = 0; } else if (rem >= a) { d = a; rem -= a; } else { d = rem; rem = 0; } m[c.id] = d; }
+    // 정산 장부 금액(= 데이트통장에서 냐냐가 돌려받은 돈)은 냐냐가 낸 것만 채움. 욱진이가 낸 건 장부로 안 칠하고 '받을 돈'에서 반만큼 빼고(groups owe),
+    //   🤝 같이 낸 건(공동 통장) 정산할 게 없음 (2026-10-26 고침 — 예전엔 낸 사람 안 가리고 채웠음)
+    for (const c of list) { if ((c.payer || "nyanya") !== "nyanya") { m[c.id] = 0; continue; } const a = Number(c.amount) || 0; let d; if (a <= 0) { if (rem > 0) { d = a; rem -= a; } else d = 0; } else if (rem >= a) { d = a; rem -= a; } else { d = rem; rem = 0; } m[c.id] = d; }
     return { m, left: rem };
   }
   const openOf = (c, al) => (Number(c.amount) || 0) - (al.m[c.id] ?? 0);
@@ -375,14 +379,14 @@ export function mountUri(root, opts = {}) {
   // 📊 첫 화면: 냐냐 엑셀 첫 시트처럼 묶음(달·여행)마다 합계 · 정산 · 미정산 · 1인당 미정산
   function summaryHtml() {
     const gs = groups(), al = alloc(), open = all().map((c) => ({ ...c, amount: openOf(c, al) })).filter((c) => c.amount !== 0), os = settleOf(open)   /* 환불(마이너스)도 미정산에서 빼게 */, now = today().slice(0, 7);
-    const shown = gs.filter((x) => st.showDone || x.open || x.key === now), hid = gs.length - shown.length;
-    const sum = gs.reduce((t, x) => ({ total: t.total + x.total, done: t.done + x.done, open: t.open + x.open }), { total: 0, done: 0, open: 0 });
+    const shown = gs.filter((x) => st.showDone || x.open || x.uk || x.key === now), hid = gs.length - shown.length;
+    const sum = gs.reduce((t, x) => ({ total: t.total + x.total, done: t.done + x.done, open: t.open + x.open, owe: t.owe + x.owe }), { total: 0, done: 0, open: 0, owe: 0 });
     const w = (n) => n ? Math.round(n).toLocaleString("ko-KR") : "-", W = (n) => Math.round(n).toLocaleString("ko-KR");   // 표 안 숫자는 '원' 없이 (엑셀처럼)
     return `
       <div class="uri-owe${os.diff ? "" : " zero"}">
         <span>💸 아직 정산 안 된 돈 (전체)</span>
         <b>${dirText(os.diff)}</b>
-        <small>${open.length ? `미정산 ${won(os.total)} · 정산한 돈 합계 ${won(settledSum())}` : "다 정산했어요 🎉"}</small>
+        <small>${open.length ? `미정산 ${won(sum.open)} · 정산한 돈 합계 ${won(settledSum())}` : "다 정산했어요 🎉"}</small>
         ${open.length && !st.pay ? `<div class="uri-row"><button type="button" class="uri-btn" data-uri="payOpen">💸 정산하기</button></div>` : ""}
       </div>
       ${st.pay ? `<div class="uri-card uri-pay"><h4>💸 정산하기 <span class="uri-muted uri-small">선입선출</span></h4>
@@ -392,9 +396,9 @@ export function mountUri(root, opts = {}) {
         <h4>한눈에 보기 <span class="uri-muted uri-small">줄을 누르면 📊 공통지출에서 그 달(여행)</span></h4>
         ${!st.loaded ? `<p class="uri-muted">불러오는 중…</p>` : `<div class="uri-tbl-wrap"><table class="uri-tbl">
           <thead><tr><th>달 <span class="uri-muted">(원)</span></th><th>합계</th><th class="c-done">정산</th><th>미정산</th><th>1인당 미정산</th></tr></thead>
-          <tbody>${shown.map((x) => `<tr class="${x.open ? "" : "done"}${x.trip ? " trip" : ""}" data-uri="view" data-k="${esc(x.key)}" tabindex="0"><td>${esc(groupLabel(x))}</td><td>${w(x.total)}</td><td class="c-done">${w(x.done)}</td><td class="op">${w(x.open)}</td><td class="op">${w(Math.round(x.open / 2))}</td></tr>`).join("")}</tbody>
-          <tfoot><tr><td>합계</td><td>${W(sum.total)}</td><td class="c-done">${W(sum.done)}</td><td class="op">${W(sum.open)}</td><td class="op">${W(sum.open / 2)}</td></tr>
-            <tr class="per"><td>1인당</td><td>${W(sum.total / 2)}</td><td class="c-done">${W(sum.done / 2)}</td><td>${W(sum.open / 2)}</td><td></td></tr></tfoot>
+          <tbody>${shown.map((x) => `<tr class="${x.open || x.uk ? "" : "done"}${x.trip ? " trip" : ""}" data-uri="view" data-k="${esc(x.key)}" tabindex="0"><td>${esc(groupLabel(x))}</td><td>${w(x.total)}</td><td class="c-done">${w(x.done)}</td><td class="op">${w(x.open)}</td><td class="op">${w(Math.round(x.owe))}</td></tr>`).join("")}</tbody>
+          <tfoot><tr><td>합계</td><td>${W(sum.total)}</td><td class="c-done">${W(sum.done)}</td><td class="op">${W(sum.open)}</td><td class="op">${W(sum.owe)}</td></tr>
+            <tr class="per"><td>1인당</td><td>${W(sum.total / 2)}</td><td class="c-done">${W(sum.done / 2)}</td><td>${W(sum.owe)}</td><td></td></tr></tfoot>
         </table></div>
         ${hid || st.showDone ? `<button type="button" class="uri-link" data-uri="showDone">${st.showDone ? "정산 끝난 달 숨기기" : `정산 끝난 달 ${hid}개 더 보기`}</button>` : ""}`}
       </div>
