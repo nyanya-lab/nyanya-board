@@ -584,7 +584,7 @@ function renderAssetAll() {
   const pts = Array.from({ length: 12 }, (_, i) => shiftMonth(m, i - 11)).map((mm) => { const b = balances(dayInMonth(mm, 31)), v = accts.reduce((t, a) => t + (b[a.id] || 0), 0);
     const pA = accts.reduce((t, a) => t + Math.max(0, b[a.id] || 0), 0), pD = accts.reduce((t, a) => t + Math.max(0, -(b[a.id] || 0)), 0);
     return { lab: `${+mm.slice(5)}월`, v, on: mm === m, tip: `${monthLabel(mm)} 끝 합계 ${won(v)}`,
-      box: [`${monthLabel(mm)} 끝`, `합계 <span class="won${v < 0 ? " minus" : " plus"}">${v < 0 ? "-" : ""}${won(v)}</span>`, `자산 <span class="won plus">${won(pA)}</span>`, `부채 <span class="won minus">${won(pD)}</span>`] }; });   // 냐냐: 점 누르면 합계·자산·부채
+      box: [`${monthLabel(mm)}`, `합계 <span class="won${v < 0 ? " minus" : " plus"}">${v < 0 ? "-" : ""}${won(v)}</span>`, `자산 <span class="won plus">${won(pA)}</span>`, `부채 <span class="won minus">${won(pD)}</span>`] }; });   // 냐냐: 점 누르면 합계·자산·부채
   const tile = (label, v, cls) => `<div><span>${label}</span><b class="won${cls ? " " + cls : ""}">${v}</b></div>`;
   const sec = (cls, label, sum, list, name) => `<div class="as-sec ${cls}"><span>${label}</span><b class="won">${won(sum)}</b></div>` + (list.length ? pieHtml(null, list, name, { color: (x) => x.col, legend: false, amount: false, center: name === "부채" ? "var(--blue)" : "var(--coral)" }) : `<p class="muted small" style="margin:0">${name === "부채" ? "갚을 카드값·빚이 없어요." : "잔액이 있는 자산이 없어요."}</p>`);
   box.innerHTML =
