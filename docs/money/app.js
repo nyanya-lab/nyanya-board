@@ -5,8 +5,8 @@
 // ❤️ 공통: 지출에 common: true → ../uri/uri.js setMirror로 공통 저장소(uri-board)에 저절로 복사, '❤️ 공통' 탭에서 둘 다 보기 + 반반 정산.
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
-import { mountUri } from "../uri/uri.js?v=20261026a";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName } from "./money.js?v=20261022d";
+import { mountUri } from "../uri/uri.js?v=20261026c";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow } from "./money.js?v=20261026a";
 import { mountRepeat } from "./repeat.js?v=20261021d";
 import { mountAcctSet } from "./acctset.js?v=20261026a";
 import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
@@ -155,6 +155,7 @@ function render() {
   rp.render(); rp.run(); ak.render(); ccm.render(); ci.render();
   tripList();
   mirrorCommon();
+  mirrorJoint();
   fitPanels();
 }
 // ✈️ 내용 칸 자동완성: 예전에 쓴 여행 이름 (소분류가 '여행…'이고 숫자로 시작하는 내용 — '2026 상해'처럼, 최근 것 먼저) — 공통 탭 여행 묶음이 같은 이름으로 묶여서
@@ -164,6 +165,22 @@ function tripList() {
   const names = [...seen].sort((a, b) => b[1].localeCompare(a[1])).map(([n]) => n), key = names.join("|");
   if (key === tripKey) return; tripKey = key;
   $("tripNames").innerHTML = names.map((n) => `<option value="${esc(n)}">`).join("");
+}
+// 🤝 공동 자산(accounts.joint) → 공통 저장소 joint/ 에 복사 (공통 탭 🏦 공동 자산에서 둘이 같이 봄, 기록은 냐냐만 — 2026-10-26 냐냐와 정함)
+//   자산 = {name, type, initial, number, memo}, 기록 = 그 자산에 들고 난 돈 {acct, date, d(+들어옴/−나감), kind, cat, sub, memo, note, other(상대 자산), at}
+function mirrorJoint() {
+  if (!S.loaded) return;
+  const accts = {}, tx = {};
+  S.accounts.forEach((a, id) => {
+    if (!a || !a.joint) return;
+    accts[id] = { name: a.name || "", type: a.type || "bank", initial: Number(a.initial) || 0, number: a.number || null, memo: a.memo || null };
+    acctFlow(id).forEach((x) => {
+      const other = x.kind === "move" ? acctName(x.account === id ? x.toAccount : x.account) : null;
+      tx[x.id] = { acct: id, date: x.date, d: x.d, kind: x.kind || "expense", cat: x.common && x.ccat ? x.ccat : x.cat || null, sub: x.common && x.ccat ? x.csub || null : x.sub || null,
+        common: x.common ? true : null, memo: x.memo || null, note: x.note || null, other, at: Number(x.createdAt) || 0 };
+    });
+  });
+  uri.setJoint({ accts, tx });
 }
 // ❤️ 공통으로 표시한 지출(원화)만 공통 저장소로
 // 🤝 공동 자산(accounts.joint, 데이트통장 등)으로 낸 건 payer "joint" = 둘이 같이 냄 → 합계엔 들어가고 정산할 돈엔 안 들어감.

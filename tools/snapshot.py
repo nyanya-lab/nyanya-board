@@ -18,7 +18,7 @@ if __name__ == "__main__":
     snap = {
         "at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
         "money": get("board", "money"), "accounts": get("board", "accounts"), "tasks": get("board", "tasks"), "settings": settings,
-        "uri": {"costs": get("uri", "costs"), "cats": get("uri", "settings/cats") or None, "settles": get("uri", "settles")},
+        "uri": {"costs": get("uri", "costs"), "cats": get("uri", "settings/cats") or None, "settles": get("uri", "settles"), "joint": get("uri", "joint")},
     }
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     json.dump(snap, open(OUT, "w", encoding="utf-8"), ensure_ascii=False)

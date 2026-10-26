@@ -10,7 +10,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   💸 이체 '공통비용 정산' 체크(#mSettle → 공통 저장소 정산 장부 settles/{이체 id}에 금액, 기록 settle: true, 메모 비면 '2511 잔액 …', 체크 빼거나 지우면 장부에서도 뺌),
 //   달력 칸 합계(수입−지출) 줄은 수입·지출 하나만 있어도 보임,
 //   분류 색 = 원형마다 금액 큰 8개가 서로 다른 색(늘 쓰는 색 먼저), 9번째부터 '그 밖' (E.catRank, setCatView),
-//   자산 탭: 💳 결제 버튼은 오른쪽 아래 ＋ 왼쪽(.as-fabs), 양쪽 칸 따로 스크롤(nyanya.css) · ▦ 다건입력 채우기 손잡이(bulkFillInit, 엑셀처럼 끌어서 복사) · 자산·분류는 안 고르면 빈칸(꼭 골라야 저장) · 날짜·고르는 칸에서도 Ctrl+V 붙여넣기(bulkPasteKey),
+//   자산 탭: 🤝 공동 자산은 내 합계에서 빼고 '🤝 공동' 묶음으로 따로(renderAssets) · 💳 결제 버튼은 오른쪽 아래 ＋ 왼쪽(.as-fabs), 양쪽 칸 따로 스크롤(nyanya.css) · ▦ 다건입력 채우기 손잡이(bulkFillInit, 엑셀처럼 끌어서 복사) · 자산·분류는 안 고르면 빈칸(꼭 골라야 저장) · 날짜·고르는 칸에서도 Ctrl+V 붙여넣기(bulkPasteKey),
 //   자산 고르는 칸 = 자산 탭 순서로 현금·통장·카드·저축 묶음 + 이름_계좌번호 (acctOptsHtml),
 //   금액 +/- 기호 없음 (색으로만, app.js won = 부호 없음) — 직접 -로 적은 금액만 - (amtText), 지출·수입·분류 합계가 마이너스면 - (wonN),
 //   ✏️ 분류·소분류 이름 바꾸기(renameCat·renameSub: 기록·예산·반복도 같이, 있는 이름이면 합침) + 기록에만 남은 분류 표시,
@@ -542,7 +542,9 @@ export function acctFlow(id) {
 // 그 달에 보여 줄 기간: 보통은 달력 한 달. 결제일을 정한 카드는 결제일 기준 = 그 달에 빠지는 카드값의 이용기간 (date = 결제일)
 export function acctPeriod(a, m) { return a && a.type === "card" && a.pay && a.pay.day ? cardPayPlan(a.pay, m) : { from: `${m}-01`, to: dayInMonth(m, 31) }; }
 const ymdDot = (s) => `${s.slice(2, 4)}.${+s.slice(5, 7)}.${+s.slice(8)}`;   // 2026-10-01 → 26.10.1
-function renderAssets(accts, bal) {
+function renderAssets(all, bal) {
+  // 냐냐: 🤝 공동 자산(accounts.joint, 데이트통장 등)은 내 자산·부채·합계에서 빼고 맨 아래 '🤝 공동' 묶음으로 따로 (기록 칸에선 그대로 고를 수 있음)
+  const accts = all.filter((a) => !a.joint), joints = all.filter((a) => a.joint);
   const fold = asFold(), sel = asSelected(), owedOf = (a) => Math.max(0, -(bal[a.id] || 0));
   const total = accts.reduce((s2, a) => s2 + (bal[a.id] || 0), 0);
   const owed = accts.filter((a) => a.type === "card").reduce((s2, a) => s2 + owedOf(a), 0);
@@ -563,17 +565,22 @@ function renderAssets(accts, bal) {
         return `<button type="button" class="as-row${a.id === sel ? " on" : ""}" data-act="asSel" data-id="${esc(a.id)}" aria-pressed="${a.id === sel}"><span class="as-name">${esc(a.name)}${a.number ? `<small class="as-num">${esc(a.number)}</small>` : ""}</span>` +   // 냐냐: 계좌번호 (accounts.number)
           (card ? `<span class="as-cp"><b class="won${d.due ? " minus" : ""}">${won(d.due)}</b><b class="won${d.open ? " minus" : ""}">${d.none ? "-" : won(d.open)}</b></span>` : `<b class="won${sg(v)}">${won(v)}</b>`) + "</button>";
       }).join("")) + "</div>";
-  }).join("") : '<p class="muted small" style="margin:0">통장·카드·현금을 추가하면 어디서 쓰고 어디로 들어왔는지 기록하고, 자산마다 잔액을 볼 수 있어요.</p>');
+  }).join("") + (joints.length ? (() => {   // 🤝 공동 (내 합계에 안 들어감, 공통 탭 🏦 공동 자산에서 둘이 같이 봄)
+    const shut = !!fold.joint, jsum = joints.reduce((s2, a) => s2 + (bal[a.id] || 0), 0);
+    return `<div class="as-group t-joint"><button type="button" class="as-gh" data-act="asFold" data-k="joint" aria-expanded="${!shut}"><span>🤝 공동<small>${joints.length}</small><i class="as-chev" aria-hidden="true"></i></span><b class="won${sg(jsum)}">${won(jsum)}</b></button>` +
+      (shut ? "" : `<p class="as-jnote small muted">내 합계엔 안 들어가요 · 공통 탭 🏦 공동 자산에서 같이 봐요</p>` + joints.map((a) => { const v = bal[a.id] || 0;
+        return `<button type="button" class="as-row${a.id === sel ? " on" : ""}" data-act="asSel" data-id="${esc(a.id)}" aria-pressed="${a.id === sel}"><span class="as-name">${esc(a.name)}${a.number ? `<small class="as-num">${esc(a.number)}</small>` : ""}</span><b class="won${sg(v)}">${won(v)}</b></button>`; }).join("")) + "</div>";
+  })() : "") : '<p class="muted small" style="margin:0">통장·카드·현금을 추가하면 어디서 쓰고 어디로 들어왔는지 기록하고, 자산마다 잔액을 볼 수 있어요.</p>');
   $("asGrid").classList.toggle("as-open", !!ui.asOpen && !!sel);
   renderAssetDetail(sel);
 }
 // 🏦 자산 전체: 자산 · 부채 · 합계, 최근 12달 합계 흐름, 자산 구성 · 부채 구성 원형
 function renderAssetAll() {
-  const box = $("asDetail"), accts = sortedAccts(), bal = balances(), m = ui.month;
+  const box = $("asDetail"), accts = sortedAccts().filter((a) => !a.joint), bal = balances(), m = ui.month;   // 냐냐: 🤝 공동 자산은 빼고
   if (!accts.length) { box.innerHTML = '<p class="muted small" style="margin:0">자산을 추가하면 여기에 자산·부채·합계가 보여요.</p>'; return; }
   const part = (sign) => accts.map((a) => ({ cat: a.name, amt: sign * (bal[a.id] || 0) })).filter((x) => x.amt > 0).sort((x1, x2) => x2.amt - x1.amt).map((x, i) => ({ ...x, col: (sign > 0 ? PIE_WARM : PIE_COOL)[i % PIE_WARM.length] }));
   const plus = part(1), minus = part(-1), A = plus.reduce((t, x) => t + x.amt, 0), D = minus.reduce((t, x) => t + x.amt, 0);
-  const pts = Array.from({ length: 12 }, (_, i) => shiftMonth(m, i - 11)).map((mm) => { const b = balances(dayInMonth(mm, 31)), v = Object.values(b).reduce((t, x) => t + x, 0); return { lab: `${+mm.slice(5)}월`, v, on: mm === m, tip: `${monthLabel(mm)} 끝 합계 ${won(v)}` }; });
+  const pts = Array.from({ length: 12 }, (_, i) => shiftMonth(m, i - 11)).map((mm) => { const b = balances(dayInMonth(mm, 31)), v = accts.reduce((t, a) => t + (b[a.id] || 0), 0); return { lab: `${+mm.slice(5)}월`, v, on: mm === m, tip: `${monthLabel(mm)} 끝 합계 ${won(v)}` }; });
   const tile = (label, v, cls) => `<div><span>${label}</span><b class="won${cls ? " " + cls : ""}">${v}</b></div>`;
   const sec = (cls, label, sum, list, name) => `<div class="as-sec ${cls}"><span>${label}</span><b class="won">${won(sum)}</b></div>` + (list.length ? pieHtml(null, list, name, { color: (x) => x.col, legend: false, amount: false, center: name === "부채" ? "var(--blue)" : "var(--coral)" }) : `<p class="muted small" style="margin:0">${name === "부채" ? "갚을 카드값·빚이 없어요." : "잔액이 있는 자산이 없어요."}</p>`);
   box.innerHTML =

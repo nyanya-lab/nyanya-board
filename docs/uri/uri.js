@@ -65,14 +65,16 @@ export function mountUri(root, opts = {}) {
   root.classList.add("uri");
   if (who === "ukjin" && HOLD_UKJIN) {
     root.innerHTML = `<div class="uri-card"><h3>🤝 준비 중이에요</h3><p class="uri-muted">냐냐와 같이 쓰는 공간을 만들고 있어요. 곧 열려요!</p></div>`;
-    return { render() {}, usePassword() {}, setMirror() {}, cats: () => null, setCats: () => Promise.reject(new Error("준비 중")), settlePreview: () => null, settleBy: () => Promise.reject(new Error("준비 중")), unsettle: () => Promise.resolve(), ready: () => false };
+    return { render() {}, usePassword() {}, setMirror() {}, setJoint() {}, cats: () => null, setCats: () => Promise.reject(new Error("준비 중")), settlePreview: () => null, settleBy: () => Promise.reject(new Error("준비 중")), unsettle: () => Promise.resolve(), ready: () => false };
   }
 
   const st = {
     phase: "start",            // start → locked | open | error
     msg: "", askNew: false, pendingPw: null,
     costs: {}, loaded: false, cats: null,   // cats = 공통 분류 (settings/cats)
-    settles: {}, settlesLoaded: false,       // 💸 정산 장부 settles/{id} = { date, amount, memo, by, at } — 금액으로 정산 (냐냐 방식 2026-10-21)
+    settles: {}, settlesLoaded: false,
+    joint: {}, jointLoaded: false,           // 🤝 공동 자산 joint/{accts, tx} (냐냐 가계부가 데이트통장을 복사해 둠, 2026-10-26)
+    js: { sel: null, month: today().slice(0, 7) },   // 🏦 공동 자산 탭: 고른 통장 · 보는 달       // 💸 정산 장부 settles/{id} = { date, amount, memo, by, at } — 금액으로 정산 (냐냐 방식 2026-10-21)
     month: today().slice(0, 7),
     view: null,                // null = 한눈에 표(첫 화면), "YYYY-MM" = 그 달, "trip:이름" = 그 여행 묶음
     showDone: false,           // 표에서 정산 끝난 줄도 보기
@@ -86,7 +88,7 @@ export function mountUri(root, opts = {}) {
   const ready = new Promise((r) => { readyDone = r; });   // 저장소 연결 준비 끝 (usePassword가 기다림)
   const hostSaves = typeof opts.savePassword === "function";
   const mirrorMode = !!opts.mirror;
-  let mirror = null, mirroring = false;   // 이 사람 가계부의 ❤️ 공통 지출 (setMirror로 받음)
+  let mirror = null, mirroring = false, jointMirror = null, jointing = false;   // 이 사람 가계부의 ❤️ 공통 지출 (setMirror로 받음)
   const path = (...p) => rt.ref(db, [ROOT, ...p].join("/"));
 
   // ── 연결 ──
@@ -140,6 +142,7 @@ export function mountUri(root, opts = {}) {
       if (typeof opts.onCats === "function") opts.onCats(st.cats);
       render();
     }));
+    unsubs.push(rt.onValue(path(room, "joint"), (snap) => { st.joint = snap.val() || {}; st.jointLoaded = true; render(); reconcileJoint(); }));
     unsubs.push(rt.onValue(path(room, "settles"), (snap) => { st.settles = snap.val() || {}; st.settlesLoaded = true; seedSettles(); render(); }));
     unsubs.push(rt.onValue(path(room, "costs"), (snap) => {
       st.costs = snap.val() || {}; st.loaded = true; seedSettles(); summary(); render(); reconcile();
@@ -150,6 +153,24 @@ export function mountUri(root, opts = {}) {
 
   // ❤️ 내 가계부의 공통 지출 → 공통 저장소 costs/{who}-{가계부 id} (src "money"). 바뀐 것만 한 번에 고치고, 가계부에서 지웠거나 ❤️를 뺀 건 지움
   function setMirror(docs) { mirror = docs || {}; reconcile(); }
+  // 🤝 공동 자산 복사: 내 가계부의 공동 통장(자산·기록) → joint/accts/{who}-{id} · joint/tx/{who}-{기록 id}. 바뀐 것만 고치고 없어진 건 지움 (내 것만)
+  function setJoint(data) { jointMirror = data || { accts: {}, tx: {} }; reconcileJoint(); }
+  const cleanDoc = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null && v !== undefined).sort(([a], [b]) => a.localeCompare(b)));
+  async function reconcileJoint() {
+    if (!jointMirror || !room || !st.jointLoaded || jointing) return;
+    const pre = who + "-", patch = {}, have = st.joint || {}, local = { accts: {}, tx: {} };
+    for (const part of ["accts", "tx"]) {
+      const want = {}, cur = have[part] || {};
+      for (const [id, d] of Object.entries(jointMirror[part] || {})) want[pre + id] = cleanDoc({ ...d, ...(part === "tx" ? { acct: pre + d.acct } : {}), by: who });
+      local[part] = want;
+      for (const [k, v] of Object.entries(want)) if (JSON.stringify(cleanDoc(cur[k] || {})) !== JSON.stringify(v)) patch[`joint/${part}/${k}`] = v;
+      for (const k of Object.keys(cur)) if (k.startsWith(pre) && !want[k]) patch[`joint/${part}/${k}`] = null;
+    }
+    if (opts.local) { const j = JSON.stringify(local); if (JSON.stringify(st.joint) !== j) { st.joint = JSON.parse(j); render(); } return; }   // 🔒 로컬 확인 모드: 저장 대신 화면에만
+    if (!Object.keys(patch).length) return;
+    jointing = true;
+    try { await rt.update(path(room), patch); } catch (e) { /* 다음에 다시 */ } finally { jointing = false; }
+  }
   async function reconcile() {
     if (!mirror || !room || !st.loaded || mirroring || opts.local) return;
     const want = {};
@@ -266,12 +287,13 @@ export function mountUri(root, opts = {}) {
     if (st.phase === "locked") { root.innerHTML = lockHtml(); return; }
     const keepAmt = st.pay && root.querySelector('[data-uri-pay]');
     root.innerHTML = st.view && !mirrorMode ? openHtml()   // (가계부 연결 없는 보드: 예전 달 화면에서 적기)
-      : `<div class="uri-tabs" role="tablist" aria-label="공통 보기"><button type="button" data-uri="tab" data-k="spend" aria-pressed="${st.tab !== "settle"}">📊 공통지출</button><button type="button" data-uri="tab" data-k="settle" aria-pressed="${st.tab === "settle"}">💸 정산</button></div>`
-        + (st.tab === "settle" ? summaryHtml() : statsHtml());
+      : `<div class="uri-tabs" role="tablist" aria-label="공통 보기"><button type="button" data-uri="tab" data-k="spend" aria-pressed="${st.tab === "spend"}">📊 공통지출</button><button type="button" data-uri="tab" data-k="settle" aria-pressed="${st.tab === "settle"}">💸 정산</button><button type="button" data-uri="tab" data-k="assets" aria-pressed="${st.tab === "assets"}">🏦 공동 자산</button></div>`
+        + (st.tab === "settle" ? summaryHtml() : st.tab === "assets" ? jointHtml() : statsHtml());
     // 작은 탭 [공통지출 | 정산]과 기간 줄(‹ 2026-10 › 월간)을 한 줄로 → 위 공백 줄이기 (냐냐 요청 2026-10-22)
     const tabs = root.querySelector(":scope > .uri-tabs"), top = root.querySelector(":scope > .st-top");
     if (tabs) { const bar = document.createElement("div"); bar.className = "uri-bar"; tabs.before(bar); bar.append(tabs); if (top) bar.append(top); }
-    if (st.tab !== "settle" && !(st.view && !mirrorMode)) drawStatsChart();
+    if (st.tab === "assets") drawJointChart();
+    else if (st.tab !== "settle" && !(st.view && !mirrorMode)) drawStatsChart();
     restoreForm();
     if (keepAmt && document.activeElement === document.body) { const i = root.querySelector('[data-uri-pay]'); if (i) i.focus(); }
   }
@@ -376,6 +398,58 @@ export function mountUri(root, opts = {}) {
       <p class="uri-muted uri-small">빼도 이미 적은 기록의 분류는 그대로예요.</p></details>`;
   }
   const saveCats = (list, msg) => save(rt.set(path(room, "settings", "cats"), list), msg).catch(() => {});
+  // 🏦 공동 자산 탭 (2026-10-26 냐냐와 정함): 가계부 자산 탭과 같은 모양 — 왼쪽 자산·부채·합계 + 공동 통장 목록 + 부채(냐냐한테 돌려줄 공통비용 = 미정산),
+  //   오른쪽 고른 통장의 그 달 입금·출금·합계·누적잔액 + 12달 잔액 그래프 + 내역(줄마다 그때 잔액). 기록은 냐냐 가계부에서만 (joint/는 복사본)
+  function jointData() {
+    const J = st.joint || {}, accts = Object.entries(J.accts || {}).map(([id, a]) => ({ id, ...a })).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    const tx = Object.entries(J.tx || {}).map(([id, x]) => ({ id, ...x })).sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.at || 0) - (b.at || 0));
+    const bal = {}; accts.forEach((a) => { bal[a.id] = Number(a.initial) || 0; }); tx.forEach((x) => { if (x.acct in bal) bal[x.acct] += Number(x.d) || 0; });
+    return { accts, tx, bal };
+  }
+  const ymOf = (m) => m.replace("-", ".");
+  const lastDay = (m) => { const [y, mm] = m.split("-").map(Number); return `${m}-${String(new Date(y, mm, 0).getDate()).padStart(2, "0")}`; };
+  function jointHtml() {
+    if (!st.jointLoaded) return `<p class="uri-muted">불러오는 중…</p>`;
+    const { accts, tx, bal } = jointData(), gs = groups(), debt = gs.reduce((t, x) => t + x.open, 0);
+    const A = accts.reduce((t, a) => t + Math.max(0, bal[a.id]), 0), D = accts.reduce((t, a) => t + Math.max(0, -bal[a.id]), 0) + debt, net = A - D;
+    const sg = (v) => v > 0 ? " plus" : v < 0 ? " minus" : "", W = (n) => won(Math.abs(n)), S = (n) => (n < 0 ? "-" : "") + W(n);
+    const sel = accts.find((a) => a.id === st.js.sel) || accts[0];
+    const side = `<div class="panel as-side">
+        <div class="panel-head"><div><h3>🤝 공동 자산</h3></div></div>
+        <div class="as-stats as-stats3 as-top"><div><span>자산</span><b class="won plus">${W(A)}</b></div><div><span>부채</span><b class="won minus">${W(D)}</b></div><div><span>합계</span><b class="won${sg(net)}">${S(net)}</b></div></div>
+        <p class="uri-muted uri-small" style="margin:0">1인당 ${S(net / 2)} · 공동 통장 기록은 냐냐 가계부에서 적어요</p>
+        <div class="as-list">
+          <div class="as-group"><div class="as-gh"><span>🏦 공동 통장<small>${accts.length}</small></span><b class="won${sg(A)}">${S(accts.reduce((t, a) => t + bal[a.id], 0))}</b></div>
+            ${accts.length ? accts.map((a) => `<button type="button" class="as-row${sel && a.id === sel.id ? " on" : ""}" data-uri="jSel" data-k="${esc(a.id)}"><span class="as-name">${esc(a.name)}${a.number ? `<small class="as-num">${esc(a.number)}</small>` : ""}</span><b class="won${sg(bal[a.id])}">${S(bal[a.id])}</b></button>`).join("")
+              : `<p class="uri-muted uri-small" style="margin:0;padding:8px 12px">아직 공동 통장이 없어요. 냐냐 가계부 설정 › 자산 관리에서 🤝를 켜면 여기에 나와요.</p>`}</div>
+          <div class="as-group"><div class="as-gh"><span>💸 부채</span><b class="won minus">${W(debt)}</b></div>
+            <button type="button" class="as-row" data-uri="tab" data-k="settle"><span class="as-name">냐냐한테 돌려줄 공통비용<small class="as-num">아직 정산 안 된 돈 · 누르면 💸 정산</small></span><b class="won minus">${W(debt)}</b></button></div>
+        </div></div>`;
+    if (!sel) return `<div class="as-grid uri-as">${side}<div class="panel as-detail"><p class="uri-muted" style="margin:0">공동 통장을 고르면 여기에 그 달 내역과 잔액이 보여요.</p></div></div>`;
+    const m = st.js.month, from = `${m}-01`, to = lastDay(m), mine = tx.filter((x) => x.acct === sel.id);
+    let run = Number(sel.initial) || 0, endBal = run, inn = 0, out = 0; const shown = [];
+    mine.forEach((x) => { run += Number(x.d) || 0; x.bal = run; if (x.date <= to) endBal = run; if (x.date >= from && x.date <= to) { shown.push(x); if (x.d > 0) inn += x.d; else out -= x.d; } });
+    const sd = (d) => { const t = new Date(d + "T00:00:00"); return `${t.getMonth() + 1}/${t.getDate()}(${DOW[t.getDay()]})`; };
+    const tile = (l, v, c) => `<div><span>${l}</span><b class="won${c}">${v}</b></div>`;
+    const detail = `<div class="panel as-detail">
+        <div class="as-head"><button class="icon-btn as-back" type="button" data-uri="jBack">‹ 목록</button><h3><span aria-hidden="true">🏦</span><span class="as-title">${esc(sel.name)}</span></h3>
+          <div class="as-month"><button class="chip" type="button" data-uri="jMonth" data-d="-1" aria-label="이전 달">‹</button><b>${ymOf(m)}</b><button class="chip" type="button" data-uri="jMonth" data-d="1" aria-label="다음 달">›</button></div></div>
+        ${sel.memo ? `<p class="small as-info"><span class="as-memo">📝 ${esc(sel.memo)}</span></p>` : ""}
+        <div class="as-stats">${tile("입금", W(inn), " plus")}${tile("출금", W(out), " minus")}${tile("합계", S(inn - out), sg(inn - out))}${tile("누적잔액", S(endBal), endBal < 0 ? " minus" : "")}</div>
+        <div class="as-chart-h small muted">달마다 잔액 (그 달 끝) · 최근 12달</div><div class="as-chart" data-uri-jchart></div>
+        <div class="tx-list as-tx">${shown.length ? `<div class="tx-row tx-th no-ck uri-jtx"><span>날짜</span><span>보낸·받은 곳</span><span>분류</span><span>소분류</span><span class="tx-amt">금액</span><span>내용</span><span>메모</span><span class="tx-amt">잔액</span></div>` +
+          shown.slice().reverse().map((x) => `<div class="tx-row no-ck uri-jtx"><span class="tx-d mono">${esc(sd(x.date))}</span><span class="tx-a">${esc(x.other || "")}</span><span class="tx-c">${esc(x.kind === "move" ? "이체" : x.cat || "")}${x.common ? " ❤️" : ""}</span><span class="tx-s">${esc(x.sub || "")}</span><span class="tx-amt won${x.d > 0 ? " plus" : " minus"}">${W(x.d)}</span><span class="tx-m">${esc(x.memo || "")}</span><span class="tx-n">${esc(x.note || "")}</span><span class="tx-amt tx-bal won">${S(x.bal)}</span></div>`).join("")
+          : `<p class="uri-muted uri-small" style="margin:8px 0 0">${ymOf(m)}에 이 통장 기록이 없어요.</p>`}</div></div>`;
+    return `<div class="as-grid uri-as${st.js.open ? " as-open" : ""}">${side}${detail}</div>`;   // 좁은 화면은 가계부 자산 탭처럼 목록 → 통장 누르면 자세히
+  }
+  function drawJointChart() {
+    const el = root.querySelector("[data-uri-jchart]"), S0 = opts.stats; if (!el || !S0 || !S0.chart) return;
+    const { accts, tx } = jointData(), sel = accts.find((a) => a.id === st.js.sel) || accts[0]; if (!sel) return;
+    const mine = tx.filter((x) => x.acct === sel.id), init = Number(sel.initial) || 0, [y, mo] = st.js.month.split("-").map(Number);
+    const pts = Array.from({ length: 12 }, (_, i) => { const d = new Date(y, mo - 12 + i, 1), mm = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, end = lastDay(mm);
+      const v = init + mine.reduce((t, x) => t + (x.date <= end ? Number(x.d) || 0 : 0), 0); return { lab: `${d.getMonth() + 1}월`, v, on: mm === st.js.month, tip: `${ymOf(mm)} 끝 잔액 ${won(v)}` }; });
+    S0.chart(el, { pts, label: "달마다 잔액" });
+  }
   // 📊 첫 화면: 냐냐 엑셀 첫 시트처럼 묶음(달·여행)마다 합계 · 정산 · 미정산 · 1인당 미정산
   function summaryHtml() {
     const gs = groups(), al = alloc(), open = all().map((c) => ({ ...c, amount: openOf(c, al) })).filter((c) => c.amount !== 0), os = settleOf(open)   /* 환불(마이너스)도 미정산에서 빼게 */, now = today().slice(0, 7);
@@ -620,7 +694,10 @@ export function mountUri(root, opts = {}) {
       else { st.view = k; st.edit = null; render(true); }
       root.scrollIntoView({ block: "start" });
     }
-    else if (a === "tab") { st.tab = b.dataset.k === "settle" ? "settle" : "spend"; st.pay = null; render(); }
+    else if (a === "tab") { st.tab = ["settle", "assets"].includes(b.dataset.k) ? b.dataset.k : "spend"; st.pay = null; render(); }
+    else if (a === "jSel") { st.js.sel = b.dataset.k; st.js.open = true; render(); }
+    else if (a === "jBack") { st.js.open = false; render(); }
+    else if (a === "jMonth") { const [y, m] = st.js.month.split("-").map(Number), d = new Date(y, m - 1 + Number(b.dataset.d || 0), 1); st.js.month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; render(); }
     else if (a === "stMonth") { st.stats = { ...st.stats, p: "month", trip: null, sel: null, sub: null }; render(); }
     else if (a === "setDel" && st.settles[id]) {
       const x = st.settles[id];
@@ -679,10 +756,10 @@ export function mountUri(root, opts = {}) {
   render();
   // 🔒 로컬 확인 모드 (냐냐 가계부가 localhost?local 일 때 opts.local = 사본 {costs, cats, settles}): 서버에 안 붙고 사본만 보여 줌, 저장 안 함
   if (opts.local) setTimeout(() => {   // 보드가 연결 코드를 다 붙인 뒤에 (바로 그리면 통계 도우미가 아직 없음)
-    room = "local"; st.phase = "open"; st.costs = opts.local.costs || {}; st.loaded = true; st.settles = opts.local.settles || {}; st.settlesLoaded = true;
+    room = "local"; st.phase = "open"; st.costs = opts.local.costs || {}; st.loaded = true; st.settles = opts.local.settles || {}; st.settlesLoaded = true; st.joint = opts.local.joint || {}; st.jointLoaded = true;
     st.cats = opts.local.cats ? catsOf(opts.local.cats) : COMMON_CATS.map((c) => ({ n: c.n, s: c.s.slice() }));
     if (typeof opts.onCats === "function") opts.onCats(st.cats);
-    summary(); render();
+    summary(); render(); reconcileJoint();
   }, 0); else start();
   // 🏷 공통 분류 저장 (냐냐 가계부 설정 '분류'에서만 부름 — 고치는 건 냐냐만, 욱진 보드는 보기만)
   const setCats = (list) => room ? rt.set(path(room, "settings", "cats"), list) : Promise.reject(new Error("공통 공간이 안 열렸어요"));
@@ -701,7 +778,7 @@ export function mountUri(root, opts = {}) {
     return { ok: true };
   }
   const unsettle = (tag) => room ? rt.remove(path(room, "settles", String(tag).replace(/[.#$[\]/]/g, "_"))) : Promise.resolve();
-  return { render, usePassword, setMirror, cats: () => st.cats, setCats, settlePreview, settleBy, unsettle, ready: () => !!room && st.loaded && st.settlesLoaded };
+  return { render, usePassword, setMirror, setJoint, cats: () => st.cats, setCats, settlePreview, settleBy, unsettle, ready: () => !!room && st.loaded && st.settlesLoaded };
 }
 
 let styled = false;
@@ -791,16 +868,19 @@ function injectStyle() {
 .uri-hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .uri-hist li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto 18px; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 8px; background: var(--sunk); font-size: 14px; }
 .uri-hist b { font-weight: 500; font-variant-numeric: tabular-nums; }
-.uri-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--sunk); border: 1px solid var(--line); border-radius: 10px; padding: 4px; max-width: 360px; }
+.uri-tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; background: var(--sunk); border: 1px solid var(--line); border-radius: 10px; padding: 4px; max-width: 480px; }
 .uri-tabs button { font: inherit; border: 0; background: transparent; border-radius: 7px; padding: 8px 4px; font-size: 14px; color: var(--muted); cursor: pointer; }
 .uri-tabs button[aria-pressed="true"] { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
 .uri-st-per { gap: 8px; }
 .uri .st-top { justify-content: flex-end; }
 .uri-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.uri-bar .uri-tabs { flex: 0 1 360px; }
+.uri-bar .uri-tabs { flex: 0 1 480px; }
 .uri-bar .st-top { margin-left: auto; }   /* 통계 탭처럼 기간 줄은 오른쪽 */
 .uri-st-pay { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); padding: 2px 0 6px; } .uri-st-pay b { color: var(--fg); font-weight: 500; margin-left: 4px; }
 .uri .st-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.uri .tx-row.no-ck.uri-jtx { grid-template-columns: 82px minmax(0, .8fr) minmax(0, 1fr) minmax(0, .8fr) 110px minmax(0, 1.3fr) minmax(0, 1fr) 110px; cursor: default; }
+.uri .as-group > .as-gh { cursor: default; }
+@media (max-width: 720px) { .uri .tx-row.no-ck.uri-jtx { grid-template-columns: 66px minmax(0, 1fr) auto; grid-template-areas: "d c amt" "d m b"; } .uri .uri-jtx .tx-a, .uri .uri-jtx .tx-n, .uri .uri-jtx .tx-s { display: none; } .uri .uri-jtx .tx-d { grid-area: d; } .uri .uri-jtx .tx-c { grid-area: c; } .uri .uri-jtx .tx-amt:not(.tx-bal) { grid-area: amt; } .uri .uri-jtx .tx-m { grid-area: m; } .uri .uri-jtx .tx-bal { grid-area: b; font-size: 12px; color: var(--muted); } .uri .tx-th.uri-jtx { display: none; } }
 .uri .tx-row.no-ck.uri-tx { grid-template-columns: 82px minmax(0, .75fr) minmax(0, 1fr) minmax(0, .8fr) 118px minmax(0, 1.4fr) minmax(0, 1fr) 56px; cursor: default; }
 .uri .tx-p { font-size: 12px; font-weight: 600; white-space: nowrap; } .uri .tx-p.p-nyanya { color: var(--coral); } .uri .tx-p.p-ukjin { color: var(--blue); } .uri .tx-p.p-joint { color: var(--mint); }
 @media (max-width: 720px) { .uri .tx-row.no-ck.uri-tx { grid-template-columns: 66px minmax(0, 1fr) auto; grid-template-areas: "d c amt" "d m p"; } .uri .uri-tx .tx-a, .uri .uri-tx .tx-n, .uri .uri-tx .tx-s { display: none; } .uri .uri-tx .tx-d { grid-area: d; } .uri .uri-tx .tx-c { grid-area: c; } .uri .uri-tx .tx-amt { grid-area: amt; } .uri .uri-tx .tx-m { grid-area: m; } .uri .uri-tx .tx-p { grid-area: p; justify-self: end; } .uri .tx-th.uri-tx { display: none; } } .uri-st-per b { font-family: var(--f-mono); min-width: 96px; text-align: center; }

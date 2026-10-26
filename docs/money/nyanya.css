@@ -213,3 +213,6 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 #moneyPage .st-pie .pie2 svg { overflow: visible; }
 /* 📗 BC카드 엑셀 업로드 버튼 (내역 탭, 다건입력 왼쪽): 초록 엑셀 그림 (자리·크기는 다른 버튼과 같게) */
 #cardOpen { color: #1d7a46; border-color: #1d7a46; }
+/* 🤝 공동 자산 묶음 (자산 탭 맨 아래, 내 합계에 안 들어감) */
+.as-group.t-joint { border-style: dashed; }
+.as-jnote { margin: 0; padding: 6px 12px; border-top: 1px solid var(--line); background: var(--surface); }
