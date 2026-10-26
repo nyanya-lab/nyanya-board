@@ -448,7 +448,7 @@ export function mountUri(root, opts = {}) {
     const mine = tx.filter((x) => x.acct === sel.id), init = Number(sel.initial) || 0, [y, mo] = st.js.month.split("-").map(Number);
     const pts = Array.from({ length: 12 }, (_, i) => { const d = new Date(y, mo - 12 + i, 1), mm = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, end = lastDay(mm);
       const v = init + mine.reduce((t, x) => t + (x.date <= end ? Number(x.d) || 0 : 0), 0); return { lab: `${d.getMonth() + 1}월`, v, on: mm === st.js.month, tip: `${ymOf(mm)} 끝 잔액 ${won(v)}` }; });
-    S0.chart(el, { pts, label: "달마다 잔액" });
+    S0.chart(el, { pts, label: "달마다 잔액", fit: true });
   }
   // 📊 첫 화면: 냐냐 엑셀 첫 시트처럼 묶음(달·여행)마다 합계 · 정산 · 미정산 · 1인당 미정산
   function summaryHtml() {

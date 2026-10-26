@@ -591,7 +591,7 @@ function renderAssetAll() {
     `<div class="as-chart-h small muted">달마다 합계 (그 달 끝) · 최근 12달</div><div class="as-chart" id="asChart"></div>` +
     sec("plus", "자산 구성", A, plus, "자산") + sec("minus", "부채 구성", D, minus, "부채") +
     '<button class="fab" type="button" data-act="txAdd" aria-label="기록하기" title="기록하기">＋</button>';
-  setChart($("asChart"), { pts, label: "달마다 합계" });
+  setChart($("asChart"), { pts, label: "달마다 합계", fit: true });
 }
 function renderAssetDetail(id) {
   if (id === "__all") { renderAssetAll(); return; }
@@ -634,7 +634,7 @@ function renderAssetDetail(id) {
     `<div class="as-fabs">${card ? `<button class="fab fab-sub as-pay" type="button" data-act="cardPayNow" data-id="${esc(id)}" aria-label="${esc(a.name)} 결제" title="${esc(a.name)} 카드값 결제">결제</button>` : ""}` +
     `<button class="fab" type="button" data-act="asAdd" data-id="${esc(id)}" aria-label="${esc(a.name)}(으)로 기록하기" title="${esc(a.name)}(으)로 기록하기">＋</button></div>`;
   if (box.dataset.acct !== id) { box.scrollTop = 0; box.dataset.acct = id; }   // 냐냐: 자산 탭 양쪽 따로 스크롤 — 다른 자산을 고르면 오른쪽은 맨 위부터
-  setChart($("asChart"), { bars: card, pts: asPts, label: card ? "달마다 쓴 돈" : "달마다 잔액" });
+  setChart($("asChart"), { bars: card, pts: asPts, label: card ? "달마다 쓴 돈" : "달마다 잔액", fit: !card });
 }
 // 📈 그래프: 칸 너비 그대로 그림 (글자가 안 줄어들게), 너비가 바뀌면 다시 그림 (ResizeObserver)
 // data = { bars(막대면 true), pts: [{ lab 아래 글자, v 값, on 지금 보는 칸, tip 마우스 올리면 }], label }
@@ -651,7 +651,10 @@ function drawChart(el) {
   const pts = d.pts, W = Math.max(260, el.clientWidth || 600), H = 170, L = 44, R = 8, T = 8, B = 24, pw = W - L - R, ph = H - T - B;
   el._w = Math.round(el.clientWidth);
   const vs = pts.map((p) => p.v);
-  let lo = Math.min(0, ...vs), hi = Math.max(0, ...vs); if (hi === lo) hi = lo + 10000;
+  let lo = Math.min(0, ...vs), hi = Math.max(0, ...vs);
+  // 냐냐: 잔액 꺾은선(d.fit)은 0부터 말고 값 범위에 맞춤 → 7천만 원 근처에서 몇십만 원 오르내리는 것도 보이게 (막대는 그대로 0부터)
+  if (d.fit && !d.bars && vs.length) { lo = Math.min(...vs); hi = Math.max(...vs); const pad = (hi - lo) * 0.2 || Math.max(Math.abs(hi) * 0.01, 10000); lo -= pad; hi += pad; }
+  if (hi === lo) hi = lo + 10000;
   const st = niceStep(hi - lo); lo = Math.floor(lo / st) * st; hi = Math.ceil(hi / st) * st;
   const n = pts.length, cw = pw / n, x = (i) => L + cw * (i + 0.5), y = (v) => T + ph - (v - lo) / (hi - lo) * ph, f = (v) => v.toFixed(1);
   let s = `<rect x="${L}" y="${T}" width="${f(pw)}" height="${ph}" class="bg"/>`;
