@@ -262,3 +262,4 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
   .rpt-li > .mono { grid-area: d; font-size: 12px; } .rpt-li > .rpt-c { grid-area: c; } .rpt-li > b { grid-area: b; } .rpt-li > .rpt-m { grid-area: m; color: var(--muted); font-size: 12.5px; }
   .rpt-li > .rpt-a, .rpt-li > .rpt-s, .rpt-li > .rpt-nt { display: none; }
 }
+.nav a.m-nav[hidden] { display: none !important; }   /* 숨긴 메뉴 (📑 보고서, 2026-10-26) */

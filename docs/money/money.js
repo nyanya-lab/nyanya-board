@@ -430,7 +430,8 @@ export const ACCT_ICON = { bank: "🏦", card: "💳", cash: "💵", save: "🐷
 export function moneyAdminView() { return isAdminDevice() && !DEMO; }
 export function moneyShown(x) { return !moneyAdminView() || x.kind === "income" || x.kind === "transfer"; }   // 달력 날짜·검색에서도 같게
 // 돈 관리 탭: 예산 · 지출 · 자산 · 통계 (이 기기에 기억). 관리자 기기는 자산 탭 없음, 지출 탭은 '내역'(수입·보낸 돈 목록만)
-export function mTab() { let v = "budget"; try { v = localStorage.getItem("nyanya-mtab") || "budget"; } catch (e) { /* 무시 */ } if (!["budget", "spend", "cal", "assets", "stats", "report", "settings", "common"].includes(v) || ((v === "assets" || v === "settings" || v === "cal") && moneyAdminView())) v = "budget"; return v; }
+export function mTab() { let v = "budget"; try { v = localStorage.getItem("nyanya-mtab") || "budget"; } catch (e) { /* 무시 */ } if (!["budget", "spend", "cal", "assets", "stats", "settings", "common"].includes(v)   // 📑 report = 보고서 탭: 2026-10-26 냐냐 요청으로 숨김 (report.js·메뉴 링크는 남겨 둠, 다시 쓰려면 여기 "report" 넣고 index.html 링크 hidden 빼기)
+     || ((v === "assets" || v === "settings" || v === "cal") && moneyAdminView())) v = "budget"; return v; }
 export function setMTab(k) { try { localStorage.setItem("nyanya-mtab", k); } catch (e) { /* 무시 */ } if (k === "assets") { ui.asSel = null; ui.asOpen = false; } renderMoney(); }
 export function renderMTabs() {
   const adm = moneyAdminView(), tab = adm ? "stats" : mTab();   // 관리자 보드 '예산'은 통계만 (실제 수입 · 보낸 돈 · 나머지)
