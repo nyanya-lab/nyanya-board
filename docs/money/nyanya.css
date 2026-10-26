@@ -16,7 +16,7 @@
 
 /* 폰 아래 메뉴: ❤️ 공통이 하나 더 있어서 7칸 (욱진 보드는 6칸), 고른 칸은 코랄 */
 @media (max-width: 720px) {
-  .app-money .m-bottom { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .app-money .m-bottom { grid-template-columns: repeat(8, minmax(0, 1fr)); }   /* 📑 보고서 더해서 8칸 */
   .app-money .m-bottom button { font-size: 10.5px; }
   .app-money .m-bottom button[aria-pressed="true"] { color: var(--coral); background: var(--coral-soft); }
 }
@@ -216,51 +216,92 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 /* 🤝 공동 자산 묶음 (자산 탭 맨 아래, 내 합계에 안 들어감) */
 .as-group.t-joint { border-style: dashed; }
 .as-jnote { margin: 0; padding: 6px 12px; border-top: 1px solid var(--line); background: var(--surface); }
-/* 📑 보고서 탭 (report.js) */
-.rpt-view { display: grid; gap: 16px; }
-.rpt-filter { display: grid; gap: 10px; }
-.rpt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.rpt-l { font-size: 13px; font-weight: 600; color: var(--muted); min-width: 40px; }
+/* 📑 보고서 탭 (report.js) — 카드 먼저 → 누르면 결과, ✏️ 조건은 작은 창 */
+.rpt-view { display: grid; gap: 14px; align-content: start; }
+.rpt-lhead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.rpt-lhead h2, .rpt-title { margin: 0; font-size: 20px; }
+.rpt-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.rpt-card { display: grid; gap: 6px; align-content: start; text-align: left; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--fg); font: inherit; cursor: pointer; transition: transform .12s, box-shadow .12s; }
+.rpt-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(23, 32, 51, .10); }
+.rpt-cn { font-size: 16px; font-weight: 700; }
+.rpt-cp { font-size: 12.5px; color: var(--muted); } .rpt-cp span { white-space: nowrap; }
+.rpt-cv { display: grid; gap: 0; margin-top: 4px; } .rpt-cv small { font-size: 12px; color: var(--muted); } #moneyPage .rpt-cv b { font-size: 24px; font-weight: 700; }
+.rpt-cc { font-size: 12.5px; color: var(--muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rpt-new { border-style: dashed; background: transparent; place-content: center; justify-items: center; text-align: center; min-height: 140px; color: var(--muted); }
+.rpt-new b { color: var(--coral, #f0604d); font-size: 16px; }
+.rpt-tpl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+/* 결과 화면 */
+.rpt-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rpt-title { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.rpt-badge { font-size: 11.5px; font-weight: 600; color: var(--coral, #f0604d); background: var(--coral-soft); border-radius: 999px; padding: 2px 8px; }
+.rpt-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.rpt-cond { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 14px; }
+.rpt-per { display: inline-flex; align-items: center; gap: 6px; } .rpt-per b { font-size: 15px; } .rpt-per .chip:disabled { opacity: .35; cursor: default; }
+.rpt-cond select { font-size: 13px; padding: 4px 8px; width: auto; }
+.rpt-cl { display: flex; flex-wrap: wrap; gap: 6px; }
+.rpt-tag { border: 1px solid var(--line); background: var(--sunk); color: var(--fg); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.rpt-tag:hover { border-color: var(--coral, #f0604d); }
+.rpt-sum { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.rpt-sum .stat b { font-size: 18px; } .rpt-sum .rpt-main-v { background: var(--coral-soft); } .rpt-sum .rpt-main-v b { font-size: 22px; }
+.rpt-grid { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.rpt-side, .rpt-main { display: grid; gap: 10px; align-content: start; }
+.rpt-pk { justify-self: start; }
+.rpt-side .st-pie .pie2 svg { overflow: visible; }
+.rpt-side .st-cats { display: grid; }
+.rpt-note { margin: -4px 0 0; text-align: center; }
+.st-cat small.muted { font-size: 11px; margin-left: 2px; }
+.rpt-mt summary { cursor: pointer; font-weight: 600; font-size: 14px; padding: 4px 0; }
+.rpt-tbl { display: grid; gap: 2px; font-size: 13.5px; margin-top: 6px; max-height: 320px; overflow-y: auto; }
+.rpt-tr { display: grid; grid-template-columns: 76px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: center; padding: 5px 8px; border: 0; border-radius: 8px; background: var(--sunk); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.rpt-tr.th { cursor: default; color: var(--muted); font-size: 12px; position: sticky; top: 0; z-index: 1; background: var(--surface); }
+.rpt-tr > :not(:first-child) { text-align: right; }
+.rpt-tr.on { background: var(--blue-soft); box-shadow: inset 3px 0 0 var(--blue); }
+.rpt-monbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 8px; background: var(--blue-soft); font-size: 13px; }
+.rpt-empty { text-align: center; display: grid; justify-items: center; gap: 8px; }
+/* ✏️ 조건 창 */
+.rpt-dlg { width: min(640px, calc(100% - 24px)); max-height: calc(100dvh - 32px); }
+.rpt-dlg[open] { display: flex; flex-direction: column; }
+.rpt-ed-body { overflow-y: auto; overscroll-behavior: contain; flex: 1 1 auto; min-height: 0; }
+.rpt-es { padding: 12px 20px; display: grid; gap: 8px; border-top: 1px solid var(--line); }
+.rpt-es h4 { margin: 0; font-size: 13px; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.rpt-es h4 .rpt-exp { margin-left: auto; }
+.rpt-name { display: grid; gap: 4px; font-size: 13px; color: var(--muted); font-weight: 600; } .rpt-name input { font-size: 15px; padding: 8px 10px; }
+.rpt-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rpt-sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
 .rpt-chip { border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 4px 11px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
 .rpt-chip.on { background: var(--coral, #f0604d); border-color: var(--coral, #f0604d); color: #fff; font-weight: 600; }
-.rpt-dates { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; font-size: 13px; }
-.rpt-dates input { font-size: 13px; padding: 4px 6px; }
-.rpt-q { flex: 1 1 260px; min-width: 0; padding: 7px 10px; }
-.rpt-cats summary { cursor: pointer; display: flex; align-items: center; gap: 6px; list-style: none; }
-.rpt-cats summary::-webkit-details-marker { display: none; }
-.rpt-cats[open] { display: grid; gap: 8px; }
-.rpt-cg, .rpt-subs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.rpt-subs { padding-left: 12px; border-left: 2px solid var(--line); }
-.rpt-saved { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
-.rpt-sv { display: inline-flex; align-items: center; }
-.rpt-x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 0 4px; }
-.rpt-sum { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.rpt-sum .stat b { font-size: 18px; }
-.rpt-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-.rpt-h { margin: 0 0 8px; font-size: 15px; }
-.rpt-tbl { display: grid; gap: 2px; font-size: 14px; }
-.rpt-tr { display: grid; grid-template-columns: 40px minmax(0, 1fr) 54px 120px; gap: 8px; align-items: center; padding: 5px 8px; border-radius: 8px; background: var(--sunk); }
-.rpt-tr.sub { background: none; font-size: 13px; color: var(--muted); padding-top: 1px; padding-bottom: 1px; }
-.rpt-tr.mon { grid-template-columns: 70px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); }
-.rpt-tr > :last-child, .rpt-tr.mon > span.won { text-align: right; font-variant-numeric: tabular-nums; }
-.rpt-k { font-size: 11px; border-radius: 6px; padding: 1px 4px; text-align: center; background: var(--surface); color: var(--muted); }
-.rpt-k.k-income { color: var(--danger, #d4483b); } .rpt-k.k-expense { color: var(--blue, #3b6fd4); }
-.rpt-c { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rpt-n { font-size: 12px; color: var(--muted); text-align: right; }
-.rpt-chart { margin-bottom: 8px; }
-.rpt-tx { display: grid; gap: 0; }
-.rpt-li { display: grid; grid-template-columns: 96px minmax(0, .9fr) minmax(0, 1fr) minmax(0, .9fr) 110px minmax(0, 1.2fr) minmax(0, 1fr); gap: 8px; align-items: center; width: 100%; padding: 8px 6px; border: 0; border-bottom: 1px solid var(--line); background: none; font: inherit; font-size: 13.5px; color: inherit; text-align: left; cursor: pointer; }
-.rpt-li:hover { background: var(--sunk); }
-.rpt-li > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rpt-li > b { text-align: right; }
-.rpt-a, .rpt-s, .rpt-nt { color: var(--muted); font-size: 12.5px; }
-@media (max-width: 900px) { .rpt-grid { grid-template-columns: minmax(0, 1fr); } }
+.rpt-dates { display: flex; align-items: center; gap: 6px; font-size: 13px; } .rpt-dates input { flex: 1; min-width: 0; font-size: 13px; padding: 5px 8px; }
+.rpt-find { width: 100%; padding: 7px 10px; font-size: 13.5px; }
+.rpt-picked { display: flex; flex-wrap: wrap; gap: 6px; }
+.rpt-pc { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; border-radius: 999px; background: var(--coral-soft); font-size: 13px; }
+.rpt-pc i { font-style: normal; font-size: 11px; color: var(--muted); }
+.rpt-pc button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; }
+.rpt-tree { display: grid; gap: 8px; max-height: 300px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.rpt-tg { display: grid; gap: 2px; } .rpt-tg > b { margin: 2px 0; }
+.rpt-tc { display: flex; align-items: center; gap: 8px; padding: 2px 6px; border-radius: 8px; }
+.rpt-tc.on { background: var(--coral-soft); }
+.rpt-ck { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; min-width: 0; flex: 1 1 auto; padding: 3px 0; }
+.rpt-ck input { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--coral, #f0604d); }
+.rpt-ck span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rpt-ck small { white-space: nowrap; }
+.rpt-exp { border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; padding: 2px 4px; }
+.rpt-exp:hover { color: var(--fg); }
+.rpt-ts { display: flex; flex-wrap: wrap; gap: 2px 14px; padding: 0 4px 4px 30px; }
+.rpt-ts .rpt-ck { flex: none; font-size: 13px; }
+.rpt-ag { display: flex; flex-wrap: wrap; gap: 2px 14px; } .rpt-ag .rpt-ck { flex: none; font-size: 13.5px; }
+.rpt-ed-foot { justify-content: space-between; }
+.rpt-live { font-size: 13.5px; } .rpt-live b.won { font-size: 15px; }
+.rpt-ed-btns { display: flex; gap: 8px; margin-left: auto; }
+@media (max-width: 1100px) { .rpt-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 720px) {
+  .rpt-cards { grid-template-columns: minmax(0, 1fr); }
   .rpt-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .rpt-dates { margin-left: 0; width: 100%; } .rpt-dates input { flex: 1; }
-  .rpt-li { grid-template-columns: 74px minmax(0, 1fr) auto; grid-template-areas: "d c b" "d m m"; row-gap: 2px; }
-  .rpt-li > .mono { grid-area: d; font-size: 12px; } .rpt-li > .rpt-c { grid-area: c; } .rpt-li > b { grid-area: b; } .rpt-li > .rpt-m { grid-area: m; color: var(--muted); font-size: 12.5px; }
-  .rpt-li > .rpt-a, .rpt-li > .rpt-s, .rpt-li > .rpt-nt { display: none; }
+  .rpt-top .rpt-title { order: -1; flex-basis: 100%; }
+  .rpt-tr { grid-template-columns: 62px repeat(3, minmax(0, 1fr)); font-size: 12.5px; }
+  .rpt-dlg { width: 100%; max-width: 100%; max-height: 100dvh; height: 100dvh; margin: 0; border-radius: 0; }
+  .rpt-es { padding: 10px 14px; }
+  .rpt-ed-foot { padding: 10px 14px 14px; }
+  .rpt-ed-btns { width: 100%; } .rpt-ed-btns .btn { flex: 1; }
 }
 .nav a.m-nav[hidden] { display: none !important; }   /* 숨긴 메뉴 (📑 보고서, 2026-10-26) */
 /* 📈 그래프 점(칸)을 누르면 뜨는 상자 (자산 전체: 그 달 합계·자산·부채) */
