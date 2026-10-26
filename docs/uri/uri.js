@@ -79,7 +79,7 @@ export function mountUri(root, opts = {}) {
     view: null,                // null = 한눈에 표(첫 화면), "YYYY-MM" = 그 달, "trip:이름" = 그 여행 묶음
     showDone: false,           // 표에서 정산 끝난 줄도 보기
     pay: null,                 // 💸 정산하기 창: { amount: "123,000" } (null = 닫힘)
-    tab: "spend",              // 공통 탭 안 작은 탭: "spend" = 📊 지출 (처음), "settle" = 💸 정산
+    tab: "assets",             // 공통 탭 안 작은 탭: "assets" = 🏦 공동 자산 (처음, 2026-10-26 냐냐 요청), "spend" = 📊 공통지출, "settle" = 💸 정산
     stats: { p: "month", anchor: today(), from: "", to: "", trip: null, sel: null, sub: null },   // 📊 지출: 주간·월간·연간·기간·여행(trip) + 고른 대분류·소분류
     edit: null,                // 고치는 중인 기록 id
     form: null                 // 다시 그릴 때 입력 중이던 값 유지
@@ -287,7 +287,7 @@ export function mountUri(root, opts = {}) {
     if (st.phase === "locked") { root.innerHTML = lockHtml(); return; }
     const keepAmt = st.pay && root.querySelector('[data-uri-pay]');
     root.innerHTML = st.view && !mirrorMode ? openHtml()   // (가계부 연결 없는 보드: 예전 달 화면에서 적기)
-      : `<div class="uri-tabs" role="tablist" aria-label="공통 보기"><button type="button" data-uri="tab" data-k="spend" aria-pressed="${st.tab === "spend"}">📊 공통지출</button><button type="button" data-uri="tab" data-k="settle" aria-pressed="${st.tab === "settle"}">💸 정산</button><button type="button" data-uri="tab" data-k="assets" aria-pressed="${st.tab === "assets"}">🏦 공동 자산</button></div>`
+      : `<div class="uri-tabs" role="tablist" aria-label="공통 보기"><button type="button" data-uri="tab" data-k="assets" aria-pressed="${st.tab === "assets"}">🏦 공동 자산</button><button type="button" data-uri="tab" data-k="spend" aria-pressed="${st.tab === "spend"}">📊 공통지출</button><button type="button" data-uri="tab" data-k="settle" aria-pressed="${st.tab === "settle"}">💸 정산</button></div>`
         + (st.tab === "settle" ? summaryHtml() : st.tab === "assets" ? jointHtml() : statsHtml());
     // 작은 탭 [공통지출 | 정산]과 기간 줄(‹ 2026-10 › 월간)을 한 줄로 → 위 공백 줄이기 (냐냐 요청 2026-10-22)
     const tabs = root.querySelector(":scope > .uri-tabs"), top = root.querySelector(":scope > .st-top");
