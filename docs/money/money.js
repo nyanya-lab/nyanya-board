@@ -17,6 +17,7 @@ import { openRangePicker, rangeLabel, shiftRange, wholeMonth } from "./range.js?
 //   자산 계좌번호(accounts.number)·메모(accounts.memo) = 목록·자산별 보기에 보임 (고치는 곳은 acctset.js),
 //   제목 = env.tabTitles[탭] (냐냐: 예산·내역·달력…), 💳 cardDue = 이용기간 끝난 최근 결제(저번 달 사용분, 결제일 없어도) · 결제 기록 내용 '카드정산 결제',
 //   🧾 내역 기간 고르기(ui.txRange, ./range.js 창 — 달 이름·[이번 달]을 누르면 열림, txPick·txShift) — 내역 표·요약 칸·아래 '지출' 칸이 그 기간을 따라감.
+//   📊 예산(planOf): 💑 내 몫 보기를 끄면 공통비용 예산 두 배(planX, 저장은 내 몫) · 지난달 월급은 있고 이번 달 월급은 아직이면 수입 = 지난달 (hasSalary),
 // (원래 설명) 보드(index.html)와 가계부 모드(money.html → index.html?app=money)가 같이 쓰는 코드
 // 한 달 예산 · 지출 기록 · 자산(통장·카드·현금, 카드 결제일) · 분류·색·원형 그래프 · 줄 돈 15일 자동 · 카드값 할 일 · 연습 데이터
 // 화면 마크업은 index.html의 #moneyPage(⚙ 설정 탭 #catEditor·#curEditor 포함) · #acctDlg · #mDrawer · #bulkDlg. 보드 쪽 공통 함수·상태는 시작할 때 bindMoney(env)로 받음
@@ -189,7 +190,7 @@ export function moneyTaskKind(x, id) {
 function moneyTaskTitle(k, m, filled) {
   if (!filled) return k === "budget" ? "🗓️ 이번 달 예산 입력하기" : "💰 이번 달 수입 입력하기";
   const mon = +m.slice(5);
-  if (k === "budget") return `🗓️ ${mon}월 예산 ${won(planOf(m).total)}`;
+  if (k === "budget") return `🗓️ ${mon}월 예산 ${won(planOf(m).saved)}`;
   const r = monthTotals(m), sal = r.items.some((x) => x.kind === "income" && x.cat === "월급");
   return `💰 ${mon}월 ${sal ? "월급" : "수입"} ${won(r.inc)}`;
 }
@@ -325,15 +326,20 @@ export function planSource(m) {
   const ks = Object.keys(all).filter((k) => k < m && all[k]).sort();
   return ks.length ? ks[ks.length - 1] : null;
 }
+// 💑 냐냐: 공통비용 예산은 '내 몫'으로 적어 둠 → 내 몫 보기를 끄면 두 배(전체)로 보여 줌 (저장은 늘 내 몫, 고칠 때 ÷2)
+export const planX = (cat) => E && E.mineView && !mineOn() && /공통비용/.test(cat || "") ? 2 : 1;
+// 냐냐: 그 달에 월급(분류에 '월급')이 들어왔는지
+function hasSalary(mm) { let f = false; S.money.forEach((x) => { if (!f && x && x.kind === "income" && (x.date || "").slice(0, 7) === mm && /월급/.test(x.cat || "")) f = true; }); return f; }
 export function planOf(m) {
   const src = planSource(m), b = (src && S.settings.budgets[src]) || {};
-  const items = Object.entries(b.items || {}).filter(([, v]) => v && v.cat).map(([id, v]) => ({ id, ...v }))
+  const items = Object.entries(b.items || {}).filter(([, v]) => v && v.cat).map(([id, v]) => ({ id, ...v, show: (Number(v.amount) || 0) * planX(v.cat) }))
     .sort((a, b2) => (a.createdAt || 0) - (b2.createdAt || 0));
   // 수입: 이번 달 실제 수입 → 아직이면 지난달 실제 수입 (incAuto). 예상 수입을 따로 넣는 칸은 없앰 (예전에 넣은 income은 안 씀)
   // 💝 줄 돈(give): 욱진이가 예산에서 정한 금액 (안 정하면 null → 남는 돈은 다 잔액)
-  const prevM = shiftMonth(m, -1), cur = monthTotals(m).inc, prevInc = monthTotals(prevM).inc, incAuto = !cur && prevInc > 0;
+  // 냐냐: 지난달엔 월급이 있었는데 이번 달엔 아직이면 지난달 수입으로 (월초 이자 몇 원만 들어와 수입이 0처럼 보이던 것, 2026-10-27)
+  const prevM = shiftMonth(m, -1), cur = monthTotals(m).inc, prevInc = monthTotals(prevM).inc, incAuto = prevInc > 0 && (!cur || (!hasSalary(m) && hasSalary(prevM)));
   const give = b.give == null || b.give === "" ? null : Number(b.give) || 0;
-  return { income: cur || (incAuto ? prevInc : 0), incAuto, incFrom: incAuto ? prevM : null, give, items, total: items.reduce((t, v) => t + (Number(v.amount) || 0), 0), from: src && src !== m ? src : null };
+  return { income: incAuto ? prevInc : cur, incAuto, incFrom: incAuto ? prevM : null, give, items, total: items.reduce((t, v) => t + v.show, 0), saved: items.reduce((t, v) => t + (Number(v.amount) || 0), 0), from: src && src !== m ? src : null };
 }
 export function savePlan(m, patch, msg) {
   if (!ready()) return Promise.resolve();
@@ -359,7 +365,7 @@ export function renderPlan(m, r) {
     : `${monthLabel(m)} · 쓸 돈을 분류별로 정해 두는 곳 (다음 달로 그대로 이어져요)`;
   const left = pl.income - pl.total - (give || 0);   // 잔액 = 수입 − 쓸 돈 − 줄 돈
   $("planTiles").innerHTML =
-    `<div class="plan-tile"><span>수입</span><b>${pl.income ? won(pl.income) : "-"}</b><small>${r.inc ? "이번 달 실제" : pl.incAuto ? `지난달 기준 (${monthLabel(pl.incFrom)} 실제)` : "수입이 들어오면 계산돼요"}</small></div>` +
+    `<div class="plan-tile"><span>수입</span><b>${pl.income ? won(pl.income) : "-"}</b><small>${pl.incAuto ? `지난달 기준 (${monthLabel(pl.incFrom)} 실제)${r.inc ? " · 월급 들어오면 이번 달로" : ""}` : r.inc ? "이번 달 실제" : "수입이 들어오면 계산돼요"}</small></div>` +
     `<div class="plan-tile"><span>쓸 돈 (예산)</span><b>${won(pl.total)}</b><small>${adm ? `${pl.items.length}개 분류` : pl.items.length ? `실제 ${won(r.exp)} 씀` : "분류별로 추가해요"}</small></div>` +
     (E.give === false ? "" : (() => {   // 💝 줄 돈 → 15일에 자동으로 '보낸 돈' 기록되면 '준 돈 ✅' + [고치기] (그 기록 열기)
       const gid = `give-${m}`, auto = S.money.get(gid), sent = give != null && r.out >= give;
@@ -369,7 +375,7 @@ export function renderPlan(m, r) {
       return `<div class="plan-tile give"><span>💝 ${esc(partner())}에게 ${auto || sent ? "준 돈 ✅" : "줄 돈"}${g.state === "ok" ? " ✔" : ""}</span><b>${give == null ? "아직 안 정함" : won(give)}</b><small>${sub}</small></div>`;
     })()) +
     `<div class="plan-tile left${left < 0 ? " minus" : ""}"><span>잔액</span><b>${pl.income ? won(left) : "-"}</b><small>수입 − 쓸 돈${give == null ? "" : " − 줄 돈"}</small></div>`;
-  $("planPie").innerHTML = pieHtml("expense", pl.items.map((v) => ({ cat: v.cat, amt: Number(v.amount) || 0 })), "예산", { full: E.pieFull });
+  $("planPie").innerHTML = pieHtml("expense", pl.items.map((v) => ({ cat: v.cat, amt: v.show })), "예산", { full: E.pieFull });
   if (document.activeElement !== $("planGive")) $("planGive").value = give == null ? "" : commaNum(give);
   const gf = $("planGiveFrom"), gfv = S.settings.giveFrom || "";
   gf.innerHTML = '<option value="">선택 안 함</option>' + sortedAccts().filter((x) => x.type !== "card").map((x) => `<option value="${esc(x.id)}">${ACCT_ICON[x.type] || ""} ${esc(x.name)}</option>`).join("");
@@ -377,12 +383,12 @@ export function renderPlan(m, r) {
   const planned = new Set(pl.items.map((v) => v.cat));
   const extra = Object.entries(r.byCat).filter(([c]) => !planned.has(c)).reduce((t, [, v]) => t + v, 0);
   if (adm) {
-    $("planRows").innerHTML = pl.items.map((v) => `<div class="plan-row plan-ro"><span class="plan-cat">${catDot("expense", v.cat)}${esc(v.cat)}${v.memo ? ` <span class="muted small" style="font-weight:400">· ${esc(v.memo)}</span>` : ""}</span><span class="won">${won(v.amount)}</span></div>`).join("") ||
+    $("planRows").innerHTML = pl.items.map((v) => `<div class="plan-row plan-ro"><span class="plan-cat">${catDot("expense", v.cat)}${esc(v.cat)}${v.memo ? ` <span class="muted small" style="font-weight:400">· ${esc(v.memo)}</span>` : ""}</span><span class="won">${won(v.show)}</span></div>`).join("") ||
       '<p class="small muted" style="margin:0">아직 예산이 없어요.</p>';
     return;
   }
   $("planRows").innerHTML = pl.items.map((v) => {
-    const used = r.byCat[v.cat] || 0, amt = Number(v.amount) || 0, over = used > amt;
+    const used = r.byCat[v.cat] || 0, amt = v.show, over = used > amt;
     return `<div class="plan-row"><span class="plan-cat">${catDot("expense", v.cat)}${esc(v.cat)}</span>` +
       `<input type="text" class="plan-memo" maxlength="40" value="${esc(v.memo || "")}" placeholder="메모" data-plan-memo="${esc(v.id)}" aria-label="${esc(v.cat)} 메모">` +
       `<input type="text" class="plan-amt amt-in" inputmode="numeric" autocomplete="off" value="${amt ? commaNum(amt) : ""}" data-plan-amt="${esc(v.id)}" aria-label="${esc(v.cat)} 예산">` +
@@ -1426,7 +1432,7 @@ export function initMoney() {
     if (!cat) { toast("분류를 적어 주세요. 예: 식비"); return; }
     if (planOf(m).items.some((v) => v.cat === cat)) { toast("이미 있는 분류예요. 금액 칸을 고쳐 주세요."); return; }
     const id = "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-    savePlan(m, { items: { [id]: { cat, memo, amount, createdAt: Date.now() } } }, `${cat} 예산을 넣었어요.`).then(() => { $("planCat").value = ""; $("planMemo").value = ""; $("planAmt").value = ""; $("planCat").focus(); });
+    savePlan(m, { items: { [id]: { cat, memo, amount: Math.round(amount / planX(cat)), createdAt: Date.now() } } }, `${cat} 예산을 넣었어요.`).then(() => { $("planCat").value = ""; $("planMemo").value = ""; $("planAmt").value = ""; $("planCat").focus(); });
   });
   $("planGiveFrom").addEventListener("change", () => act(E.backend.saveSettings({ giveFrom: $("planGiveFrom").value || null }), "💝 보내는 통장을 저장했어요.").catch(() => {}));
   $("planGive").addEventListener("change", () => { const v = $("planGive").value.trim(); savePlan(ui.month, { give: v ? amtVal($("planGive")) : null }, v ? `💝 줄 돈을 ${won(amtVal($("planGive")))}으로 정했어요.` : "💝 줄 돈을 비웠어요. 남는 돈은 다 잔액이에요."); });
@@ -1434,7 +1440,8 @@ export function initMoney() {
     const d = ev.target.dataset || {};
     if (d.planMemo) { savePlan(ui.month, { items: { [d.planMemo]: { memo: ev.target.value.trim() } } }, "메모를 고쳤어요."); return; }
     const id = d.planAmt; if (!id) return;
-    savePlan(ui.month, { items: { [id]: { amount: amtVal(ev.target) } } }, "예산을 고쳤어요.");
+    const v = planOf(ui.month).items.find((z) => z.id === id), x = v ? planX(v.cat) : 1;   // 💑 두 배로 보이던 공통비용은 ÷2 해서 내 몫으로 저장
+    savePlan(ui.month, { items: { [id]: { amount: Math.round(amtVal(ev.target) / x) } } }, x > 1 ? "예산을 고쳤어요 (내 몫 = 절반으로 저장)." : "예산을 고쳤어요.");
   });
   $("budgetForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
