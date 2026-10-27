@@ -27,7 +27,7 @@ export function mountReport(root, env) {
   const norm = (f = {}) => ({ per: f.per != null ? f.per : f.from ? "" : "이번 달", from: f.from || ymd(new Date(Y, M, 1)), to: f.to || today0,
     kinds: f.kinds && f.kinds.length ? f.kinds.slice() : ["expense", "income"], accts: (f.accts || []).slice(), cats: (f.cats || []).slice(), q: f.q || "", common: f.common || "all" });
   // 보는 중: id(저장한 보고서, 새 것이면 null) · name · f · sh(기간 ‹ › 몇 칸) · pk(원형 수입/지출) · pick(분류) · psub(소분류) · mon(그 달만) · more(내역 더 보기)
-  const st = { yr: null, yopen: {}, f: null, id: null, name: "", sh: 0, pk: null, pick: null, psub: null, mon: null, more: 0 };
+  const st = { yr: null, yopen: {}, ysel: {}, f: null, id: null, name: "", sh: 0, pk: null, pick: null, psub: null, mon: null, more: 0 };
   let ed = null;   // ✏️ 조건 창에서 고치는 중: { id, name, f, q(분류 찾기), aq(자산 찾기), open{}, acOpen }
 
   // ---------- 기간 ----------
@@ -216,10 +216,10 @@ export function mountReport(root, env) {
   let cmpMemo = null;
   const cmpOf = () => { if (cmpMemo) return cmpMemo; try { cmpMemo = JSON.parse(localStorage.getItem("nyanya-rpt-cmp") || "{}") || {}; } catch (e) { cmpMemo = {}; } return cmpMemo; };
   const num = (v) => { v = Math.round(v); return v ? v.toLocaleString("ko-KR") : ""; };
-  function yTable(head, rows, foot) {   // rows = [{name, vals, cls, key, sub, open, can}]
+  function yTable(head, rows, foot) {   // rows = [{name, vals, cls, sel(그래프로 고르기 data-k·data-c·data-s), key(▾ 소분류 펼치기), open, can, on}]
     const cells = (vals) => vals.map((v) => `<td>${num(v)}</td>`).join("") + `<td class="yr-avg">${num(sum(vals) / 12)}</td><td class="yr-sum">${num(sum(vals))}</td>`;
     return `<div class="yr-tw"><table class="yr-t"><thead><tr><th>${esc(head)}</th>${Array.from({ length: 12 }, (_, i) => `<th>${i + 1}월</th>`).join("")}<th>평균</th><th>합계</th></tr></thead><tbody>` +
-      rows.map((r) => `<tr class="${r.cls || ""}"${r.key ? ` data-rf="yopen" data-k="${esc(r.key)}"` : ""}><th title="${esc(r.name)}"><span>${esc(r.name)}</span>${r.can ? `<i aria-hidden="true">${r.open ? "▴" : "▾"}</i>` : ""}</th>${cells(r.vals)}</tr>`).join("") +
+      rows.map((r) => `<tr class="${r.cls || ""}${r.on ? " on" : ""}"${r.sel ? ` data-rf="ysel" ${r.sel} title="누르면 위 그래프가 이 분류로"` : ""}><th title="${esc(r.name)}"><span>${esc(r.name)}</span>${r.can ? `<button type="button" class="yr-tg" data-rf="yopen" data-k="${esc(r.key)}" aria-label="소분류 ${r.open ? "접기" : "펼치기"}" aria-expanded="${r.open}">${r.open ? "▴" : "▾"}</button>` : ""}</th>${cells(r.vals)}</tr>`).join("") +
       `</tbody>${foot ? `<tfoot><tr><th>합계</th>${cells(foot)}</tr></tfoot>` : ""}</table></div>`;
   }
   function annualHtml() {
@@ -228,14 +228,18 @@ export function mountReport(root, env) {
     st._bars = {};
     const sec = (k, label) => {
       const g = D[k], cats = Object.entries(g.cats).sort((a, b) => sum(b[1].v) - sum(a[1].v));
-      st._bars[k] = { series: (cmp[k] ? [{ name: `${y - 1}년`, cls: "prev", vals: P[k].tot }] : []).concat([{ name: cmp[k] ? `${y}년` : label, cls: k, vals: g.tot }]) };
-      const rows = [];
+      // 표에서 분류(소분류)를 누르면 그래프가 그 분류만 (전년도 비교도 같은 분류로), 한 번 더 누르면 전체로
+      const sel = st.ysel[k], z12 = Array(12).fill(0);
+      const pick = (G) => { if (!sel) return G[k].tot; const c = G[k].cats[sel.c]; return !c ? z12 : sel.s != null ? c.subs[sel.s] || z12 : c.v; };
+      const selName = sel ? sel.c + (sel.s != null ? " › " + sel.s : "") : "";
+      st._bars[k] = { series: (cmp[k] ? [{ name: `${y - 1}년`, cls: "prev", vals: pick(P) }] : []).concat([{ name: cmp[k] ? `${y}년` : selName || label, cls: k, vals: pick(D) }]) };
+      const rows = [], selAttr = (cn, sn) => `data-k="${k}" data-c="${esc(cn)}"${sn != null ? ` data-s="${esc(sn)}"` : ""}`;
       cats.forEach(([cn, c]) => {
         const subs = Object.entries(c.subs).sort((a, b) => sum(b[1]) - sum(a[1])), can = !(subs.length === 1 && subs[0][0] === "(소분류 없음)"), key = `${k}|${cn}`, open = can && !!st.yopen[key];
-        rows.push({ name: cn, vals: c.v, key: can ? key : "", can, open, cls: "yr-cat" });
-        if (open) subs.forEach(([sn, v]) => rows.push({ name: sn, vals: v, cls: "yr-sub" }));
+        rows.push({ name: cn, vals: c.v, key, can, open, cls: "yr-cat", sel: selAttr(cn), on: sel && sel.c === cn && sel.s == null });
+        if (open) subs.forEach(([sn, v]) => rows.push({ name: sn, vals: v, cls: "yr-sub", sel: selAttr(cn, sn), on: sel && sel.c === cn && sel.s === sn }));
       });
-      return `<div class="panel yr-sec"><div class="yr-sh"><h3>${label}</h3><label class="yr-cmp"><input type="checkbox" data-rf="ycmp" data-k="${k}"${cmp[k] ? " checked" : ""}> 전년도 비교</label></div>
+      return `<div class="panel yr-sec"><div class="yr-sh"><h3>${label}${sel ? ` <span class="yr-selc">› ${esc(selName)}<button type="button" data-rf="ysel" data-k="${k}" aria-label="전체로" title="전체로">×</button></span>` : ' <small class="muted yr-hint">표에서 분류를 누르면 그래프가 그 분류로</small>'}</h3><label class="yr-cmp"><input type="checkbox" data-rf="ycmp" data-k="${k}"${cmp[k] ? " checked" : ""}> 전년도 비교</label></div>
         <div class="yr-chart" data-yb="${k}"></div>${cats.length ? yTable(label, rows, g.tot) : `<p class="muted small" style="margin:0">${y}년 ${label} 기록이 없어요.</p>`}</div>`;
     };
     st._bars.all = { series: [{ name: "수입", cls: "income", vals: inc }, { name: "지출", cls: "expense", vals: exp }] };
@@ -420,6 +424,7 @@ export function mountReport(root, env) {
     else if (k === "ysh") st.yr += +v;
     else if (k === "ycmp") { const c = cmpOf(); c[v] = !c[v]; try { localStorage.setItem("nyanya-rpt-cmp", JSON.stringify(c)); } catch (err) { /* 무시 */ } }
     else if (k === "yopen") st.yopen[v] = !st.yopen[v];
+    else if (k === "ysel") { const c = b.dataset.c, sb = b.dataset.s, cur = st.ysel[v]; st.ysel[v] = c == null || (cur && cur.c === c && cur.s === sb) ? null : { c, s: sb }; }
     else if (k === "print") { window.print(); return; }
     else if (k === "edit") { openEd(st.id, st.name, st.f); return; }
     else if (k === "copy") { openEd(null, `${st.name} 복사본`, st.f, true); return; }
