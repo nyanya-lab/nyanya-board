@@ -303,6 +303,7 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
   .rpt-ed-foot { padding: 10px 14px 14px; }
   .rpt-ed-btns { width: 100%; } .rpt-ed-btns .btn { flex: 1; }
 }
+.rpt-mine { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--coral-soft); font-size: 13px; }
 /* 📅 연간 보고서 (report.js annualHtml) — 편한가계부 연간 보고서처럼: 막대 + 달마다 표 */
 .rpt-annual { border-color: color-mix(in srgb, var(--coral, #f0604d) 45%, var(--line)); }
 .rpt-annual .rpt-badge { font-size: 11px; vertical-align: 2px; }

@@ -52,7 +52,7 @@ export function mountReport(root, env) {
   const keyOf = (x) => { const k = x.kind || "expense"; return [`${k}|${x.cat || ""}`, `${k}|${x.cat || ""}|${x.sub || ""}`]; };
   function match(x, f, r) {
     const k = x.kind || "expense";
-    if (!x || !env.isWon(x) || !x.date || x.date < r.from || x.date > r.to) return false;
+    if (!x || !env.isWon(x) || !x.date || x.date < r.from || x.date > r.to || mineSkip(x)) return false;
     if (!f.kinds.includes(k === "transfer" ? "expense" : k)) return false;
     if (f.accts.length && !f.accts.includes(x.account) && !(k === "move" && f.accts.includes(x.toAccount))) return false;
     if (f.cats.length) {   // 분류만 고르면 그 분류 전체, 그 분류의 소분류를 하나라도 고르면 고른 소분류만
@@ -65,13 +65,18 @@ export function mountReport(root, env) {
     return true;
   }
   const subOf = (x) => (x.common && x.ccat ? x.ccat : x.sub) || "(소분류 없음)";   // ❤️ 공통비용은 소분류 대신 공통 분류(식비·문화생활…)로 묶음
+  // 💑 내 몫으로 보기(왼쪽 메뉴 버튼, settings.moneyMine)가 켜져 있으면 다른 탭처럼: 💙 공통비용은 절반, 💚 욱진입금은 수입에서 뺌 (2026-10-27 냐냐 요청)
+  const mine = () => !!(env.mineOn && env.mineOn());
+  const amt = (x) => (env.cntAmt ? env.cntAmt(x) : Number(x.amount) || 0);
+  const mineSkip = (x) => mine() && env.isSettleIn && env.isSettleIn(x);
+  const mineNote = () => mine() ? '<p class="rpt-mine">💑 내 몫으로 보는 중 — 💙 공통비용은 절반만, 💚 욱진입금은 수입에서 뺐어요 (왼쪽 메뉴에서 끄기)</p>' : "";
   const kOf = (x) => (x.kind === "income" ? "income" : x.kind === "move" ? "move" : "expense");
   function compute(f, r) {
     const list = [];
     S.money.forEach((x, id) => { if (match(x, f, r)) list.push({ id, ...x }); });
     list.sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
     let inc = 0, exp = 0, mv = 0;
-    list.forEach((x) => { const a = Number(x.amount) || 0, k = kOf(x); if (k === "income") inc += a; else if (k === "move") mv += a; else exp += a; });
+    list.forEach((x) => { const a = amt(x), k = kOf(x); if (k === "income") inc += a; else if (k === "move") mv += a; else exp += a; });
     return { list, inc, exp, mv };
   }
   // 대표 금액: 수입·지출 둘 다면 쓴 돈(지출 − 수입) 또는 남은 돈(수입 − 지출), 하나면 그것
@@ -119,7 +124,7 @@ export function mountReport(root, env) {
         `<span class="rpt-cv"><small>${esc(h.l)}</small><b class="won ${h.c}">${won(h.v)}</b></span>` +
         `<span class="rpt-cc">${esc(condList(f).join(" · "))} · ${c.list.length.toLocaleString()}건</span></button>`;
     }).join("");
-    return `<div class="rpt-lhead"><h2>📑 보고서</h2><span class="muted small">자주 보는 조건을 저장해 두고 눌러서 봐요</span></div>
+    return mineNote() + `<div class="rpt-lhead"><h2>📑 보고서</h2><span class="muted small">자주 보는 조건을 저장해 두고 눌러서 봐요</span></div>
       <div class="rpt-cards">${cards}<button type="button" class="rpt-card rpt-new" data-rf="new"><b>＋ 새 보고서</b><span class="muted small">기간 · 분류 · 자산을 골라서 만들어요</span></button></div>
       ${sv.length ? "" : `<div class="rpt-tpl"><span class="muted small">예시로 시작</span>${TPL.map(([n], i) => `<button type="button" class="chip" data-rf="tpl" data-k="${i}">${esc(n)}</button>`).join("")}</div>`}`;
   }
@@ -129,8 +134,8 @@ export function mountReport(root, env) {
     const kinds = ["expense", "income"].filter((k) => f.kinds.includes(k) && c.list.some((x) => kOf(x) === k));
     if (!kinds.includes(st.pk)) { st.pk = kinds[0] || null; st.pick = st.psub = null; }
     const pk = st.pk, kl = pk ? c.list.filter((x) => kOf(x) === pk) : [];
-    const byCat = {}; kl.forEach((x) => { const cn = x.cat || "(분류 없음)", o = (byCat[cn] ||= { amt: 0, n: 0, subs: {} }), a = Number(x.amount) || 0, sn = subOf(x); o.amt += a; o.n++; (o.subs[sn] ||= { amt: 0, n: 0 }); o.subs[sn].amt += a; o.subs[sn].n++; });
-    const cats = Object.entries(byCat).sort((a, b) => b[1].amt - a[1].amt), ktot = kl.reduce((t, x) => t + (Number(x.amount) || 0), 0);
+    const byCat = {}; kl.forEach((x) => { const cn = x.cat || "(분류 없음)", o = (byCat[cn] ||= { amt: 0, n: 0, subs: {} }), a = amt(x), sn = subOf(x); o.amt += a; o.n++; (o.subs[sn] ||= { amt: 0, n: 0 }); o.subs[sn].amt += a; o.subs[sn].n++; });
+    const cats = Object.entries(byCat).sort((a, b) => b[1].amt - a[1].amt), ktot = kl.reduce((t, x) => t + (amt(x)), 0);
     if (st.pick && !byCat[st.pick]) st.pick = st.psub = null;
     if (st.psub && !(byCat[st.pick].subs[st.psub])) st.psub = null;
     // 분류가 하나뿐이면 원형은 소분류로
@@ -147,18 +152,18 @@ export function mountReport(root, env) {
     const pl = st.pick ? kl.filter((x) => (x.cat || "(분류 없음)") === st.pick && (!st.psub || subOf(x) === st.psub)) : c.list;
     const shown = st.mon ? pl.filter((x) => x.date.slice(0, 7) === st.mon) : pl;
     const both = !st.pick && f.kinds.includes("income") && f.kinds.includes("expense");
-    const byMon = {}; pl.forEach((x) => { const m = x.date.slice(0, 7), o = (byMon[m] ||= { inc: 0, exp: 0, n: 0 }), a = Number(x.amount) || 0, k = kOf(x); if (k === "income") o.inc += a; else if (k === "expense") o.exp += a; o.n++; });
+    const byMon = {}; pl.forEach((x) => { const m = x.date.slice(0, 7), o = (byMon[m] ||= { inc: 0, exp: 0, n: 0 }), a = amt(x), k = kOf(x); if (k === "income") o.inc += a; else if (k === "expense") o.exp += a; o.n++; });
     const mVal = (o) => both ? o.exp - o.inc : pk === "income" && st.pick ? o.inc : st.pick ? o.exp : f.kinds.includes("expense") ? o.exp : o.inc;
     const months = Object.keys(byMon).sort();
     if (st.mon && !byMon[st.mon]) st.mon = null;
-    const sm = { inc: 0, exp: 0, n: 0 }; shown.forEach((x) => { const a = Number(x.amount) || 0, k = kOf(x); if (k === "income") sm.inc += a; else if (k === "expense") sm.exp += a; });
+    const sm = { inc: 0, exp: 0, n: 0 }; shown.forEach((x) => { const a = amt(x), k = kOf(x); if (k === "income") sm.inc += a; else if (k === "expense") sm.exp += a; });
     const headName = (st.pick ? `${st.pick}${st.psub ? " › " + st.psub : ""}` : both ? h.l : `${KIND[pk] || "이체"} 전체`) + (st.mon ? ` · ${+st.mon.slice(5)}월` : "");
     const headV = mVal(sm);
     const unit = period(f).unit, canNext = r.to < today0;
     // 달마다 막대 (최근 24달)
     st._chart = months.length > 1 ? { bars: true, label: both ? "달마다 쓴 돈 (지출 − 수입)" : "달마다 금액",
       pts: months.slice(-24).map((m) => { const v = mVal(byMon[m]); return { lab: `${+m.slice(5)}월`, v, on: st.mon === m, tip: `${dot(m)} ${wonS(v)}` }; }) } : null;
-    return `<div class="rpt-top">
+    return mineNote() + `<div class="rpt-top">
         <button type="button" class="btn ghost small" data-rf="back">‹ 보고서</button>
         <h2 class="rpt-title">${esc(st.name || "새 보고서")}${isNew ? ' <span class="rpt-badge">저장 안 함</span>' : dt ? ' <span class="rpt-badge">바뀜</span>' : ""}</h2>
         <span class="rpt-acts">${dt ? '<button type="button" class="btn small" data-rf="save">💾 저장</button>' : ""}
@@ -206,9 +211,9 @@ export function mountReport(root, env) {
   function yearData(y) {
     const z = () => Array(12).fill(0), D = { income: { tot: z(), cats: {} }, expense: { tot: z(), cats: {} } }, ys = String(y);
     S.money.forEach((x) => {
-      if (!x || !env.isWon(x) || !x.date || x.date.slice(0, 4) !== ys) return;
+      if (!x || !env.isWon(x) || !x.date || x.date.slice(0, 4) !== ys || mineSkip(x)) return;
       const k = kOf(x); if (k === "move") return;
-      const i = +x.date.slice(5, 7) - 1, a = Number(x.amount) || 0, g = D[k], cn = x.cat || "(분류 없음)", c = (g.cats[cn] ||= { v: z(), subs: {} });
+      const i = +x.date.slice(5, 7) - 1, a = amt(x), g = D[k], cn = x.cat || "(분류 없음)", c = (g.cats[cn] ||= { v: z(), subs: {} });
       g.tot[i] += a; c.v[i] += a; (c.subs[subOf(x)] ||= z())[i] += a;
     });
     return D;
@@ -243,7 +248,7 @@ export function mountReport(root, env) {
         <div class="yr-chart" data-yb="${k}"></div>${cats.length ? yTable(label, rows, g.tot) : `<p class="muted small" style="margin:0">${y}년 ${label} 기록이 없어요.</p>`}</div>`;
     };
     st._bars.all = { series: [{ name: "수입", cls: "income", vals: inc }, { name: "지출", cls: "expense", vals: exp }] };
-    return `<div class="rpt-top">
+    return mineNote() + `<div class="rpt-top">
         <button type="button" class="btn ghost small" data-rf="back">‹ 보고서</button>
         <h2 class="rpt-title">📅 연간 보고서</h2>
         <span class="rpt-acts"><button type="button" class="btn ghost small" data-rf="print" title="인쇄">🖨 인쇄</button></span>
