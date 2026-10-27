@@ -303,6 +303,59 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
   .rpt-ed-foot { padding: 10px 14px 14px; }
   .rpt-ed-btns { width: 100%; } .rpt-ed-btns .btn { flex: 1; }
 }
+/* 📅 연간 보고서 (report.js annualHtml) — 편한가계부 연간 보고서처럼: 막대 + 달마다 표 */
+.rpt-annual { border-color: color-mix(in srgb, var(--coral, #f0604d) 45%, var(--line)); }
+.rpt-annual .rpt-badge { font-size: 11px; vertical-align: 2px; }
+.yr-nav { display: flex; align-items: center; gap: 8px; } .yr-nav b { font-size: 17px; min-width: 64px; text-align: center; } .yr-nav .chip:disabled { opacity: .35; cursor: default; }
+.yr-sum { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.yr-sum .stat b { font-size: 20px; }
+.yr-sec { display: grid; gap: 10px; min-width: 0; }
+.yr-sh { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.yr-sh h3 { margin: 0; font-size: 16px; }
+.yr-cmp { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+.yr-cmp input { width: 15px; height: 15px; margin: 0; accent-color: var(--coral, #f0604d); }
+.yr-leg { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.yr-leg i, .yr-tip i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.yr-leg i + i, .yr-leg i:not(:first-child) { margin-left: 6px; }
+.yr-leg i.income, .yr-tip i.income { background: var(--danger); } .yr-leg i.expense, .yr-tip i.expense { background: var(--blue); } .yr-tip i.prev { background: #C3C7CF; }
+.yr-chart { position: relative; min-width: 0; }
+.yr-chart svg { display: block; }
+.yr-chart line { stroke: var(--line); stroke-width: 1; } .yr-chart line.z { stroke: var(--muted); stroke-opacity: .5; }
+.yr-chart text { fill: var(--muted); font-size: 11px; font-family: var(--f-body); }
+.yr-chart text.yl { text-anchor: end; } .yr-chart text.xl { text-anchor: middle; }
+.yr-chart rect.b.income { fill: var(--danger); } .yr-chart rect.b.expense { fill: var(--blue); } .yr-chart rect.b.prev { fill: #C3C7CF; }
+.yr-chart rect.hit { fill: transparent; cursor: pointer; } .yr-chart rect.hit.on { fill: var(--muted); fill-opacity: .07; }
+.yr-tip { position: absolute; top: 6px; z-index: 3; min-width: 140px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 6px 18px rgba(10, 16, 28, .14); font-size: 12.5px; display: grid; gap: 3px; pointer-events: none; white-space: nowrap; }
+.yr-tip div { display: flex; align-items: center; gap: 6px; }
+.yr-tw { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.yr-t { width: 100%; min-width: 1280px; table-layout: fixed; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.yr-t th, .yr-t td { padding: 7px 6px; border-bottom: 1px solid var(--line); border-left: 1px solid var(--line); white-space: nowrap; }
+.yr-t thead th { background: var(--sunk); color: var(--muted); font-weight: 600; text-align: center; }
+.yr-t td { text-align: right; }
+.yr-t tbody th, .yr-t tfoot th { position: sticky; left: 0; z-index: 1; background: var(--surface); text-align: left; font-weight: 500; overflow: hidden; border-left: 0; }
+.yr-t thead th:first-child { position: sticky; left: 0; z-index: 2; border-left: 0; width: 120px; }
+.yr-t thead th:nth-last-child(-n+2) { width: 8%; }   /* 평균·합계는 조금 넓게 */
+.yr-t td { overflow: hidden; text-overflow: ellipsis; }
+.yr-t tbody th { display: table-cell; }
+.yr-t tbody th span { display: inline-block; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.yr-t tbody th i { font-style: normal; color: var(--muted); font-size: 11px; float: right; margin-left: 4px; }
+.yr-t tr[data-rf] { cursor: pointer; }
+.yr-t tbody tr:hover td, .yr-t tbody tr:hover th { background: var(--coral-soft); }
+.yr-t tr.yr-sub th, .yr-t tr.yr-sub td { color: var(--muted); font-size: 12px; background: color-mix(in srgb, var(--sunk) 50%, var(--surface)); }
+.yr-t tr.yr-sub th { padding-left: 22px; }
+.yr-t .yr-avg, .yr-t .yr-sum { background: color-mix(in srgb, var(--sunk) 60%, transparent); }
+.yr-t .yr-sum { font-weight: 600; }
+.yr-t tfoot th, .yr-t tfoot td { font-weight: 700; background: var(--sunk); border-bottom: 0; }
+.yr-t tr.yr-net th, .yr-t tr.yr-net td { font-weight: 600; }
+.yr-t tbody tr:last-child th, .yr-t tbody tr:last-child td { border-bottom: 0; } .yr-t tfoot tr th, .yr-t tfoot tr td { border-top: 1px solid var(--line); }
+@media (max-width: 720px) { .yr-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } .yr-sum .stat:last-child { grid-column: 1 / -1; } }
+/* 🖨 인쇄: 메뉴·버튼 빼고 보고서만 */
+@media print {
+  body { padding: 0 !important; background: #fff; }
+  .side, .m-bottom, .m-top, .topbar, header, #toast, .rpt-top .btn, .yr-nav .chip, .local-bar, .ver-bar { display: none !important; }
+  .yr-tw { overflow: visible; } .yr-t { min-width: 0; font-size: 9.5px; } .yr-t th, .yr-t td { padding: 3px 4px; }
+  .yr-sec { break-inside: avoid; }
+}
 .nav a.m-nav[hidden] { display: none !important; }   /* 숨긴 메뉴 (📑 보고서, 2026-10-26) */
 /* 📈 그래프 점(칸)을 누르면 뜨는 상자 (자산 전체: 그 달 합계·자산·부채) */
 .as-chart { position: relative; }

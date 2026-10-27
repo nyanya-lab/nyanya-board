@@ -27,7 +27,7 @@ export function mountReport(root, env) {
   const norm = (f = {}) => ({ per: f.per != null ? f.per : f.from ? "" : "이번 달", from: f.from || ymd(new Date(Y, M, 1)), to: f.to || today0,
     kinds: f.kinds && f.kinds.length ? f.kinds.slice() : ["expense", "income"], accts: (f.accts || []).slice(), cats: (f.cats || []).slice(), q: f.q || "", common: f.common || "all" });
   // 보는 중: id(저장한 보고서, 새 것이면 null) · name · f · sh(기간 ‹ › 몇 칸) · pk(원형 수입/지출) · pick(분류) · psub(소분류) · mon(그 달만) · more(내역 더 보기)
-  const st = { f: null, id: null, name: "", sh: 0, pk: null, pick: null, psub: null, mon: null, more: 0 };
+  const st = { yr: null, yopen: {}, f: null, id: null, name: "", sh: 0, pk: null, pick: null, psub: null, mon: null, more: 0 };
   let ed = null;   // ✏️ 조건 창에서 고치는 중: { id, name, f, q(분류 찾기), aq(자산 찾기), open{}, acOpen }
 
   // ---------- 기간 ----------
@@ -103,12 +103,16 @@ export function mountReport(root, env) {
   function render() {
     if (!root.offsetParent && root.innerHTML) return;   // 다른 탭일 땐 안 그림 (보고서 탭으로 오면 다시)
     if (st.f && st.id) { if (savedOf(st.id)) st.seen = true; else if (st.seen) { st.f = null; st.id = null; } }   // 다른 기기에서 지움 (막 저장해서 아직 안 들어온 건 그대로)
-    root.innerHTML = st.f ? detailHtml() : listHtml();
-    if (st.f) afterDetail();
+    root.innerHTML = st.yr ? annualHtml() : st.f ? detailHtml() : listHtml();
+    if (st.yr) afterAnnual(); else if (st.f) afterDetail();
   }
   function listHtml() {
-    const sv = saved();
-    const cards = sv.map(([id, s]) => {
+    const sv = saved(), yd = yearData(Y), yi = sum(yd.income.tot), ye = sum(yd.expense.tot);
+    const annual = `<button type="button" class="rpt-card rpt-annual" data-rf="annual"><span class="rpt-cn">📅 연간 보고서 <small class="rpt-badge">기본</small></span>` +
+      `<span class="rpt-cp">${Y}년 · 달마다 수입 · 지출 · 분류별 표</span>` +
+      `<span class="rpt-cv"><small>합계 (수입 − 지출)</small><b class="won ${yi - ye < 0 ? "minus" : "plus"}">${wonS(yi - ye)}</b></span>` +
+      `<span class="rpt-cc">수입 ${won(yi)} · 지출 ${won(ye)}</span></button>`;
+    const cards = annual + sv.map(([id, s]) => {
       const f = norm(s.f), r = period(f), c = compute(f, r), h = headOf(f, c);
       return `<button type="button" class="rpt-card" data-rf="open" data-k="${esc(id)}"><span class="rpt-cn">${esc(s.name)}</span>` +
         `<span class="rpt-cp">📅 ${esc(f.per || "직접")} <span>· ${esc(perText(r))}</span></span>` +
@@ -193,6 +197,103 @@ export function mountReport(root, env) {
   function afterDetail() {
     const el = root.querySelector("[data-rf-chart]");
     if (el && st._chart && env.chart) env.chart(el, st._chart);
+  }
+
+  // ---------- 📅 연간 보고서 (기본, 지울 수 없음) — 편한가계부 '연간 보고서'처럼 (2026-10-26 냐냐 요청) ----------
+  // 해 ‹ › · 수입/지출/합계 · [전체] 달마다 수입·지출 막대 + 표(수입·지출·합계) · [수입]·[지출] 막대(☑ 전년도 비교 = 작년 회색 막대) + 분류별 표(▾ 소분류)
+  // 평균 = 합계 ÷ 12 (편한가계부와 같게), 이체는 빼고, 💝 보낸 돈은 지출에, 원화만
+  const sum = (a) => a.reduce((t, v) => t + v, 0);
+  function yearData(y) {
+    const z = () => Array(12).fill(0), D = { income: { tot: z(), cats: {} }, expense: { tot: z(), cats: {} } }, ys = String(y);
+    S.money.forEach((x) => {
+      if (!x || !env.isWon(x) || !x.date || x.date.slice(0, 4) !== ys) return;
+      const k = kOf(x); if (k === "move") return;
+      const i = +x.date.slice(5, 7) - 1, a = Number(x.amount) || 0, g = D[k], cn = x.cat || "(분류 없음)", c = (g.cats[cn] ||= { v: z(), subs: {} });
+      g.tot[i] += a; c.v[i] += a; (c.subs[subOf(x)] ||= z())[i] += a;
+    });
+    return D;
+  }
+  let cmpMemo = null;
+  const cmpOf = () => { if (cmpMemo) return cmpMemo; try { cmpMemo = JSON.parse(localStorage.getItem("nyanya-rpt-cmp") || "{}") || {}; } catch (e) { cmpMemo = {}; } return cmpMemo; };
+  const num = (v) => { v = Math.round(v); return v ? v.toLocaleString("ko-KR") : ""; };
+  function yTable(head, rows, foot) {   // rows = [{name, vals, cls, key, sub, open, can}]
+    const cells = (vals) => vals.map((v) => `<td>${num(v)}</td>`).join("") + `<td class="yr-avg">${num(sum(vals) / 12)}</td><td class="yr-sum">${num(sum(vals))}</td>`;
+    return `<div class="yr-tw"><table class="yr-t"><thead><tr><th>${esc(head)}</th>${Array.from({ length: 12 }, (_, i) => `<th>${i + 1}월</th>`).join("")}<th>평균</th><th>합계</th></tr></thead><tbody>` +
+      rows.map((r) => `<tr class="${r.cls || ""}"${r.key ? ` data-rf="yopen" data-k="${esc(r.key)}"` : ""}><th title="${esc(r.name)}"><span>${esc(r.name)}</span>${r.can ? `<i aria-hidden="true">${r.open ? "▴" : "▾"}</i>` : ""}</th>${cells(r.vals)}</tr>`).join("") +
+      `</tbody>${foot ? `<tfoot><tr><th>합계</th>${cells(foot)}</tr></tfoot>` : ""}</table></div>`;
+  }
+  function annualHtml() {
+    const y = st.yr, D = yearData(y), P = yearData(y - 1), inc = D.income.tot, exp = D.expense.tot, ti = sum(inc), te = sum(exp), cmp = cmpOf();
+    let first = Y; S.money.forEach((x) => { if (x && x.date) { const yy = +x.date.slice(0, 4); if (yy && yy < first) first = yy; } });
+    st._bars = {};
+    const sec = (k, label) => {
+      const g = D[k], cats = Object.entries(g.cats).sort((a, b) => sum(b[1].v) - sum(a[1].v));
+      st._bars[k] = { series: (cmp[k] ? [{ name: `${y - 1}년`, cls: "prev", vals: P[k].tot }] : []).concat([{ name: cmp[k] ? `${y}년` : label, cls: k, vals: g.tot }]) };
+      const rows = [];
+      cats.forEach(([cn, c]) => {
+        const subs = Object.entries(c.subs).sort((a, b) => sum(b[1]) - sum(a[1])), can = !(subs.length === 1 && subs[0][0] === "(소분류 없음)"), key = `${k}|${cn}`, open = can && !!st.yopen[key];
+        rows.push({ name: cn, vals: c.v, key: can ? key : "", can, open, cls: "yr-cat" });
+        if (open) subs.forEach(([sn, v]) => rows.push({ name: sn, vals: v, cls: "yr-sub" }));
+      });
+      return `<div class="panel yr-sec"><div class="yr-sh"><h3>${label}</h3><label class="yr-cmp"><input type="checkbox" data-rf="ycmp" data-k="${k}"${cmp[k] ? " checked" : ""}> 전년도 비교</label></div>
+        <div class="yr-chart" data-yb="${k}"></div>${cats.length ? yTable(label, rows, g.tot) : `<p class="muted small" style="margin:0">${y}년 ${label} 기록이 없어요.</p>`}</div>`;
+    };
+    st._bars.all = { series: [{ name: "수입", cls: "income", vals: inc }, { name: "지출", cls: "expense", vals: exp }] };
+    return `<div class="rpt-top">
+        <button type="button" class="btn ghost small" data-rf="back">‹ 보고서</button>
+        <h2 class="rpt-title">📅 연간 보고서</h2>
+        <span class="rpt-acts"><button type="button" class="btn ghost small" data-rf="print" title="인쇄">🖨 인쇄</button></span>
+      </div>
+      <div class="yr-nav"><button type="button" class="chip" data-rf="ysh" data-k="-1" aria-label="앞 해"${y <= first ? " disabled" : ""}>‹</button><b>${y}년</b><button type="button" class="chip" data-rf="ysh" data-k="1" aria-label="다음 해"${y >= Y ? " disabled" : ""}>›</button></div>
+      <div class="stats yr-sum">
+        <div class="stat"><span>수입</span><b class="won plus">${wonS(ti)}</b></div>
+        <div class="stat"><span>지출</span><b class="won minus">${wonS(te)}</b></div>
+        <div class="stat"><span>합계 (수입 − 지출)</span><b class="won">${wonS(ti - te)}</b></div>
+      </div>
+      <div class="panel yr-sec"><div class="yr-sh"><h3>전체</h3><span class="yr-leg"><i class="income"></i>수입 <i class="expense"></i>지출</span></div>
+        <div class="yr-chart" data-yb="all"></div>
+        ${yTable("전체", [{ name: "수입", vals: inc }, { name: "지출", vals: exp }, { name: "합계", vals: inc.map((v, i) => v - exp[i]), cls: "yr-net" }])}</div>
+      ${sec("income", "수입")}
+      ${sec("expense", "지출")}`;
+  }
+  // 막대: 달마다 묶음(수입·지출 또는 작년·올해), 칸에 마우스를 올리거나 누르면 그 달 상자
+  const axisW = (v) => { const a = Math.abs(v), s = v < 0 ? "-" : ""; return a >= 1e8 ? s + +(a / 1e8).toFixed(1) + "억" : a >= 1e4 ? s + +(a / 1e4).toFixed(0) + "만" : s + a; };
+  const nice = (raw) => { const p = Math.pow(10, Math.floor(Math.log10(raw || 1))), f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; };
+  function drawBars(el) {
+    const d = el._bars; if (!d) return;
+    const W = Math.max(280, el.clientWidth || 600), H = 220, L = 48, R = 6, T = 10, B = 24, pw = W - L - R, ph = H - T - B, f = (v) => v.toFixed(1);
+    el._w = Math.round(el.clientWidth);
+    const all = d.series.flatMap((s) => s.vals); let lo = Math.min(0, ...all), hi = Math.max(0, ...all); if (hi === lo) hi = lo + 10000;
+    const stp = nice((hi - lo) / 4); lo = Math.floor(lo / stp) * stp; hi = Math.ceil(hi / stp) * stp;
+    const yv = (v) => T + ph - (v - lo) / (hi - lo) * ph, cw = pw / 12, ns = d.series.length, bw = Math.min(28, cw * 0.72 / ns);
+    let s = "";
+    for (let v = lo; v <= hi + 1e-6; v += stp) s += `<line x1="${L}" x2="${W - R}" y1="${f(yv(v))}" y2="${f(yv(v))}"${v === 0 ? ' class="z"' : ""}/><text class="yl" x="${L - 6}" y="${f(yv(v) + 3.5)}">${axisW(v)}</text>`;
+    for (let i = 0; i < 12; i++) {
+      const x0 = L + cw * i + cw / 2 - bw * ns / 2;
+      d.series.forEach((se, j) => { const v = se.vals[i]; if (!v) return; s += `<rect class="b ${se.cls}" x="${f(x0 + bw * j)}" y="${f(Math.min(yv(v), yv(0)))}" width="${f(bw - 2)}" height="${f(Math.max(1.5, Math.abs(yv(0) - yv(v))))}" rx="2"/>`; });
+      s += `<text class="xl" x="${f(L + cw * i + cw / 2)}" y="${H - 6}">${i + 1}${cw < 38 ? "" : "월"}</text><rect class="hit" data-i="${i}" x="${f(L + cw * i)}" y="${T}" width="${f(cw)}" height="${ph}"/>`;
+    }
+    el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="달마다 막대">${s}</svg><div class="yr-tip" hidden></div>`;
+    if (el._bound) return; el._bound = true;
+    const show = (ev) => {
+      const r = ev.target.closest && ev.target.closest("rect.hit"), tip = el.querySelector(".yr-tip"), dd = el._bars; if (!tip || !dd) return;
+      el.querySelectorAll("rect.hit.on").forEach((x) => x.classList.remove("on"));
+      if (!r) { tip.hidden = true; return; }
+      const i = +r.dataset.i; r.classList.add("on");
+      tip.innerHTML = `<b>${i + 1}월</b>` + dd.series.map((se) => `<div><i class="${se.cls}"></i>${esc(se.name)}: <b>${won(se.vals[i])}</b></div>`).join("");
+      tip.hidden = false;
+      const cx = +r.getAttribute("x") + +r.getAttribute("width") / 2, w = tip.offsetWidth || 150;
+      tip.style.left = Math.max(4, Math.min(el.clientWidth - w - 4, cx + 10)) + "px";
+    };
+    el.addEventListener("mousemove", show); el.addEventListener("click", show);
+    el.addEventListener("mouseleave", () => { const t = el.querySelector(".yr-tip"); if (t) t.hidden = true; el.querySelectorAll("rect.hit.on").forEach((x) => x.classList.remove("on")); });
+  }
+  let barRO = null;
+  function afterAnnual() {
+    root.querySelectorAll("[data-yb]").forEach((el) => {
+      el._bars = st._bars[el.dataset.yb]; drawBars(el);
+      if (window.ResizeObserver) { barRO = barRO || new ResizeObserver((es) => es.forEach((e) => { const w = Math.round(e.contentRect.width); if (w && w !== e.target._w) drawBars(e.target); })); barRO.observe(el); }
+    });
   }
 
   // ---------- ✏️ 조건 창 ----------
@@ -314,7 +415,12 @@ export function mountReport(root, env) {
     if (k === "open") { const s = savedOf(v); if (!s) return; Object.assign(st, { f: norm(s.f), id: v, name: s.name, seen: true, sh: 0, pk: null, pick: null, psub: null, mon: null, more: 0 }); scrollTo(0, 0); }
     else if (k === "new") { openEd(null, "", norm({})); return; }
     else if (k === "tpl") { const t = TPL[+v]; if (t) openEd(null, t[0], norm(t[1])); return; }
-    else if (k === "back") { st.f = null; st.id = null; }
+    else if (k === "back") { st.f = null; st.id = null; st.yr = null; }
+    else if (k === "annual") { st.yr = Y; scrollTo(0, 0); }
+    else if (k === "ysh") st.yr += +v;
+    else if (k === "ycmp") { const c = cmpOf(); c[v] = !c[v]; try { localStorage.setItem("nyanya-rpt-cmp", JSON.stringify(c)); } catch (err) { /* 무시 */ } }
+    else if (k === "yopen") st.yopen[v] = !st.yopen[v];
+    else if (k === "print") { window.print(); return; }
     else if (k === "edit") { openEd(st.id, st.name, st.f); return; }
     else if (k === "copy") { openEd(null, `${st.name} 복사본`, st.f, true); return; }
     else if (k === "save") { if (!st.id) { openEd(null, st.name, st.f, true); return; } await saveReport(st.id, st.name, st.f); }

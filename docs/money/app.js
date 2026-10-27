@@ -14,7 +14,7 @@ import { startVerCheck } from "../vercheck.js?v=20261022a";
 import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
 import { mountCardImport } from "./cardimport.js?v=20261022d";
-import { mountReport } from "./report.js?v=20261026e";
+import { mountReport } from "./report.js?v=20261026g";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
