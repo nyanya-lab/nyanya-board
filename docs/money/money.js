@@ -400,6 +400,7 @@ export function renderPlan(m, r) {
   $("planCatList").innerHTML = moneyCats("expense").filter((c) => !planned.has(c)).map((c) => `<option value="${esc(c)}">`).join("");
 }
 
+export const curMonth = () => ui.month;   // 냐냐: 📝 이번 달 정리(summary.js)가 예산 탭에서 고른 달을 읽음
 export function monthTotals(m, range) {   // range = {from, to} 이면 그 기간 (내역 기간 고르기)
   const r = { inc: 0, out: 0, exp: 0, byCat: {}, items: [], settleIn: 0 };
   S.money.forEach((x, id) => {

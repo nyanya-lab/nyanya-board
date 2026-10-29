@@ -372,3 +372,15 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 .ch-box { position: absolute; top: 4px; z-index: 3; min-width: 150px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 6px 18px rgba(10, 16, 28, .14); font-size: 13px; display: grid; gap: 2px; pointer-events: none; }
 .ch-box b { font-size: 12px; color: var(--muted); font-weight: 600; }
 .ch-box div { display: flex; justify-content: space-between; gap: 12px; white-space: nowrap; }
+
+/* 📝 이번 달 정리 (summary.js, 예산 탭) */
+.sm-panel { display: grid; gap: 12px; }
+.sm-sub { margin: 0; }
+#sumPanel { padding: 12px 16px; }
+.sm-line { display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; font-size: 14px; }
+.sm-line .sm-t { white-space: nowrap; } .sm-line .sm-txt { flex: 1 1 220px; min-width: 0; } .sm-line .muted { font-size: 12.5px; }
+.sm-line .btn { margin-left: auto; }
+.sm-list { display: grid; gap: 10px; font-size: 14px; line-height: 1.55; }
+.sm-li ul { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 2px; }
+.sm-li .muted { font-size: 12.5px; }
+.sm-good { color: var(--ok, #1a9a5b); } .sm-bad { color: var(--danger); }

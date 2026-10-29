@@ -27,7 +27,7 @@ export function mountReport(root, env) {
   const norm = (f = {}) => ({ per: f.per != null ? f.per : f.from ? "" : "이번 달", from: f.from || ymd(new Date(Y, M, 1)), to: f.to || today0,
     kinds: f.kinds && f.kinds.length ? f.kinds.slice() : ["expense", "income"], accts: (f.accts || []).slice(), cats: (f.cats || []).slice(), q: f.q || "", common: f.common || "all" });
   // 보는 중: id(저장한 보고서, 새 것이면 null) · name · f · sh(기간 ‹ › 몇 칸) · pk(원형 수입/지출) · pick(분류) · psub(소분류) · mon(그 달만) · more(내역 더 보기)
-  const st = { yr: null, yopen: {}, ysel: {}, f: null, id: null, name: "", sh: 0, pk: null, pick: null, psub: null, mon: null, more: 0 };
+  const st = { mo: null, yr: null, yopen: {}, ysel: {}, f: null, id: null, name: "", sh: 0, pk: null, pick: null, psub: null, mon: null, more: 0 };
   let ed = null;   // ✏️ 조건 창에서 고치는 중: { id, name, f, q(분류 찾기), aq(자산 찾기), open{}, acOpen }
 
   // ---------- 기간 ----------
@@ -108,8 +108,8 @@ export function mountReport(root, env) {
   function render() {
     if (!root.offsetParent && root.innerHTML) return;   // 다른 탭일 땐 안 그림 (보고서 탭으로 오면 다시)
     if (st.f && st.id) { if (savedOf(st.id)) st.seen = true; else if (st.seen) { st.f = null; st.id = null; } }   // 다른 기기에서 지움 (막 저장해서 아직 안 들어온 건 그대로)
-    root.innerHTML = st.yr ? annualHtml() : st.f ? detailHtml() : listHtml();
-    if (st.yr) afterAnnual(); else if (st.f) afterDetail();
+    root.innerHTML = st.mo ? monthHtml() : st.yr ? annualHtml() : st.f ? detailHtml() : listHtml();
+    if (st.mo) return; if (st.yr) afterAnnual(); else if (st.f) afterDetail();
   }
   function listHtml() {
     const sv = saved(), yd = yearData(Y), yi = sum(yd.income.tot), ye = sum(yd.expense.tot);
@@ -117,7 +117,13 @@ export function mountReport(root, env) {
       `<span class="rpt-cp">${Y}년 · 달마다 수입 · 지출 · 분류별 표</span>` +
       `<span class="rpt-cv"><small>합계 (수입 − 지출)</small><b class="won ${yi - ye < 0 ? "minus" : "plus"}">${wonS(yi - ye)}</b></span>` +
       `<span class="rpt-cc">수입 ${won(yi)} · 지출 ${won(ye)}</span></button>`;
-    const cards = annual + sv.map(([id, s]) => {
+    // 📝 월간 정리 (summary.js — 예산 탭 한 줄의 '자세히 ›'도 여기로)
+    const cm = today0.slice(0, 7), mc = env.summary ? env.summary.card(cm) : null;
+    const monthly = mc ? `<button type="button" class="rpt-card rpt-annual" data-rf="monthly"><span class="rpt-cn">📝 월간 정리 <small class="rpt-badge">기본</small></span>` +
+      `<span class="rpt-cp">${M + 1}월 1일~${now.getDate()}일 · 지난달 · 평소와 비교</span>` +
+      `<span class="rpt-cv"><small>쓴 돈</small><b class="won minus">${won(mc.exp)}</b></span>` +
+      `<span class="rpt-cc">${esc(mc.line)}</span></button>` : "";
+    const cards = annual + monthly + sv.map(([id, s]) => {
       const f = norm(s.f), r = period(f), c = compute(f, r), h = headOf(f, c);
       return `<button type="button" class="rpt-card" data-rf="open" data-k="${esc(id)}"><span class="rpt-cn">${esc(s.name)}</span>` +
         `<span class="rpt-cp">📅 ${esc(f.per || "직접")} <span>· ${esc(perText(r))}</span></span>` +
@@ -226,6 +232,17 @@ export function mountReport(root, env) {
     return `<div class="yr-tw"><table class="yr-t"><thead><tr><th>${esc(head)}</th>${Array.from({ length: 12 }, (_, i) => `<th>${i + 1}월</th>`).join("")}<th>평균</th><th>합계</th></tr></thead><tbody>` +
       rows.map((r) => `<tr class="${r.cls || ""}${r.on ? " on" : ""}"${r.sel ? ` data-rf="ysel" ${r.sel} title="누르면 위 그래프가 이 분류로"` : ""}><th title="${esc(r.name)}"><span>${esc(r.name)}</span>${r.can ? `<button type="button" class="yr-tg" data-rf="yopen" data-k="${esc(r.key)}" aria-label="소분류 ${r.open ? "접기" : "펼치기"}" aria-expanded="${r.open}">${r.open ? "▴" : "▾"}</button>` : ""}</th>${cells(r.vals)}</tr>`).join("") +
       `</tbody>${foot ? `<tfoot><tr><th>합계</th>${cells(foot)}</tr></tfoot>` : ""}</table></div>`;
+  }
+  // 📝 월간 정리 화면: 달 ‹ › + summary.js full
+  function monthHtml() {
+    const m = st.mo, cm = today0.slice(0, 7), first = (() => { let f = cm; S.money.forEach((x) => { if (x && x.date && x.date.slice(0, 7) < f) f = x.date.slice(0, 7); }); return f; })();
+    const sh = (k) => { const [y, mo] = m.split("-").map(Number); return ymd(new Date(y, mo - 1 + k, 1)).slice(0, 7); };
+    return `<div class="rpt-top">
+        <button type="button" class="btn ghost small" data-rf="back">‹ 보고서</button>
+        <h2 class="rpt-title">📝 월간 정리</h2>
+      </div>
+      <div class="yr-nav"><button type="button" class="chip" data-rf="msh" data-k="${sh(-1)}" aria-label="지난달"${m <= first ? " disabled" : ""}>‹</button><b>${m.slice(0, 4)}년 ${Number(m.slice(5))}월</b><button type="button" class="chip" data-rf="msh" data-k="${sh(1)}" aria-label="다음 달"${m >= cm ? " disabled" : ""}>›</button></div>
+      <div class="panel sm-panel">${env.summary.full(m)}</div>`;
   }
   function annualHtml() {
     const y = st.yr, D = yearData(y), P = yearData(y - 1), inc = D.income.tot, exp = D.expense.tot, ti = sum(inc), te = sum(exp), cmp = cmpOf();
@@ -424,7 +441,9 @@ export function mountReport(root, env) {
     if (k === "open") { const s = savedOf(v); if (!s) return; Object.assign(st, { f: norm(s.f), id: v, name: s.name, seen: true, sh: 0, pk: null, pick: null, psub: null, mon: null, more: 0 }); scrollTo(0, 0); }
     else if (k === "new") { openEd(null, "", norm({})); return; }
     else if (k === "tpl") { const t = TPL[+v]; if (t) openEd(null, t[0], norm(t[1])); return; }
-    else if (k === "back") { st.f = null; st.id = null; st.yr = null; }
+    else if (k === "back") { st.f = null; st.id = null; st.yr = null; st.mo = null; }
+    else if (k === "monthly") { st.mo = today0.slice(0, 7); scrollTo(0, 0); }
+    else if (k === "msh") st.mo = v;
     else if (k === "annual") { st.yr = Y; scrollTo(0, 0); }
     else if (k === "ysh") st.yr += +v;
     else if (k === "ycmp") { const c = cmpOf(); c[v] = !c[v]; try { localStorage.setItem("nyanya-rpt-cmp", JSON.stringify(c)); } catch (err) { /* 무시 */ } }
@@ -454,5 +473,7 @@ export function mountReport(root, env) {
     if (!v) { const r = period(st.f, st.sh); st.f.from = r.from; st.f.to = r.to; st.f.per = ""; st.sh = 0; openEd(st.id, st.name, st.f); render(); return; }
     st.f.per = v; st.sh = 0; st.mon = null; st.more = 0; render();
   });
-  return { render };
+  // 예산 탭 '📝 정리 › 자세히'에서 그 달로 바로
+  function openMonth(m) { Object.assign(st, { mo: m, yr: null, f: null, id: null }); root.innerHTML = ""; render(); scrollTo(0, 0); }
+  return { render, openMonth };
 }

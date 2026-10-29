@@ -6,7 +6,7 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261026e";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn } from "./money.js?v=20261027b";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab } from "./money.js?v=20261029a";
 import { mountRepeat } from "./repeat.js?v=20261021d";
 import { mountAcctSet } from "./acctset.js?v=20261026a";
 import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
@@ -14,7 +14,8 @@ import { startVerCheck } from "../vercheck.js?v=20261022a";
 import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
 import { mountCardImport } from "./cardimport.js?v=20261022d";
-import { mountReport } from "./report.js?v=20261027b";
+import { mountReport } from "./report.js?v=20261029a";
+import { mountSummary } from "./summary.js?v=20261029a";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -147,13 +148,13 @@ function fitPanels() {
   });
 }
 window.addEventListener("resize", fitPanels);
-document.addEventListener("click", (ev) => setTimeout(() => { fitPanels(); if (ev.target.closest && ev.target.closest('[data-act="mTab"]')) rpt.render(); }, 0));   // 탭을 바꾸면 (📑 보고서는 그 탭으로 올 때 그림)
+document.addEventListener("click", (ev) => setTimeout(() => { fitPanels(); if (ev.target.closest && ev.target.closest('[data-act="mTab"]')) rpt.render(); if (ev.target.closest && ev.target.closest('[data-act="month"], #mineBtn')) sm.render(); }, 0));   // 탭을 바꾸면 (📑 보고서는 그 탭으로 올 때 그림)
 function render() {
   if (!backend) return;
   $("todayMono").textContent = today().replace(/-/g, ".");
   renderMoney();
   bal.render();
-  rp.render(); rp.run(); ak.render(); ccm.render(); ci.render(); rpt.render();
+  rp.render(); rp.run(); ak.render(); ccm.render(); ci.render(); rpt.render(); sm.render();
   tripList();
   mirrorCommon();
   mirrorJoint();
@@ -337,8 +338,11 @@ const rp = mountRepeat($("repeatPanel"), { S, backend: () => backend, toast, act
   cats: (k) => { const c = (S.settings.moneyCats || {})[k]; return (c && c.length ? c : MONEY_CATS[k] || []).slice(); }, subs: subsOf, acctOpts: acctOptsHtml });
 // 🏷 예전 공통비용 기록 → 공통 분류로 옮기기 (가계부 설정 '분류', 다 옮기면 안 보임)
 const ccm = mountCcMigrate($("ccmPanel"), { S, backend: () => backend, toast, esc, won, ccOf, commonCatName, commonCats: () => uri.cats() });
+// 📝 이번 달 정리 — 예산 탭엔 한 줄 + [자세히 ›] → 📑 보고서 '월간 정리' 화면 (지난달·평소와 비교해서 문장으로)
+const sm = mountSummary($("sumPanel"), { S, esc, won, isWon, mineOn, cntAmt, monthTotals, planOf, month: curMonth,
+  openReport: (m) => { setMTab("report"); rpt.openMonth(m); } });
 // 📑 보고서 탭 (기간·자산·분류·검색으로 골라 보기, 저장한 보고서는 settings.reports)
-const rpt = mountReport($("reportRoot"), { S, backend: () => backend, toast, esc, won, isWon, acctName, subs: subsOf, chart: setChart, pie: pieHtml, txRow: (x) => txRow(x, false), mineOn, cntAmt, isSettleIn,
+const rpt = mountReport($("reportRoot"), { S, backend: () => backend, summary: sm, toast, esc, won, isWon, acctName, subs: subsOf, chart: setChart, pie: pieHtml, txRow: (x) => txRow(x, false), mineOn, cntAmt, isSettleIn,
   accts: () => sortedAccts(), cats: (k) => { const c = (S.settings.moneyCats || {})[k]; return (c && c.length ? c : MONEY_CATS[k] || []).slice(); } });
 // 🏦 자산 관리 (가계부 설정 탭) — 이름 · 계좌번호 · 메모 · 🙈 숨기기
 const ak = mountAcctSet($("acctSetPanel"), { S, backend: () => backend, toast, act, esc, rows });
