@@ -406,3 +406,17 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 .ex-add { display: flex; gap: 6px; } .ex-add input { flex: 1; min-width: 0; padding: 5px 8px; font-size: 13.5px; }
 .ex-new { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 6px; } .ex-new input { min-width: 0; font-size: 13.5px; padding: 6px 8px; }
 @media (max-width: 720px) { .ex-row { grid-template-columns: minmax(0, 1fr) auto; } .ex-btns { grid-column: 1 / -1; } .ex-new { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .ex-new input[name="n"] { grid-column: 1 / -1; } }
+
+/* 🔗 보험금 ↔ 병원비 잇기 · 🔔 위쪽 알림 (extras.js) */
+.ex-tiles { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); }
+.ex-link { border: 0; background: var(--mint-soft); color: var(--fg); border-radius: 999px; padding: 3px 9px; font: inherit; font-size: 12px; cursor: pointer; }
+.ex-open { border: 0; background: none; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ex-pk { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--sunk); cursor: pointer; font-size: 14px; }
+.ex-pk input { width: 18px; height: 18px; margin: 0; accent-color: var(--coral, #f0604d); }
+.ins-pop { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 101; width: max-content; display: flex; align-items: center; gap: 2px; max-width: calc(100% - 24px); padding: 4px 6px 4px 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: 0 8px 24px rgba(10, 16, 28, .18); font-size: 13.5px; }
+.ins-pop[hidden] { display: none; }
+.ins-go { border: 0; background: none; color: var(--fg); font: inherit; padding: 5px 10px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ins-go span { color: var(--coral, #f0604d); font-weight: 600; }
+.ins-x { border: 0; background: none; color: var(--muted); font-size: 17px; line-height: 1; padding: 4px 8px; cursor: pointer; }
+@media (max-width: 720px) { .ins-pop { top: 62px; font-size: 13px; } }
+@media print { .ins-pop { display: none !important; } }

@@ -443,7 +443,7 @@ export function mountReport(root, env) {
     else if (k === "tpl") { const t = TPL[+v]; if (t) openEd(null, t[0], norm(t[1])); return; }
     else if (k === "back") { st.f = null; st.id = null; st.yr = null; st.mo = null; st.ex = null; }
     else if (k === "claims" || k === "funds") { st.ex = k; scrollTo(0, 0); }
-    else if (env.extras && ["clf", "clp", "cls", "fdel"].includes(k)) { await env.extras.onClick(k, v, b); }
+    else if (env.extras && ["clf", "clp", "cls", "fdel", "clo", "cli"].includes(k)) { const go = await env.extras.onClick(k, v, b); if (!go) return; }
     else if (k === "monthly") { st.mo = today0.slice(0, 7); scrollTo(0, 0); }
     else if (k === "msh") st.mo = v;
     else if (k === "annual") { st.yr = Y; scrollTo(0, 0); }
@@ -477,6 +477,7 @@ export function mountReport(root, env) {
   });
   // 예산 탭 '📝 정리 › 자세히'에서 그 달로 바로
   root.addEventListener("submit", (e) => { if (env.extras && env.extras.onSubmit(e)) { const f = e.target; if (f.reset) f.reset(); } });
+  function openClaims() { Object.assign(st, { ex: "claims", mo: null, yr: null, f: null, id: null }); root.innerHTML = ""; render(); scrollTo(0, 0); }
   function openMonth(m) { Object.assign(st, { ex: null, mo: m, yr: null, f: null, id: null }); root.innerHTML = ""; render(); scrollTo(0, 0); }
-  return { render, openMonth };
+  return { render, openMonth, openClaims };
 }

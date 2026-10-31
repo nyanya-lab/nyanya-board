@@ -1369,14 +1369,16 @@ export function initMoney() {
     fresh.forEach((p) => { pics[p.id] = date; });
     const gone = Object.keys(old).filter((pid) => !(pid in pics));
     doc.pics = Object.keys(pics).length ? pics : null;
+    let savedId = null;
     act((async () => {
       const id = editing ? (await E.backend.update("money", id0, doc), id0) : await E.backend.add("money", { ...doc, createdAt: Date.now() });
+      savedId = id;
       for (const p of fresh) await E.backend.putPic(p.id, { full: p.full, thumb: p.thumb, money: id, kind: "money", title: doc.memo || doc.cat || "", date, at: Date.now() });
       for (const pid of gone) await E.backend.putPic(pid, null);
       if (wantSettle) await E.settleCommon(amount, id, { date, memo: doc.memo || doc.note || "이체", money: id });
       else if (wasSettle) await E.unsettleCommon(id);
     })(), settle ? `💸 정산했어요. ${settle.rest}` : wasSettle && !wantSettle ? "정산 장부에서 뺐어요." : editing ? "고쳤어요." : "기록했어요.")
-      .then(() => { const mm = shownMonth(doc); if (mm !== ui.month) ui.month = mm; resetMoneyForm(); }).catch(() => {});
+      .then(() => { const mm = shownMonth(doc); if (mm !== ui.month) ui.month = mm; resetMoneyForm(); if (E.onMoneySaved && savedId) E.onMoneySaved(savedId); }).catch(() => {});   // 냐냐: 🏥보험금 저장 → 병원비 고르는 창
   });
 
   $("acctForm").addEventListener("submit", (ev) => {
