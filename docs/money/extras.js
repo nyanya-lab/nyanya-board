@@ -2,7 +2,7 @@
 // 🏥 병원비(지출, 소분류에 병원·약국, ❤️ 공통 빼고) 마다 money/{id}/ins = "asked"(청구함) | "got"(받음) | "skip"(청구 안 함), 없으면 아직 표시 안 함. 금액은 안 바꿈.
 // 🔗 보험금 ↔ 병원비 잇기 (2026-11-01 냐냐 요청): 🏥보험금 수입을 저장하면 고르는 창 #insPick → 수입 money/{id}/insFor/{병원비 id} = true, 병원비 money/{id}/insBy/{수입 id} = true + ins "got".
 //    한 보험금에 병원비 여러 건, 병원비 하나에 보험금 여러 건(중복) 다 됨. 이어진 보험금을 지우면 그 병원비는 다시 '청구 전'으로 보임(statusOf). 금액은 안 바꿈.
-// 🔔 위쪽 알림(.ins-pop): 최근 3달 아직 못 받은 병원비(청구 전·청구함)가 있으면 띄움, ×는 이 기기에서 오늘만 닫음.
+// 🔔 못 받은 병원비: 최근 3달 청구 전·청구함이 있으면 왼쪽 메뉴 '가계부 설정' 아래 #insSide, 폰은 예산 탭 맨 위 #insPhone (떠 있는 알림이 내용을 가려서 2026-11-01 옮김).
 // 🎯 settings.funds/{id} = {name, goal, saved, date(목표일, 없어도 됨), at} — 통장 잔액과 상관없는 '봉투' 메모. 기록·잔액은 안 건드림.
 const ST = { asked: "청구함", got: "받음", skip: "청구 안 함" };
 export function mountExtras(env) {
@@ -148,24 +148,20 @@ export function mountExtras(env) {
   // 💰 기록 창에서 🏥보험금 수입을 저장한 뒤 (money.js E.onMoneySaved)
   function onSaved(id) { setTimeout(() => { const x = S.money.get(id); if (isIns(x)) pick(id); }, 300); }
 
-  // ---------- 🔔 위쪽 알림 ----------
-  const KEY = "nyanya-insbar";
-  let bar = null;
+  // ---------- 🔔 못 받은 병원비: 왼쪽 메뉴 '가계부 설정' 아래 #insSide + 폰은 예산 탭 #insPhone (폰 메뉴는 ≡ 안에 숨어 있어서) ----------
   function renderBar() {
     if (!S.loaded) return;
-    let shut = ""; try { shut = localStorage.getItem(KEY) || ""; } catch (e) { /* 무시 */ }
     const l = claims(fromOf(3)).filter((x) => ["", "asked"].includes(statusOf(x)));
-    const onClaims = document.querySelector(".ex-tile");   // 보험금 챙기기를 보는 중이면 안 띄움
-    if (!l.length || shut === ymd(new Date()) || (onClaims && onClaims.offsetParent)) { if (bar) bar.hidden = true; return; }
-    if (!bar) {
-      bar = document.createElement("div"); bar.className = "ins-pop"; bar.setAttribute("role", "status"); document.body.appendChild(bar);
-      bar.addEventListener("click", (e) => {
-        if (e.target.closest("[data-x]")) { try { localStorage.setItem(KEY, ymd(new Date())); } catch (err) { /* 무시 */ } bar.hidden = true; return; }
-        if (e.target.closest("[data-go]")) { bar.hidden = true; ui.show = ""; env.openClaims(); }
-      });
-    }
-    bar.hidden = false;
-    bar.innerHTML = `<button type="button" class="ins-go" data-go="1">🏥 아직 못 받은 병원비 <b>${l.length}건 ${won(total(l))}</b> <span>보기 ›</span></button><button type="button" class="ins-x" data-x="1" aria-label="오늘은 닫기" title="오늘은 닫기">×</button>`;
+    const html = l.length ? `<span>🏥 못 받은 병원비</span><b>${l.length}건 ${won(total(l))}</b>` : "";
+    const side = document.getElementById("insSide"), ph = document.getElementById("insPhone");
+    if (side) { side.hidden = !l.length; side.innerHTML = html; }
+    if (ph) ph.innerHTML = l.length ? `<button type="button" class="ins-side" data-ins-go="1">${html}<i>›</i></button>` : "";
   }
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#insSide, [data-ins-go]")) return;
+    const sc = document.querySelector('.scrim[data-act="menuClose"]');
+    if (sc && !sc.hidden) sc.click();   // 폰 메뉴가 열려 있으면 닫기
+    ui.show = ""; env.openClaims();
+  });
   return { claimCard, claimHtml, fundCard, fundHtml, onClick, onSubmit, onSaved, renderBar, pick };
 }

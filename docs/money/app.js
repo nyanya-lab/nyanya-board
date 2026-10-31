@@ -16,7 +16,7 @@ import { mountImport } from "./import.js?v=20261021b";
 import { mountCardImport } from "./cardimport.js?v=20261022d";
 import { mountReport } from "./report.js?v=20261101a";
 import { mountSummary } from "./summary.js?v=20261101a";
-import { mountExtras } from "./extras.js?v=20261101a";
+import { mountExtras } from "./extras.js?v=20261101b";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
