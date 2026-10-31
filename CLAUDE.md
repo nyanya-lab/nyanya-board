@@ -106,6 +106,7 @@ docs/google-sync.html     구글 캘린더 연결 안내 (Apps Script에 Code.gs
 docs/apps-script/Code.gs        냐냐 Apps Script에 넣는 짧은 로더 (한 번만 붙여넣음)
 docs/apps-script/sync-core.js   실제 구글 동기화 코드. 로더가 5분마다 받아서 실행 → 여기만 고치면 자동 적용 (CORE_VERSION 올리기)
 docs/manifest.webmanifest, *.png  홈 화면 앱 아이콘 = 냐냐 캐릭터(다운로드 '케릭터사진.png' 왼쪽 분홍 원, 2026-10-20). avatar.png = 둥근 로고(.logo-img). 바꾸면 ?v= 올리기
+docs/money/coin-*.png     💰 가계부 아이콘 = 같은 얼굴, 분홍 배경만 금색 + 오른쪽 아래 ₩ 동전(보드와 구분, 2026-11-01 냐냐가 시안 4개 중 고름, tools/make_coin_icon.py로 만듦). 메뉴 로고·브라우저 탭·홈 화면 아이콘(money/manifest.webmanifest)
 ```
 
 ## 데이터 (Firebase Realtime Database `nyanya-board`, 싱가포르)
