@@ -27,7 +27,7 @@ export function mountReport(root, env) {
   const norm = (f = {}) => ({ per: f.per != null ? f.per : f.from ? "" : "이번 달", from: f.from || ymd(new Date(Y, M, 1)), to: f.to || today0,
     kinds: f.kinds && f.kinds.length ? f.kinds.slice() : ["expense", "income"], accts: (f.accts || []).slice(), cats: (f.cats || []).slice(), q: f.q || "", common: f.common || "all" });
   // 보는 중: id(저장한 보고서, 새 것이면 null) · name · f · sh(기간 ‹ › 몇 칸) · pk(원형 수입/지출) · pick(분류) · psub(소분류) · mon(그 달만) · more(내역 더 보기)
-  const st = { mo: null, yr: null, yopen: {}, ysel: {}, f: null, id: null, name: "", sh: 0, pk: null, pick: null, psub: null, mon: null, more: 0 };
+  const st = { ex: null, mo: null, yr: null, yopen: {}, ysel: {}, f: null, id: null, name: "", sh: 0, pk: null, pick: null, psub: null, mon: null, more: 0 };
   let ed = null;   // ✏️ 조건 창에서 고치는 중: { id, name, f, q(분류 찾기), aq(자산 찾기), open{}, acOpen }
 
   // ---------- 기간 ----------
@@ -108,8 +108,8 @@ export function mountReport(root, env) {
   function render() {
     if (!root.offsetParent && root.innerHTML) return;   // 다른 탭일 땐 안 그림 (보고서 탭으로 오면 다시)
     if (st.f && st.id) { if (savedOf(st.id)) st.seen = true; else if (st.seen) { st.f = null; st.id = null; } }   // 다른 기기에서 지움 (막 저장해서 아직 안 들어온 건 그대로)
-    root.innerHTML = st.mo ? monthHtml() : st.yr ? annualHtml() : st.f ? detailHtml() : listHtml();
-    if (st.mo) return; if (st.yr) afterAnnual(); else if (st.f) afterDetail();
+    root.innerHTML = st.ex === "claims" ? env.extras.claimHtml() : st.ex === "funds" ? env.extras.fundHtml() : st.mo ? monthHtml() : st.yr ? annualHtml() : st.f ? detailHtml() : listHtml();
+    if (st.mo || st.ex) return; if (st.yr) afterAnnual(); else if (st.f) afterDetail();
   }
   function listHtml() {
     const sv = saved(), yd = yearData(Y), yi = sum(yd.income.tot), ye = sum(yd.expense.tot);
@@ -123,7 +123,7 @@ export function mountReport(root, env) {
       `<span class="rpt-cp">${M + 1}월 1일~${now.getDate()}일 · 지난달 · 평소와 비교</span>` +
       `<span class="rpt-cv"><small>쓴 돈</small><b class="won minus">${won(mc.exp)}</b></span>` +
       `<span class="rpt-cc">${esc(mc.line)}</span></button>` : "";
-    const cards = annual + monthly + sv.map(([id, s]) => {
+    const cards = annual + monthly + (env.extras ? env.extras.claimCard() + env.extras.fundCard() : "") + sv.map(([id, s]) => {
       const f = norm(s.f), r = period(f), c = compute(f, r), h = headOf(f, c);
       return `<button type="button" class="rpt-card" data-rf="open" data-k="${esc(id)}"><span class="rpt-cn">${esc(s.name)}</span>` +
         `<span class="rpt-cp">📅 ${esc(f.per || "직접")} <span>· ${esc(perText(r))}</span></span>` +
@@ -441,7 +441,9 @@ export function mountReport(root, env) {
     if (k === "open") { const s = savedOf(v); if (!s) return; Object.assign(st, { f: norm(s.f), id: v, name: s.name, seen: true, sh: 0, pk: null, pick: null, psub: null, mon: null, more: 0 }); scrollTo(0, 0); }
     else if (k === "new") { openEd(null, "", norm({})); return; }
     else if (k === "tpl") { const t = TPL[+v]; if (t) openEd(null, t[0], norm(t[1])); return; }
-    else if (k === "back") { st.f = null; st.id = null; st.yr = null; st.mo = null; }
+    else if (k === "back") { st.f = null; st.id = null; st.yr = null; st.mo = null; st.ex = null; }
+    else if (k === "claims" || k === "funds") { st.ex = k; scrollTo(0, 0); }
+    else if (env.extras && ["clf", "clp", "cls", "fdel"].includes(k)) { await env.extras.onClick(k, v, b); }
     else if (k === "monthly") { st.mo = today0.slice(0, 7); scrollTo(0, 0); }
     else if (k === "msh") st.mo = v;
     else if (k === "annual") { st.yr = Y; scrollTo(0, 0); }
@@ -474,6 +476,7 @@ export function mountReport(root, env) {
     st.f.per = v; st.sh = 0; st.mon = null; st.more = 0; render();
   });
   // 예산 탭 '📝 정리 › 자세히'에서 그 달로 바로
-  function openMonth(m) { Object.assign(st, { mo: m, yr: null, f: null, id: null }); root.innerHTML = ""; render(); scrollTo(0, 0); }
+  root.addEventListener("submit", (e) => { if (env.extras && env.extras.onSubmit(e)) { const f = e.target; if (f.reset) f.reset(); } });
+  function openMonth(m) { Object.assign(st, { ex: null, mo: m, yr: null, f: null, id: null }); root.innerHTML = ""; render(); scrollTo(0, 0); }
   return { render, openMonth };
 }

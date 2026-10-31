@@ -14,8 +14,9 @@ import { startVerCheck } from "../vercheck.js?v=20261022a";
 import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
 import { mountCardImport } from "./cardimport.js?v=20261022d";
-import { mountReport } from "./report.js?v=20261029a";
-import { mountSummary } from "./summary.js?v=20261029a";
+import { mountReport } from "./report.js?v=20261031a";
+import { mountSummary } from "./summary.js?v=20261031a";
+import { mountExtras } from "./extras.js?v=20261031a";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -149,12 +150,21 @@ function fitPanels() {
 }
 window.addEventListener("resize", fitPanels);
 document.addEventListener("click", (ev) => setTimeout(() => { fitPanels(); if (ev.target.closest && ev.target.closest('[data-act="mTab"]')) rpt.render(); if (ev.target.closest && ev.target.closest('[data-act="month"], #mineBtn')) sm.render(); }, 0));   // 탭을 바꾸면 (📑 보고서는 그 탭으로 올 때 그림)
+// 🔔 매달 1일 할 일 '지난달 가계부 정리 보기' (2026-11부터). 금액 없고 구글 캘린더엔 안 보냄(noGoogle). 지워도 다시 안 생김(settings.autoTasks)
+let reviewAsked = "";
+function reviewTask() {
+  const m = today().slice(0, 7), key = `mt-review-${m}`;
+  if (LOCAL || !S.loaded || !S.settings.createdAt || m < "2026-11" || reviewAsked === key || (S.settings.autoTasks || {})[key]) return;
+  reviewAsked = key;
+  Promise.all([backend.update("tasks", key, { title: "📝 지난달 가계부 정리 보기", repeat: "none", date: `${m}-01`, noPractice: true, noGoogle: true, createdAt: Date.now() }),
+    backend.saveSettingsDeep({ autoTasks: { [key]: true } })]).catch(() => { reviewAsked = ""; });
+}
 function render() {
   if (!backend) return;
   $("todayMono").textContent = today().replace(/-/g, ".");
   renderMoney();
   bal.render();
-  rp.render(); rp.run(); ak.render(); ccm.render(); ci.render(); rpt.render(); sm.render();
+  rp.render(); rp.run(); ak.render(); ccm.render(); ci.render(); rpt.render(); sm.render(); reviewTask();
   tripList();
   mirrorCommon();
   mirrorJoint();
@@ -339,10 +349,10 @@ const rp = mountRepeat($("repeatPanel"), { S, backend: () => backend, toast, act
 // 🏷 예전 공통비용 기록 → 공통 분류로 옮기기 (가계부 설정 '분류', 다 옮기면 안 보임)
 const ccm = mountCcMigrate($("ccmPanel"), { S, backend: () => backend, toast, esc, won, ccOf, commonCatName, commonCats: () => uri.cats() });
 // 📝 이번 달 정리 — 예산 탭엔 한 줄 + [자세히 ›] → 📑 보고서 '월간 정리' 화면 (지난달·평소와 비교해서 문장으로)
-const sm = mountSummary($("sumPanel"), { S, esc, won, isWon, mineOn, cntAmt, monthTotals, planOf, month: curMonth,
+const sm = mountSummary($("sumPanel"), { S, esc, won, isWon, mineOn, cntAmt, monthTotals, planOf, month: curMonth, balances, sortedAccts, toast, backend: () => backend,
   openReport: (m) => { setMTab("report"); rpt.openMonth(m); } });
 // 📑 보고서 탭 (기간·자산·분류·검색으로 골라 보기, 저장한 보고서는 settings.reports)
-const rpt = mountReport($("reportRoot"), { S, backend: () => backend, summary: sm, toast, esc, won, isWon, acctName, subs: subsOf, chart: setChart, pie: pieHtml, txRow: (x) => txRow(x, false), mineOn, cntAmt, isSettleIn,
+const rpt = mountReport($("reportRoot"), { S, backend: () => backend, summary: sm, extras: mountExtras({ S, esc, won, isWon, toast, backend: () => backend }), toast, esc, won, isWon, acctName, subs: subsOf, chart: setChart, pie: pieHtml, txRow: (x) => txRow(x, false), mineOn, cntAmt, isSettleIn,
   accts: () => sortedAccts(), cats: (k) => { const c = (S.settings.moneyCats || {})[k]; return (c && c.length ? c : MONEY_CATS[k] || []).slice(); } });
 // 🏦 자산 관리 (가계부 설정 탭) — 이름 · 계좌번호 · 메모 · 🙈 숨기기
 const ak = mountAcctSet($("acctSetPanel"), { S, backend: () => backend, toast, act, esc, rows });
