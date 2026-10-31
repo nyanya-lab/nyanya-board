@@ -374,7 +374,7 @@ export function renderPlan(m, r) {
         : r.out ? `${won(r.out)} 보냄 · 남은 ${won(give - r.out)} · 15일 자동 기록` : "15일에 자동으로 '보낸 돈' 기록";
       return `<div class="plan-tile give"><span>💝 ${esc(partner())}에게 ${auto || sent ? "준 돈 ✅" : "줄 돈"}${g.state === "ok" ? " ✔" : ""}</span><b>${give == null ? "아직 안 정함" : won(give)}</b><small>${sub}</small></div>`;
     })()) +
-    `<div class="plan-tile left${left < 0 ? " minus" : ""}"><span>잔액</span><b>${pl.income ? won(left) : "-"}</b><small>수입 − 쓸 돈${give == null ? "" : " − 줄 돈"}</small></div>`;
+    `<div class="plan-tile left${left < 0 ? " minus" : ""}"><span>잔액</span><b>${pl.income ? wonN(left) : "-"}</b><small>수입 − 쓸 돈${give == null ? "" : " − 줄 돈"}</small></div>`;
   $("planPie").innerHTML = pieHtml("expense", pl.items.map((v) => ({ cat: v.cat, amt: v.show })), "예산", { full: E.pieFull });
   if (document.activeElement !== $("planGive")) $("planGive").value = give == null ? "" : commaNum(give);
   const gf = $("planGiveFrom"), gfv = S.settings.giveFrom || "";

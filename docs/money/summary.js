@@ -81,8 +81,8 @@ export function mountSummary(root, env) {
       <div class="plan-tiles sm-tiles">
         <div class="plan-tile"><span>쓴 돈</span><b>${won(s.me.exp)}</b><small>평소보다 ${diffTxt(dAvg)}</small></div>
         <div class="plan-tile"><span>들어온 돈</span><b>${won(s.me.inc)}</b><small>지난달 ${man(s.prev.inc)}</small></div>
-        <div class="plan-tile${left < 0 ? " minus" : " left"}"><span>남은 돈</span><b>${left < 0 ? "−" : ""}${won(left)}</b><small>들어온 돈 − 쓴 돈</small></div>
-        <div class="plan-tile"><span>저축으로</span><b>${s.me.save < 0 ? "−" : ""}${won(s.me.save)}</b><small>저축·투자 통장으로 넘긴 돈</small></div>
+        <div class="plan-tile${left < 0 ? " minus" : " left"}"><span>남은 돈</span><b>${left < 0 ? "-" : ""}${won(left)}</b><small>들어온 돈 − 쓴 돈</small></div>
+        <div class="plan-tile"><span>저축으로</span><b>${s.me.save < 0 ? "-" : ""}${won(s.me.save)}</b><small>저축·투자 통장으로 넘긴 돈</small></div>
       </div>
       <div class="sm-list">${b.map((x) => `<div class="sm-li">${x}</div>`).join("")}</div>`;
   }
@@ -114,9 +114,9 @@ export function mountSummary(root, env) {
     S.money.forEach((x) => { if (!x || x.sub !== "이자" || x.kind !== "expense" || !planned.has(x.cat)) return; const mm = (x.date || "").slice(0, 7); if (mm === prevM) was += Number(x.amount) || 0; else if (mm === m) has = true; });
     return t + (has ? 0 : was);
   }
-  function daily(m, s) {
-    const t = ymd(new Date()), day = Number(t.slice(8)); if (m !== t.slice(0, 7) || !s.pl || !s.pl.items.length) return "";
-    const planned = new Set(s.pl.items.map((v) => v.cat)), used = [...planned].reduce((a, c) => a + (s.me.byCat[c] || 0), 0), fixed = pendingFixed(m, planned), days = lastDay(m) - day + 1, left = s.pl.total - used - fixed;
+  function daily(m) {   // 그 달 기록이 아직 없어도 보임
+    const t = ymd(new Date()), day = Number(t.slice(8)), pl = env.planOf(m); if (m !== t.slice(0, 7) || !pl.items.length) return "";
+    const byCat = env.monthTotals(m).byCat, planned = new Set(pl.items.map((v) => v.cat)), used = [...planned].reduce((a, c) => a + (byCat[c] || 0), 0), fixed = pendingFixed(m, planned), days = lastDay(m) - day + 1, left = pl.total - used - fixed;
     return `<div class="sm-line sm-day"><b class="sm-t">📅 오늘 쓸 수 있는 돈</b><span class="sm-txt">${left > 0 ? `하루 <b class="sm-big">${won(Math.floor(left / days))}</b>` : `<b class="sm-bad">이번 달 예산을 다 썼어요</b>`} <span class="muted">· 남은 예산 ${left < 0 ? "−" : ""}${man(left)} (곧 나갈 고정비 ${man(fixed)} 뺌) ÷ ${days}일</span></span></div>`;
   }
   // 💰 예산 탭: 오늘 쓸 돈 · 저축 목표 · 한 줄 + 자세히 ›
@@ -127,7 +127,7 @@ export function mountSummary(root, env) {
     let line = s.empty ? esc(s.empty) : headline(s);
     if (!s.empty && s.pl.items.length) line += ` <span class="muted">· 예산 ${s.pl.total ? Math.round(s.me.exp / s.pl.total * 100) : 0}% 씀${s.over.length ? ` · <span class="sm-bad">${s.over.length}개 분류 초과</span>` : ""}</span>`;
     if (root.contains(document.activeElement) && document.activeElement.tagName === "INPUT") return;   // 저축 목표를 적는 중엔 안 그림
-    root.innerHTML = daily(m, s) + saveRow(m) + `<div class="sm-line"><b class="sm-t">📝 ${mon}월 정리</b><span class="sm-txt">${line}</span>${s.empty ? "" : `<button type="button" class="btn ghost small" data-sm="more">자세히 ›</button>`}</div>`;
+    root.innerHTML = daily(m) + saveRow(m) + `<div class="sm-line"><b class="sm-t">📝 ${mon}월 정리</b><span class="sm-txt">${line}</span>${s.empty ? "" : `<button type="button" class="btn ghost small" data-sm="more">자세히 ›</button>`}</div>`;
   }
   root.addEventListener("click", (e) => { if (e.target.closest("[data-sm='more']")) env.openReport(env.month()); });
   root.addEventListener("change", (e) => {

@@ -6,7 +6,7 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261026e";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab } from "./money.js?v=20261029a";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab } from "./money.js?v=20261101a";
 import { mountRepeat } from "./repeat.js?v=20261021d";
 import { mountAcctSet } from "./acctset.js?v=20261026a";
 import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
@@ -15,7 +15,7 @@ import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
 import { mountCardImport } from "./cardimport.js?v=20261022d";
 import { mountReport } from "./report.js?v=20261031a";
-import { mountSummary } from "./summary.js?v=20261031a";
+import { mountSummary } from "./summary.js?v=20261101a";
 import { mountExtras } from "./extras.js?v=20261031a";
 
 const FB_VER = "10.12.2";
