@@ -151,7 +151,7 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 #ccmPanel.ccm-none { display: none !important; }   /* 다 옮기면 숨김 */
 /* 💳 카드 승인내역 올리기 미리보기 (cardimport.js) */
 .ci-tbl { display: grid; gap: 2px; font-size: 14px; max-height: 65vh; overflow-y: auto; }
-.ci-row { display: grid; grid-template-columns: 24px 84px minmax(0, 1.5fr) 84px minmax(0, 1fr) minmax(0, 1fr) minmax(0, .9fr) minmax(0, 1.2fr); gap: 8px; align-items: center; padding: 5px 8px; border-radius: 8px; background: var(--sunk); }
+.ci-row { display: grid; grid-template-columns: 24px 84px minmax(0, 1.5fr) 100px minmax(0, 1fr) minmax(0, 1fr) minmax(0, .9fr) minmax(0, 1.2fr); gap: 8px; align-items: center; padding: 5px 8px; border-radius: 8px; background: var(--sunk); }
 .ci-row select, .ci-row input[type="text"] { min-width: 0; width: 100%; font-size: 13px; padding: 4px 6px; }
 .ci-row.bad { background: var(--coral-soft); } .ci-row.off { opacity: .5; }
 .ci-th { background: none; color: var(--muted); font-size: 12px; }
@@ -166,6 +166,10 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
   .ci-row .ci-shop, .ci-th span:nth-child(3) { grid-column: span 2; }
   .ci-row > select[data-ci="cat"], .ci-row > input[data-ci="memo"] { grid-column: 2 / 4; } .ci-row > select[data-ci="sub"], .ci-row > input[data-ci="note"] { grid-column: 4 / 6; }
   .ci-th span:nth-child(n+5) { display: none; } .ci-have span:nth-child(5) { grid-column: 2 / 6; } }
+.ci-cut { border: 0; background: none; padding: 0 4px 0 0; font-size: 12px; cursor: pointer; opacity: .55; } .ci-cut:hover { opacity: 1; }   /* ✂️ 금액 나눠 적기 */
+.ci-cutrow { margin-left: 6px; box-shadow: inset 3px 0 0 var(--mint, #2ea77f); border-radius: 0; }
+.ci-row input.ci-amt-in { text-align: right; font-variant-numeric: tabular-nums; }
+.ci-amt[data-left] { line-height: 1.25; }
 .ci-mg { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; font-size: 11px; padding: 1px 8px; margin-left: 4px; cursor: pointer; color: var(--muted); }
 /* 💳 카드 승인내역 팝업 (내역 탭 💳 버튼) */
 .dlg.ci-dlg { max-width: 1500px; }
@@ -420,3 +424,16 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 .ins-phone { display: none; }
 @media (max-width: 720px) { .ins-phone:not(:empty) { display: block; } .ins-phone[hidden] { display: none; } .ins-phone .ins-side { flex-wrap: nowrap; } .ins-phone .ins-side b { margin-left: auto; } }
 @media print { .ins-side { display: none !important; } }
+
+/* 🎀 고르는 칸 (picker.js): 닫힌 칸은 둥글게 + 부드러운 화살표, 누르면 둥근 창에 알약 버튼 */
+select:not([multiple]) { appearance: none; -webkit-appearance: none; border-radius: 10px; padding-right: 24px !important; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%238a93a6' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; text-overflow: ellipsis; cursor: pointer; }
+select:disabled { cursor: default; opacity: .6; }
+.pk-pop { position: fixed; inset: auto; margin: 0; box-sizing: border-box; display: grid; align-content: start; gap: 10px; padding: 12px; overflow: auto; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 10px 30px rgba(23, 32, 51, .16); font-size: 13px; animation: pk-in .12s ease-out; }
+@keyframes pk-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .pk-pop { animation: none; } }
+.pk-h { margin: 0 0 5px 2px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.pk-l { display: flex; flex-wrap: wrap; gap: 5px; }
+.pk-l button { max-width: 100%; padding: 5px 11px; border: 0; border-radius: 999px; background: var(--sunk); color: inherit; font: inherit; line-height: 1.35; text-align: left; overflow-wrap: anywhere; cursor: pointer; transition: background .1s; }
+.pk-l button:hover { background: var(--coral-soft); }
+.pk-l button[aria-selected="true"] { background: var(--coral); color: #fff; font-weight: 600; }
+.pk-l button:disabled { opacity: .45; cursor: default; }

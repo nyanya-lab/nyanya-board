@@ -13,10 +13,11 @@ import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
 import { startVerCheck } from "../vercheck.js?v=20261022a";
 import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
-import { mountCardImport } from "./cardimport.js?v=20261022d";
+import { mountCardImport } from "./cardimport.js?v=20261102a";
 import { mountReport } from "./report.js?v=20261101a";
 import { mountSummary } from "./summary.js?v=20261101a";
 import { mountExtras } from "./extras.js?v=20261101b";
+import { mountPicker } from "./picker.js?v=20261102a";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -374,6 +375,7 @@ $("setTabs").addEventListener("click", (ev) => { const b = ev.target.closest("[d
 try { setSubTab(localStorage.getItem("nyanya-stab") || "cat"); } catch (e) { setSubTab("cat"); }
 // 보드 첫 화면 '공통비용' 칸에서 바로 오면 (#common)
 if (location.hash === "#common") { try { localStorage.setItem("nyanya-mtab", "common"); } catch (e) { /* 무시 */ } }
+mountPicker();
 setSync();
 firebaseStart().catch(() => { $("loginView").hidden = false; $("loginMsg").textContent = "저장소에 연결하지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요."; });
 // 🔄 새 버전 알림 (욱진 보드처럼)

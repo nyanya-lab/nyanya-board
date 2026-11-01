@@ -8,6 +8,7 @@
 //   → 분류는 전에 같은 가게(메모 note)를 적은 분류로 미리 골라 둠 (❤️ 공통비용이었으면 공통 분류까지). 단 음식점·배달앱은 빈칸, 평일 11:00~14:30이면 '점심'.
 //     내용은 빈칸 · 메모는 가게 이름으로 채워 두고 미리보기에서 고칠 수 있음. 날짜 옆 요일·시간. 미리보기에서 바꾸고 [기록하기].
 //   기록 = { kind expense, amount, date, account, cat, sub, memo "", note 가맹점명, src "BC카드", bcNo 승인번호 } (공통이면 cat '💙 공통비용' + common·ccat·csub)
+//   → ✂️ 승인 한 건을 금액별로 나눠 적기 (2026-11-02 냐냐 요청): 금액 칸 ✂️ → 줄마다 금액·분류·소분류·내용·메모, 마지막 줄은 나머지 금액 자동. 기록 id = bc-… / bc-…-s1, bcNo는 같은 번호라 다시 올려도 안 겹침.
 // 파일은 이 브라우저에서만 읽고 저장소에 안 올라감.
 const SHEETJS = "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 const norm = (s) => String(s || "").replace(/\s+/g, "");
@@ -48,7 +49,7 @@ export async function readCardFile(file) {
 
 export function mountCardImport(root, env) {
   const { esc, won } = env;
-  const st = { rows: null, acct: null, pick: {}, merge: {}, busy: false };   // pick[i] = { on, cat, sub } (사람이 바꾼 것), merge[묶음] = 합치기 켬/끔
+  const st = { rows: null, acct: null, pick: {}, merge: {}, splits: {}, busy: false };   // pick[i] = { on, cat, sub } (사람이 바꾼 것), merge[묶음] = 합치기 켬/끔, splits[i] = { n, rows: [{ k, amt }] } 나눠 적기 (마지막 줄 = 나머지)
   const cards = () => [...env.S.accounts.entries()].filter(([, a]) => a && a.type === "card" && !a.hidden);
   const defAcct = () => { const cs = cards(); return (cs.find(([, a]) => /^bc/i.test(a.name || "")) || cs[0] || [null])[0]; };
   // 가게별로 마지막에 적은 분류 (같은 이름 → 꼬리 뗀 이름)
@@ -119,8 +120,21 @@ export function mountCardImport(root, env) {
       news.push({ ...r, i: gk, amount: items.reduce((a, x) => a + x.amount, 0), nos: items.map((x) => x.no).filter(Boolean), parts: byTime, partial: items.some((x) => x.partial),
         cat: p.cat ?? r.cat, sub: p.sub ?? r.sub, on: p.on ?? true, memo: p.memo ?? "", note: p.note ?? r.shop });
     });
+    // ✂️ 나눠 적기: 한 줄을 여러 줄로. 한 승인은 다 같이 들어가야 해서(다시 올리면 승인번호로 건너뜀) 금액이 안 맞거나 분류를 안 고른 줄이 있으면 묶음 전체를 뺌(hold)
+    const lines = news.flatMap((r) => {
+      const sp = st.splits[r.i]; if (!sp) return [r];
+      const left = sp.rows.slice(0, -1).reduce((a, x) => a - x.amt, r.amount);
+      const kids = sp.rows.map((x, n) => {
+        const last = n === sp.rows.length - 1, i = `${r.i}~${x.k}`, p = st.pick[i] || {};
+        return { ...r, i, sp: r.i, spN: n, spLast: last, spTotal: r.amount, amount: last ? left : x.amt, id: n ? `${r.id}-s${x.k}` : r.id, first: r.first && !n, last: r.last && last,
+          cat: p.cat ?? r.cat, sub: p.sub ?? r.sub, memo: p.memo ?? r.memo, note: p.note ?? r.note };
+      });
+      const hold = kids.some((x) => x.amount <= 0 || !x.cat);
+      kids.forEach((x) => { x.hold = hold; x.bad = x.amount <= 0; });
+      return kids;
+    });
     const dates = st.rows.map((r) => r.date).sort();
-    return { acct, live, news, haves: live.filter((r) => r.have), canceled: st.rows.filter((r) => r.canceled).length, from: dates[0], to: dates[dates.length - 1] };
+    return { acct, live, news: lines, haves: live.filter((r) => r.have), canceled: st.rows.filter((r) => r.canceled).length, from: dates[0], to: dates[dates.length - 1] };
   }
   const isCc = (cat) => cat && cat === env.commonCatName();
   function subOpts(r) {
@@ -139,28 +153,37 @@ export function mountCardImport(root, env) {
     const t2 = root.querySelector(".ci-tbl"); if (t2) t2.scrollTop = keep.t; if (dlg) dlg.scrollTop = keep.d; if (!dlg) window.scrollTo(0, keep.w);
     if (focus) { const el = [...root.querySelectorAll(`[data-ci="${focus[0]}"]`)].find((x) => x.dataset.i === focus[1]); if (el) el.focus({ preventScroll: true }); }
   }
+  function goHtml(v) {
+    const ready = v.news.filter((r) => r.on && r.cat && !r.hold), noCat = v.news.filter((r) => r.on && !r.cat).length, held = new Set(v.news.filter((r) => r.on && r.hold).map((r) => r.sp)).size;
+    return `<button class="btn" type="button" data-ci="go"${st.busy || !ready.length ? " disabled" : ""}>${st.busy ? "기록하는 중…" : `💳 ${ready.length}건 기록하기`}</button>
+          ${noCat ? `<span class="small" style="color:var(--danger)">분류를 안 고른 ${noCat}건은 빼고 넣어요</span>` : ""}
+          ${held ? `<span class="small" style="color:var(--danger)">✂️ 금액·분류를 다 맞춰야 들어가요 (${held}건 대기)</span>` : ""}`;
+  }
+  const leftText = (r) => `${r.amount < 0 ? "-" : ""}${won(r.amount)}`;
   function draw() {
     const v = view();
     let h = `<div class="panel-head"><div>${env.dialog ? "" : "<h3>💳 카드 승인내역 올리기</h3>"}<span class="muted small">BC카드 홈페이지·앱의 <b>승인내역</b> 엑셀을 올리면 승인취소는 빼고, 가계부에 아직 없는 것만 지출로 넣어요. 분류는 전에 같은 가게를 적은 대로 골라 둬요.</span></div></div>
       <label class="btn ghost" style="align-self:flex-start;cursor:pointer">📂 승인내역 엑셀 고르기<input type="file" accept=".xls,.xlsx" data-ci="file" hidden></label>`;
     if (v) {
-      const cs = cards(), ready = v.news.filter((r) => r.on && r.cat), noCat = v.news.filter((r) => r.on && !r.cat).length;
-      h += `<div class="imp-sum"><span>📅 ${esc(v.from)} ~ ${esc(v.to)}</span><span>승인 <b>${st.rows.length}</b></span><span>취소 빠짐 <b>${v.canceled}</b></span><span>이미 있음 <b>${v.haves.length}</b></span><span>새로 <b>${v.news.length}</b></span></div>
+      const cs = cards();
+      h += `<div class="imp-sum"><span>📅 ${esc(v.from)} ~ ${esc(v.to)}</span><span>승인 <b>${st.rows.length}</b></span><span>취소 빠짐 <b>${v.canceled}</b></span><span>이미 있음 <b>${v.haves.length}</b></span><span>새로 <b>${v.news.filter((r) => !r.spN).length}</b></span></div>
         <label class="small">카드 자산 <select data-ci="acct">${cs.map(([id, a]) => `<option value="${esc(id)}"${id === v.acct ? " selected" : ""}>${esc(a.name)}</option>`).join("")}</select></label>`;
       if (v.news.length) {
         h += `<div class="ci-tbl"><div class="ci-row ci-th"><span></span><span>날짜</span><span>가게</span><span>금액</span><span>분류</span><span>소분류</span><span>내용</span><span>메모</span></div>
-          ${v.news.map((r) => `<div class="ci-row${r.on && !r.cat ? " bad" : ""}${r.on ? "" : " off"}${r.grp ? ` ci-g${r.first ? " ci-g1" : ""}${r.last ? " ci-gz" : ""}` : ""}${r.parts ? " ci-m" : ""}"><input type="checkbox" data-ci="on" data-i="${esc(r.i)}"${r.on ? " checked" : ""} aria-label="넣기">
-            <span class="mono">${esc(r.date.slice(5))}<span class="ci-dow${r.dow === "토" || r.dow === "일" ? " we" : ""}">(${r.dow})</span>${r.parts ? "" : `<br><span class="muted small">${esc(r.time.slice(0, 5))}</span>`}</span>
-            <span class="ci-shop">${esc(r.shop)}${r.partial ? ' <span class="muted small">(부분취소)</span>' : ""}
+          ${v.news.map((r) => `<div class="ci-row${r.on && (!r.cat || r.bad) ? " bad" : ""}${r.on ? "" : " off"}${r.sp != null ? " ci-cutrow" : ""}${r.grp ? ` ci-g${r.first ? " ci-g1" : ""}${r.last ? " ci-gz" : ""}` : ""}${r.parts ? " ci-m" : ""}" data-row="${esc(r.i)}">${r.spN ? "<span></span>" : `<input type="checkbox" data-ci="on" data-i="${esc(r.sp ?? r.i)}"${r.on ? " checked" : ""} aria-label="넣기">`}
+            <span class="mono">${r.spN ? "" : `${esc(r.date.slice(5))}<span class="ci-dow${r.dow === "토" || r.dow === "일" ? " we" : ""}">(${r.dow})</span>${r.parts ? "" : `<br><span class="muted small">${esc(r.time.slice(0, 5))}</span>`}`}</span>
+            ${r.spN ? `<span class="ci-shop muted">↳ 나눈 줄 <button type="button" class="ci-mg" data-ci="cutdel" data-i="${esc(r.i)}" aria-label="이 줄 빼기">×</button></span>` : `<span class="ci-shop">${esc(r.shop)}${r.partial ? ' <span class="muted small">(부분취소)</span>' : ""}
               ${r.parts ? `<br><span class="ci-parts">🧸 ${r.parts.length}건 합: ${r.parts.map((x) => `${esc(x.time.slice(0, 5))} ${esc(won(x.amount))}`).join(" + ")}</span> <button type="button" class="ci-mg" data-ci="split" data-g="${esc(r.i)}">나누기</button>`
-                : r.grp ? `<br><span class="ci-parts">같은 날 같은 가게 ${r.gn}건</span>${r.first ? ` <button type="button" class="ci-mg" data-ci="join" data-g="${esc(r.grp)}">합치기</button>` : ""}` : ""}</span>
-            <span class="ci-amt">${esc(won(r.amount))}</span>
+                : r.grp ? `<br><span class="ci-parts">같은 날 같은 가게 ${r.gn}건</span>${r.first ? ` <button type="button" class="ci-mg" data-ci="join" data-g="${esc(r.grp)}">합치기</button>` : ""}` : ""}
+              ${r.sp != null ? `<br><span class="ci-parts">✂️ 전체 ${esc(won(r.spTotal))}</span> <button type="button" class="ci-mg" data-ci="cutadd" data-g="${esc(r.sp)}">＋ 줄 더</button><button type="button" class="ci-mg" data-ci="cutoff" data-g="${esc(r.sp)}">안 나누기</button>` : ""}</span>`}
+            ${r.sp == null ? `<span class="ci-amt"><button type="button" class="ci-cut" data-ci="cut" data-g="${esc(r.i)}" title="금액 나눠 적기" aria-label="금액 나눠 적기">✂️</button>${esc(won(r.amount))}</span>`
+              : r.spLast ? `<span class="ci-amt" data-left><b>${esc(leftText(r))}</b><br><span class="muted small">나머지</span></span>`
+              : `<input type="text" class="ci-amt-in" inputmode="numeric" autocomplete="off" data-ci="amt" data-i="${esc(r.i)}" value="${r.amount ? r.amount.toLocaleString() : ""}" placeholder="금액" aria-label="나눌 금액">`}
             <select data-ci="cat" data-i="${esc(r.i)}" aria-label="분류"><option value="">-</option>${env.cats("expense").map((c) => `<option${c === r.cat ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>
             <select data-ci="sub" data-i="${esc(r.i)}" aria-label="소분류"${r.cat ? "" : " disabled"}>${subOpts(r)}</select>
             <input type="text" data-ci="memo" data-i="${esc(r.i)}" value="${esc(r.memo)}" maxlength="80" placeholder="내용" aria-label="내용">
             <input type="text" data-ci="note" data-i="${esc(r.i)}" value="${esc(r.note)}" maxlength="500" placeholder="메모" aria-label="메모"></div>`).join("")}</div>
-          <div class="row ci-go" style="flex:0 0 auto;align-items:center;gap:10px"><button class="btn" type="button" data-ci="go"${st.busy || !ready.length ? " disabled" : ""}>${st.busy ? "기록하는 중…" : `💳 ${ready.length}건 기록하기`}</button>
-          ${noCat ? `<span class="small" style="color:var(--danger)">분류를 안 고른 ${noCat}건은 빼고 넣어요</span>` : ""}</div>`;
+          <div class="row ci-go" style="flex:0 0 auto;align-items:center;gap:10px;flex-wrap:wrap">${goHtml(v)}</div>`;
       } else h += `<p class="small" style="margin:0">✅ 새로 넣을 게 없어요. 다 가계부에 있어요.</p>`;
       if (v.haves.length) h += `<details class="small"><summary>이미 있어서 건너뛰는 ${v.haves.length}건 보기</summary><div class="ci-tbl" style="margin-top:6px">${v.haves.map((r) => `<div class="ci-row ci-have"><span></span><span class="mono">${esc(r.date.slice(5))}</span><span class="ci-shop">${esc(r.shop)}</span><span class="ci-amt">${esc(won(r.amount))}</span><span class="muted">${r.have === "id" ? "전에 올림" : r.have === "same" ? "같은 날 같은 금액" : r.have.startsWith("sum") ? `가계부에 ${r.have.slice(4)}건으로 나눠 적음` : `가계부에 ${r.have.slice(7)}건 합쳐 적음`}</span><span></span></div>`).join("")}</div></details>`;
     }
@@ -169,7 +192,7 @@ export function mountCardImport(root, env) {
   root.addEventListener("change", async (e) => {
     const t = e.target, k = t.dataset.ci, i = t.dataset.i;
     if (k === "file" && t.files[0]) {
-      try { st.rows = await readCardFile(t.files[0]); st.pick = {}; st.merge = {}; env.toast("승인내역을 읽었어요. 아래에서 확인해 주세요."); }
+      try { st.rows = await readCardFile(t.files[0]); st.pick = {}; st.merge = {}; st.splits = {}; env.toast("승인내역을 읽었어요. 아래에서 확인해 주세요."); }
       catch (err) { env.toast(err.message || "엑셀을 읽지 못했어요."); }
     } else if (k === "acct") st.acct = t.value;
     else if (k === "on") (st.pick[i] ||= {}).on = t.checked;
@@ -179,6 +202,20 @@ export function mountCardImport(root, env) {
     else return;
     render();
   });
+  // ✂️ 나눌 금액: 적는 동안엔 칸을 다시 그리지 않고 나머지·빨간 줄·기록 버튼만 고침 (포커스·클릭이 안 끊기게)
+  root.addEventListener("input", (e) => {
+    const t = e.target; if (t.dataset.ci !== "amt") return;
+    const at = t.dataset.i.lastIndexOf("~"), g = t.dataset.i.slice(0, at), k = +t.dataset.i.slice(at + 1), x = st.splits[g] && st.splits[g].rows.find((y) => y.k === k); if (!x) return;
+    x.amt = num(t.value); t.value = x.amt ? x.amt.toLocaleString() : "";
+    const v = view();
+    v.news.filter((r) => String(r.sp) === g).forEach((r) => {
+      const row = [...root.querySelectorAll(".ci-row[data-row]")].find((el) => el.dataset.row === String(r.i)); if (!row) return;
+      row.classList.toggle("bad", r.on && (!r.cat || r.bad));
+      const left = row.querySelector("[data-left] b"); if (left) left.textContent = leftText(r);
+    });
+    root.querySelector(".ci-go").innerHTML = goHtml(v);
+  });
+  const focusAmt = (i) => { const el = [...root.querySelectorAll('[data-ci="amt"]')].find((x) => x.dataset.i === i); if (el) el.focus(); };
   // 📋 분류 복사·붙여넣기: 분류·소분류 칸에서 Ctrl+C → 그 줄의 분류+소분류를 기억, 다른 줄 분류·소분류 칸에서 Ctrl+V
   //   (클립보드에 '분류 / 소분류' 글자도 넣어 둠. 기억한 게 없으면 클립보드 글자로 같은 이름 분류를 찾음)
   let clip = null;
@@ -204,9 +241,18 @@ export function mountCardImport(root, env) {
   root.addEventListener("click", async (e) => {
     const mg = e.target.closest('[data-ci="join"], [data-ci="split"]');
     if (mg) { st.merge[mg.dataset.g] = mg.dataset.ci === "join"; render(); return; }
+    const cut = e.target.closest('[data-ci="cut"], [data-ci="cutadd"], [data-ci="cutoff"], [data-ci="cutdel"]');
+    if (cut) {
+      const c = cut.dataset.ci, at = c === "cutdel" ? cut.dataset.i.lastIndexOf("~") : -1, g = c === "cutdel" ? cut.dataset.i.slice(0, at) : cut.dataset.g, sp = st.splits[g];
+      if (c === "cut") { st.splits[g] = { n: 2, rows: [{ k: 0, amt: 0 }, { k: 1, amt: 0 }] }; render(); focusAmt(`${g}~0`); }
+      else if (c === "cutoff") { delete st.splits[g]; render(); }
+      else if (c === "cutadd") { const k = sp.n++; sp.rows.splice(sp.rows.length - 1, 0, { k, amt: 0 }); render(); focusAmt(`${g}~${k}`); }
+      else { const k = +cut.dataset.i.slice(at + 1); sp.rows = sp.rows.filter((y) => y.k !== k); if (sp.rows.length < 2) delete st.splits[g]; render(); }
+      return;
+    }
     if (!e.target.closest('[data-ci="go"]') || st.busy) return;
     const be = env.backend(), v = view(); if (!be || !v) return;
-    const list = v.news.filter((r) => r.on && r.cat); if (!list.length) return;
+    const list = v.news.filter((r) => r.on && r.cat && !r.hold); if (!list.length) return;
     if (!confirm(`💳 ${list.length}건 (${won(list.reduce((a, r) => a + r.amount, 0))})을 가계부에 넣을까요?`)) return;
     st.busy = true; render();
     try {
