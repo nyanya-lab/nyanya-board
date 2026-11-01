@@ -149,6 +149,8 @@ a.tile:hover { border-color: var(--line); }
 .todo-list li.done .t { color: var(--muted); text-decoration: line-through; }
 .todo-list input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--mint); flex: none; }
 .todo-list .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.todo-list a.t-go { color: var(--me); font-weight: 600; text-decoration: none; }
+.todo-list li.done a.t-go { color: var(--muted); text-decoration: line-through; }
 .todo-list .del { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 0 4px; }
 .todo-list .del:hover { color: var(--danger); }
 .todo-list .empty { background: none; color: var(--muted); padding: 4px 0; }

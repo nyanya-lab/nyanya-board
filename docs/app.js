@@ -346,7 +346,7 @@ function renderCalendar() {
       d.getDay() === 0 && "sun",
       d.getDay() === 6 && "sat"].filter(Boolean).join(" ");
     const gs = gEventsOn(key).filter((e) => !gMulti(e));   // 여러 날 일정은 막대로
-    const all = list.map(([, x]) => `<span class="day-item${x.done ? " done" : ""}">${esc(x.title)}</span>`)
+    const all = list.map(([id, x]) => `<span class="day-item${x.done ? " done" : ""}"${taskLink(id) ? ` data-go="${taskLink(id)}"` : ""}>${esc(x.title)}</span>`)
       .concat(gs.map((e) => `<span class="day-item g" style="--gc:${esc(gcolor(e.c))}">${e.tm ? `<b>${esc(e.tm)}</b> ` : ""}${esc(e.t)}</span>`));
     const items = all.slice(0, DAY_ITEMS + 1).join("");
     const more = all.length > DAY_ITEMS + 1 ? `<span class="day-more">+${all.length - DAY_ITEMS - 1}</span>` : "";
@@ -361,6 +361,12 @@ function renderCalendar() {
   $("#calGrid").innerHTML = html;
 }
 
+// 📝 매달 1일 할 일 '지난달 가계부 정리 보기'(id mt-review-YYYY-MM, 가계부 reviewTask가 만듦) → 누르면 가계부 지난달 월간 정리로 바로
+function taskLink(id) {
+  const m = /^mt-review-(\d{4})-(\d{2})$/.exec(id); if (!m) return "";
+  const d = new Date(+m[1], +m[2] - 2, 1);
+  return `money/#month=${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
 function renderDay() {
   const d = new Date(ui.sel + "T00:00:00");
   const label = `${d.getMonth() + 1}월 ${d.getDate()}일 (${DOW[d.getDay()]})`;
@@ -371,7 +377,7 @@ function renderDay() {
     : list.length
       ? list.map(([id, t]) => `<li class="${t.done ? "done" : ""}">
         <input type="checkbox" data-check="${id}" ${t.done ? "checked" : ""} aria-label="끝냄">
-        <span class="t">${esc(t.title)}</span>
+        ${taskLink(id) ? `<a class="t t-go" href="${taskLink(id)}">${esc(t.title)} ›</a>` : `<span class="t">${esc(t.title)}</span>`}
         <button type="button" class="del" data-del="${id}" aria-label="지우기">×</button></li>`).join("")
       : `<li class="empty">할 일이 없어요.</li>`;
   const gs = gEventsOn(ui.sel);
@@ -532,6 +538,8 @@ document.addEventListener("click", (e) => {
     else if (a === "lock" && lockAction && confirm("이 기기를 잠글까요? 다시 열려면 비밀번호가 필요해요.")) lockAction();
     return;
   }
+  const go = e.target.closest("[data-go]");
+  if (go) { location.href = go.dataset.go; return; }
   const day = e.target.closest("[data-date]");
   if (day) {
     ui.sel = day.dataset.date;

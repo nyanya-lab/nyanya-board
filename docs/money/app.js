@@ -159,6 +159,8 @@ function reviewTask() {
   Promise.all([backend.update("tasks", key, { title: "📝 지난달 가계부 정리 보기", repeat: "none", date: `${m}-01`, noPractice: true, noGoogle: true, createdAt: Date.now() }),
     backend.saveSettingsDeep({ autoTasks: { [key]: true } })]).catch(() => { reviewAsked = ""; });
 }
+// 📝 보드 할 일 '지난달 가계부 정리 보기'에서 바로 오면 (#month=YYYY-MM) → 📑 보고서 그 달 월간 정리 (데이터가 온 뒤 한 번만)
+let jumpMonth = (/^#month=(\d{4}-\d{2})$/.exec(location.hash) || [])[1] || "";
 function render() {
   if (!backend) return;
   $("todayMono").textContent = today().replace(/-/g, ".");
@@ -168,6 +170,7 @@ function render() {
   tripList();
   mirrorCommon();
   mirrorJoint();
+  if (jumpMonth && S.loaded) { const m = jumpMonth; jumpMonth = ""; history.replaceState(null, "", location.pathname + location.search); setMTab("report"); rpt.openMonth(m); }
   fitPanels();
 }
 // ✈️ 내용 칸 자동완성: 예전에 쓴 여행 이름 (소분류가 '여행…'이고 숫자로 시작하는 내용 — '2026 상해'처럼, 최근 것 먼저) — 공통 탭 여행 묶음이 같은 이름으로 묶여서
