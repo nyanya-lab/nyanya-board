@@ -721,10 +721,10 @@ function renderTx(m, r) {
 export function txRow(x, ck, o = {}) {   // o.d = 이 자산 쪽에서 본 +/− (자산 화면), o.bal = 금액 밑 그때 잔액
         const kind = x.kind || "expense", n = x.pics && typeof x.pics === "object" ? Object.keys(x.pics).length : 0;
         const where = kind === "move" ? `${esc(acctName(x.account))} → ${esc(acctName(x.toAccount))}` : esc(acctName(x.account));
-        const cat = kind === "move" ? '<span class="muted">이체</span>' : `${x.cat ? esc(x.cat) : esc(KIND_LABEL[kind])}${kind === "transfer" ? ' <span class="muted small">💝</span>' : ""}${x.common ? ' <span class="m-common-mark" title="공통비용">❤️</span>' : ""}${x.recvTo || x.recvOf ? ' <span class="m-common-mark" title="받을 돈">🤲</span>' : ""}`;   // 표·목록 줄엔 색 동그라미 없이 (색은 원형·그 옆 목록·예산·설정에만)
+        const cat = kind === "move" ? '<span class="muted">이체</span>' : `${x.recvTo || x.recvOf ? "🤲 받을 돈" : x.cat ? esc(x.cat) : esc(KIND_LABEL[kind])}${kind === "transfer" ? ' <span class="muted small">💝</span>' : ""}${x.common ? ' <span class="m-common-mark" title="공통비용">❤️</span>' : ""}`;   // 표·목록 줄엔 색 동그라미 없이 (색은 원형·그 옆 목록·예산·설정에만)
         return `<div class="tx-row k-${kind}${ck ? "" : " no-ck"}${ui.mEdit === x.id ? " cur" : ""}${ck && txSel.has(x.id) ? " sel" : ""}" data-act="editMoney" data-id="${esc(x.id)}" role="button" tabindex="0">` +
           (ck ? `<label class="tx-ck" data-noedit><input type="checkbox" data-txck="${esc(x.id)}" ${txSel.has(x.id) ? "checked" : ""} aria-label="고르기"></label>` : "") +
-          `<span class="tx-d mono">${shortDate(x.date)}</span><span class="tx-a">${where}</span><span class="tx-c">${cat}</span><span class="tx-s">${x.common && E.commonCats ? (() => { const o = ccOf(x); return esc(o.c + (o.s ? " · " + o.s : "")); })() : esc(x.sub || "")}</span>` +
+          `<span class="tx-d mono">${shortDate(x.date)}</span><span class="tx-a">${where}</span><span class="tx-c">${cat}</span><span class="tx-s">${(x.recvTo || x.recvOf) && E.recv ? esc(E.recv.nameOf(x.recvTo || x.account)) : x.common && E.commonCats ? (() => { const o = ccOf(x); return esc(o.c + (o.s ? " · " + o.s : "")); })() : esc(x.sub || "")}</span>` +
           (o.d != null ? `<span class="tx-amt won ${o.d > 0 ? "plus" : "minus"}">${Number(x.amount) < 0 ? "-" : ""}${won(Math.abs(o.d))}${o.bal ? `<small class="tx-bal">${o.bal}</small>` : ""}</span>`
             : (() => {   // 마이너스 금액(환불·취소)은 부호를 뒤집어 보여 줌 (냐냐 쪽에서 더함 — 편한가계부 가져온 환불 줄)
               const neg = Number(x.amount) < 0, plus = kind === "income" ? !neg : kind === "move" ? null : neg;
@@ -1045,7 +1045,7 @@ export function renderMoneyForm(fill) {
     mc.innerHTML = names.map((c) => `<option>${esc(c)}</option>`).join(""); if (want) mc.value = want;
     mc.dataset.cc = "1";
   } else {
-    const want = fill ? fill.cat : mc.dataset.cc === "1" ? "" : mc.value, list = moneyCats(k === "move" ? "expense" : k);
+    const want = fill ? (fill.recvTo && E.recv ? E.recv.cat : fill.cat) : mc.dataset.cc === "1" ? "" : mc.value, list = moneyCats(k === "move" ? "expense" : k).concat(k === "expense" && E.recv ? [E.recv.cat] : []);   // 🤲 냐냐: 분류 칸에서 받을 돈 고르기 (recv.js)
     if (want && !list.includes(want)) list.push(want);
     mc.innerHTML = list.map((c) => `<option>${esc(c)}</option>`).join("");
     if (want && list.includes(want)) mc.value = want;
@@ -1093,7 +1093,7 @@ export function resetMoneyForm() {
   ui.mEdit = null; $("mAmount").value = ""; $("mMemo").value = ""; $("mDate").value = today();
   $("mSub").value = ""; $("mNote").value = ""; $("mCur").value = "원"; setMPics([]);
   if ($("mCommon")) $("mCommon").checked = false;
-  if ($("mRecv")) $("mRecv").checked = false;
+  if (E.recv) E.recv.clear();
   closeDrawer();
   renderMoney();
 }
@@ -1111,7 +1111,7 @@ function drawerClosed() {
   if ($("mDrawer").open) return;   // 늦게 온 close 이벤트가 다시 연 창을 건드리지 않게
   if (drawerHome && $("moneyPanel").parentNode !== drawerHome) drawerHome.appendChild($("moneyPanel"));
   ui.asFor = null;
-  if ($("mRecv")) $("mRecv").checked = false;   // 🤲 냐냐: 저장 안 하고 닫으면 다음 기록에 안 남게
+  if (E.recv) E.recv.clear();   // 🤲 냐냐: 저장 안 하고 닫으면 다음 기록에 안 남게
   if (ui.mEdit) resetMoneyForm();
 }
 // 저장한 기록이 보이는 달: 보통은 그 날짜의 달. 자산 탭에서 결제일 정한 카드를 보는 중이면 결제 달
@@ -1362,7 +1362,7 @@ export function initMoney() {
     const doc = { kind: k, amount: sp ? sp.left : amount, date, cat: k === "move" ? null : $("mCat").value, sub: k === "move" || !$("mSub").value || $("mSub").value === "__add" ? null : $("mSub").value, cur,
       memo: $("mMemo").value.trim(), note: $("mNote").value.trim() || null, account, toAccount,
       common: k === "expense" && $("mCommon") && $("mCommon").checked ? true : null, ccat: null, csub: null };
-    if (E.recv) doc.recvTo = rv;
+    if (E.recv) { doc.recvTo = rv; if (rv) { doc.cat = E.recv.storeCat(); doc.sub = null; } }
     if (k === "expense" && ccOn()) { doc.ccat = doc.cat; doc.csub = doc.sub; doc.cat = commonCatName(); doc.sub = null; }   // 🏷 공통 분류 → ccat·csub, 내 분류는 '💙 공통비용'
     rememberAcct(k, account); if (k === "move") rememberAcct("moveTo", toAccount);
     const editing = ui.mEdit && S.money.has(ui.mEdit), id0 = editing ? ui.mEdit : null, old = editing ? S.money.get(id0).pics || {} : {};

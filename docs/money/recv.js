@@ -3,11 +3,13 @@
 // 기록: 실제 지출 recvTo = 받을 돈 자산 id / 짝 money/{id}-rv = { amount -금액, account 받을 돈 자산, recvOf 실제 지출 id } (날짜·분류·내용은 실제 지출과 같음)
 // 받았을 때: 받을 돈 자산 → 통장 이체 한 건 + 고른 줄마다 recvPaid = 이체 id. 그 이체를 지우면 다시 안 받은 돈으로 돌아옴.
 // 받을 돈 자산 = accounts.recv (안 정했으면 이름에 빌려준·받기·받을). 자산 관리 🤲에서 켜고 끔.
+// 고르는 곳 (같은 날 냐냐: 체크가 번거로움): 분류 칸의 '🤲 받을 돈'(RECV_CAT, 진짜 분류 아님) → 소분류 칸이 이름 칸. 저장은 그대로 두 줄이고 분류는 기타로 (합이 0이라 통계엔 안 보임), 내역 줄엔 txRow가 '🤲 받을 돈'·이름으로 보여 줌.
 // 이름 직접 적기 (같은 날 냐냐 요청): 칸에 이름을 적으면 그 이름의 자산을 찾고(이름 또는 괄호 안 이름, 자동완성 #recvNames), 없으면 '받기(이름)' 자산을 새로 만듦.
 // 잔액 0원이면 자산 탭 목록·고르는 칸에서 저절로 숨김 (zero, 기록은 그대로, 같은 이름을 다시 적으면 이어짐). 이체 받는 곳에는 남겨 둠 (돈을 빌려줄 때 고를 수 있게).
 // 2026-11-02 전에 적은 기록은 잔액이 다 맞춰져 있어서 목록에 안 나옴 (RECV_FROM).
 const RECV_FROM = new Date("2026-11-02T00:00:00+09:00").getTime();
 
+export const RECV_CAT = "🤲 받을 돈";
 export const isRecvAcct = (a) => !!a && !a.hidden && (a.recv ?? /빌려준|받기|받을/.test(a.name || ""));
 export const recvShort = (a) => { const m = /\((.+)\)/.exec(a.name || ""); return m ? m[1] : a.name; };
 // 기록 하나의 짝 찾기 (지우기·고치기에 씀)
@@ -41,21 +43,21 @@ export function mountRecv(env) {
   }
 
   // ── 기록 창 칸 ──
+  const isOn = () => env.kind() === "expense" && $("mCat").value === RECV_CAT;
+  const storeCat = () => { const c = env.moneyCats("expense"); return c.find((x) => /기타/.test(x)) || c[0] || ""; };
   function formSync(fill) {
-    const wrap = $("mRecvWrap"), ck = $("mRecv"), box = $("mRecvTo"); if (!wrap) return;
-    wrap.hidden = env.kind() !== "expense";
-    if (fill) { const a = fill.recvTo && S.accounts.get(fill.recvTo); ck.checked = !!fill.recvTo; box.value = a ? recvShort(a) : ""; }
-    if (!ck.checked) box.value = "";
-    box.hidden = !ck.checked;
+    const box = $("mRecvTo"), on = isOn();
+    $("mRecvWrap").hidden = !on; $("mSubWrap").hidden = on;
+    if (fill) { const a = fill.recvTo && S.accounts.get(fill.recvTo); box.value = a ? recvShort(a) : ""; }
+    else if (!on) box.value = "";
     fillNames();
   }
   // 저장 전 확인: 받을 돈 자산 id | null | { error }
   function collect() {
-    if (env.kind() !== "expense" || !$("mRecv").checked) return null;
+    if (!isOn()) return null;
     const name = $("mRecvTo").value.trim();
     if (!name) return { error: "받을 사람 이름을 적어 주세요." };
     const to = idOf(name);
-    if ($("mCommon") && $("mCommon").checked) return { error: "❤️ 공통비용과 🤲 받을 돈은 같이 못 적어요. 하나만 골라 주세요." };
     if ($("mCur").value && $("mCur").value !== "원") return { error: "🤲 받을 돈은 원화만 적을 수 있어요." };
     if ($("mAcct").value === to) return { error: "낸 곳과 받을 돈 자산이 같아요." };
     return to;
@@ -96,7 +98,7 @@ export function mountRecv(env) {
     const on = openOf(box.dataset.rvAcct).filter((x) => !off.has(x.id)), go = box.querySelector('[data-rv="go"]');
     go.disabled = !on.length; go.textContent = `${on.length}건 받았어요 · ${won(on.reduce((t, x) => t + x.amt, 0))}`;
   }
-  $("mRecv").addEventListener("change", () => { formSync(); if ($("mRecv").checked) $("mRecvTo").focus(); });
+  $("mCat").addEventListener("change", () => { formSync(); if (isOn()) $("mRecvTo").focus(); });
   $("asDetail").addEventListener("change", (e) => {
     const k = e.target.dataset.rv; if (!k) return;
     if (k === "ck") { if (e.target.checked) off.delete(e.target.dataset.id); else off.add(e.target.dataset.id); goText(e.target.closest("[data-rv-acct]")); }
@@ -114,5 +116,8 @@ export function mountRecv(env) {
     env.rememberAcct("moveTo", to);
     env.act(env.backend().rootUpdate(p), `🤲 ${won(sum)} 받았다고 적었어요.`).then(() => { form.date = ""; env.render(); }).catch(() => {});
   });
-  return { accts, idOf, newDoc, done: (id) => pending.delete(id), fillNames, zero, formSync, collect, sync, panel, partner: (id) => recvPartner(S, id) };
+  return { cat: RECV_CAT, storeCat, nameOf: (id) => { const a = S.accounts.get(id); return a ? recvShort(a) : ""; },
+    // 창을 닫으면: 다음 기록에 안 남게
+    clear() { $("mRecvTo").value = ""; if ($("mCat").value === RECV_CAT) $("mCat").selectedIndex = 0; formSync(); },
+    accts, idOf, newDoc, done: (id) => pending.delete(id), fillNames, zero, formSync, collect, sync, panel, partner: (id) => recvPartner(S, id) };
 }
