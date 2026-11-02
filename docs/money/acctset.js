@@ -4,6 +4,7 @@
 // 칸에서 나가면(change) 그 칸만 저장. 계좌번호·메모는 자산 목록·자산별 보기에 보임 (money.js).
 // 숨긴 자산도 여기엔 다 보임 (흐리게) → 다시 보이게 할 수 있음.
 
+import { isRecvAcct } from "./recv.js?v=20261102a";
 const ICON = { cash: "💵", bank: "🏦", card: "💳", save: "🐷" };
 const GROUPS = [["cash", "현금"], ["bank", "통장"], ["card", "카드"], ["save", "저축·투자"]];
 
@@ -22,6 +23,7 @@ export function mountAcctSet(root, env) {
           <input type="text" class="ak-num" data-ak="number" data-id="${esc(a.id)}" value="${esc(a.number || "")}" maxlength="40" placeholder="계좌번호" aria-label="${esc(a.name)} 계좌번호">
           <input type="text" class="ak-memo" data-ak="memo" data-id="${esc(a.id)}" value="${esc(a.memo || "")}" maxlength="200" placeholder="메모 (예: 월급통장, 적금 만기 27.3)" aria-label="${esc(a.name)} 메모">
           <label class="ak-hide" title="공동 통장: 이 자산으로 낸 ❤️ 공통비용은 '같이 냄'"><input type="checkbox" data-ak="joint" data-id="${esc(a.id)}"${a.joint ? " checked" : ""}> 🤝</label>
+          <label class="ak-hide" title="받을 돈 자산: 기록 창의 🤲 받을 돈에서 고를 수 있어요"><input type="checkbox" data-ak="recv" data-id="${esc(a.id)}"${isRecvAcct(a) ? " checked" : ""}> 🤲</label>
           <label class="ak-hide" title="숨기기"><input type="checkbox" data-ak="hidden" data-id="${esc(a.id)}"${a.hidden ? " checked" : ""}> 🙈</label>
         </div>`).join("");
       }).join("") || '<p class="muted small" style="margin:0">자산이 아직 없어요.</p>'}</div>`;
@@ -31,6 +33,10 @@ export function mountAcctSet(root, env) {
     const be = env.backend(), a = env.S.accounts.get(id); if (!be || !a) return;
     if (k === "joint") {
       env.act(be.update("accounts", id, { joint: e.target.checked || null }), e.target.checked ? `🤝 ${a.name}: 공동 통장으로 했어요. 앞으로 이 자산으로 적는 ❤️ 공통비용은 '같이 냄'이에요.` : `${a.name}: 공동 통장 표시를 뺐어요.`).catch(() => { e.target.checked = !e.target.checked; });
+      return;
+    }
+    if (k === "recv") {
+      env.act(be.update("accounts", id, { recv: e.target.checked }), e.target.checked ? `🤲 ${a.name}: 받을 돈 자산으로 했어요.` : `${a.name}: 받을 돈 표시를 뺐어요.`).catch(() => { e.target.checked = !e.target.checked; });
       return;
     }
     if (k === "hidden") {

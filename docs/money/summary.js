@@ -23,6 +23,7 @@ export function mountSummary(root, env) {
         const f = typeOf(x.account) === "save", t = typeOf(x.toAccount) === "save", a = Number(x.amount) || 0;
         if (t && !f) save += a; else if (f && !t) save -= a;
       } else if (x.kind === "expense" || !x.kind) {
+        if (x.recvTo || x.recvOf) return;   // 🤲 대신 낸 돈은 내 지출 아님 (합계는 짝과 합쳐 0)
         list.push({ ...x, amt: env.cntAmt(x) });
         const a = Number(x.amount) || 0;
         if ((x.common || /공통비용/.test(x.cat || "")) && /식비/.test(x.ccat || "") && /외식|배달/.test(x.csub || "")) { food += a / 2; if (a > 0) foodN++; }   // 늘 내 몫(반)으로

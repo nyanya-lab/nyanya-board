@@ -6,19 +6,20 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261026e";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, moneyCats, subOptions, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab } from "./money.js?v=20261102a";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, moneyCats, subOptions, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab, lastAcct, rememberAcct } from "./money.js?v=20261102b";
 import { mountRepeat } from "./repeat.js?v=20261021d";
-import { mountAcctSet } from "./acctset.js?v=20261026a";
+import { mountAcctSet } from "./acctset.js?v=20261102a";
 import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
 import { startVerCheck } from "../vercheck.js?v=20261022a";
 import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
-import { mountCardImport } from "./cardimport.js?v=20261102b";
+import { mountCardImport } from "./cardimport.js?v=20261102c";
 import { mountReport } from "./report.js?v=20261101a";
-import { mountSummary } from "./summary.js?v=20261101a";
-import { mountExtras } from "./extras.js?v=20261101b";
+import { mountSummary } from "./summary.js?v=20261102a";
+import { mountExtras } from "./extras.js?v=20261102a";
 import { mountPicker } from "./picker.js?v=20261102a";
-import { mountRecSplit } from "./recsplit.js?v=20261102a";
+import { mountRecSplit } from "./recsplit.js?v=20261102b";
+import { mountRecv, recvShort } from "./recv.js?v=20261102a";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -221,7 +222,7 @@ if (LOCAL) { try { localSnap = await (await fetch("_local/snapshot.json", { cach
 function localStart() {
   const d = localSnap;
   if (!d) { $("loginView").hidden = false; $("mainView").hidden = true; $("loginMsg").textContent = "로컬 사본이 없어요. python tools/snapshot.py 로 먼저 받아 주세요."; return; }
-  let said = 0; const no = () => { if (Date.now() - said > 4000) { said = Date.now(); toast("🔒 로컬 확인 모드라 저장 안 돼요 (보기 전용)"); } return Promise.resolve(null); };
+  let said = 0; const no = (...a) => { (window.__localWrites ||= []).push(a); if (Date.now() - said > 4000) { said = Date.now(); toast("🔒 로컬 확인 모드라 저장 안 돼요 (보기 전용)"); } return Promise.resolve(null); };
   backend = { add: no, update: no, remove: no, set: no, saveSettings: no, saveSettingsDeep: no, putPic: no, saveUriPw: no, rootUpdate: no, async getPic() { return null; } };
   $("loginView").hidden = true; $("mainView").hidden = false;
   S.money = new Map(Object.entries(d.money || {})); S.accounts = new Map(Object.entries(d.accounts || {})); S.tasks = new Map(Object.entries(d.tasks || {}));
@@ -326,6 +327,8 @@ const uri = mountUri($("uriRoot"), {
     return pieHtml(null, xs, label, { color: (x) => `var(--c${top.indexOf(x) < 0 ? 8 : top.indexOf(x)})`, legend: false, full: true }); },
   savePassword: (pw) => { if (backend) act(backend.saveUriPw(pw || null)).catch(() => {}); }
 });
+// 🤲 받을 돈 (기록 창 체크 · 나눠 적기 · 엑셀 업로드 · 자산 화면에서 받기)
+const rv = mountRecv({ $, S, esc, won, act, rid, toast, render, today, shortDate, balances, sortedAccts, acctOptsHtml, lastAcct, rememberAcct, kind: () => ui.kind, backend: () => backend });
 bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum, deepMerge, esc, isAdminDevice, moneyShort, monthLabel, openDlg, pad, partner, quietly, ready, render, rid, rows, shiftMonth, shortDate, shrinkPic, statTile, toast, today, ui, viewPic, won,
   give: false,   // 💝 줄 돈(욱진 보드 전용)은 안 씀
   tabTitles: { budget: "예산", spend: "내역", cal: "달력", assets: "자산", stats: "통계", report: "보고서", common: "공통", settings: "설정" },   // 위 제목 = 지금 탭 이름 (냐냐 요청)
@@ -337,7 +340,8 @@ bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum,
   settlePreview: (amt) => uri.ready() ? uri.settlePreview(amt) : null,   // 💸 이체로 정산: 미리보기
   settleCommon: (amt, tag, meta) => uri.settleBy(amt, tag, meta),   // 💸 이체로 정산: 정산 장부 settles/{이체 id}에 금액
   unsettleCommon: (tag) => uri.unsettle(tag),   // 💸 체크 빼거나 이체 지우면 장부에서 뺌
-  recSplit: mountRecSplit({ $, S, esc, won, amtVal, moneyCats, subOptions, commonCatName, commonCats: () => uri.cats(), kind: () => ui.kind, backend: () => backend }),   // ✂️ 기록 창 금액 나눠 적기
+  recSplit: mountRecSplit({ $, S, esc, won, amtVal, moneyCats, subOptions, commonCatName, commonCats: () => uri.cats(), kind: () => ui.kind, backend: () => backend, recv: () => rv, recvShort }),   // ✂️ 기록 창 금액 나눠 적기
+  recv: rv,
   onMoneySaved: (id) => ex.onSaved(id),   // 🏥보험금 저장 → 🔗 병원비 고르는 창 (extras.js)
   get backend() { return backend; }, get testMode() { return false; } });
 initMoney(); moneyBound = true;
@@ -346,7 +350,7 @@ const bal = mountBalance($("balPanel"), { S, backend: () => backend, toast, act,
 // 💳 카드 승인내역 올리기 (내역 탭 💳 버튼 → 팝업) — 승인취소 빼고, 이미 있는 건 건너뛰고
 $("cardOpen").addEventListener("click", () => { openDlg($("cardDlg")); ci.render(); });
 $("cardClose").addEventListener("click", () => closeDlg($("cardDlg")));
-const ci = mountCardImport($("cardImpPanel"), { S, backend: () => backend, close: () => closeDlg($("cardDlg")), toast, esc, won, render, commonCatName, commonCats: () => uri.cats(), subs: subsOf, dialog: true,
+const ci = mountCardImport($("cardImpPanel"), { S, backend: () => backend, close: () => closeDlg($("cardDlg")), recvAccts: () => rv.accts(), toast, esc, won, render, commonCatName, commonCats: () => uri.cats(), subs: subsOf, dialog: true,
   cats: (k) => { const c = (S.settings.moneyCats || {})[k]; return (c && c.length ? c : MONEY_CATS[k] || []).slice(); } });
 // 📥 편한가계부 가져오기 (가계부 설정 탭)
 mountImport($("importPanel"), { S, backend: () => backend, toast, act, esc, won, render, balances, catKey, defaultCats: (k) => (MONEY_CATS[k] || []).slice() });

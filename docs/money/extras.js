@@ -15,7 +15,7 @@ export function mountExtras(env) {
   const isIns = (x) => x && x.kind === "income" && /보험금/.test(x.cat || "");
   const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`;
   const fromOf = (n) => { const d = new Date(); return ymd(new Date(d.getFullYear(), d.getMonth() - n + 1, 1)); };
-  const isClaim = (x) => x && (x.kind === "expense" || !x.kind) && !x.common && !/공통비용/.test(x.cat || "") && /병원|약국/.test(x.sub || "") && (Number(x.amount) || 0) > 0;
+  const isClaim = (x) => x && (x.kind === "expense" || !x.kind) && !x.common && !x.recvTo && !/공통비용/.test(x.cat || "") && /병원|약국/.test(x.sub || "") && (Number(x.amount) || 0) > 0;
   function claims(from) {
     const out = []; S.money.forEach((x, id) => { if (isClaim(x) && env.isWon(x) && x.date >= from) out.push({ ...x, id }); });
     return out.sort((a, b) => (a.date < b.date ? 1 : -1));

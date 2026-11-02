@@ -632,6 +632,7 @@ function renderAssetDetail(id) {
     `<p class="small muted as-period">${payCard ? `<b>${+m.slice(5)}월 ${+p.date.slice(8)}일 결제</b> · 이용기간 ${ymdDot(p.from)} ~ ${ymdDot(p.to)}`
       : `기간 ${ymdDot(p.from)} ~ ${ymdDot(p.to)}${card ? ` · <button class="link-btn" type="button" data-act="editAcct" data-id="${esc(id)}">결제일을 정하면</button> 결제일 기준으로 보여요` : ""}`}</p>` +
     (a.number || a.memo ? `<p class="small as-info">${a.number ? `<span class="mono">${esc(a.number)}</span>` : ""}${a.number && a.memo ? " · " : ""}${a.memo ? `<span class="as-memo">📝 ${esc(a.memo)}</span>` : ""}</p>` : "") +   // 냐냐: 계좌번호 · 자산 메모 (가계부 설정 '자산 관리'에서)
+    (E.recv ? E.recv.panel(id) : "") +   // 🤲 냐냐: 받을 돈 자산이면 아직 안 받은 돈 목록 (recv.js)
     `<div class="as-stats">${payCard
       ? tile("결제할 돈", won(out), "minus") + tile("낸 돈", won(inn), "plus") + tile("남은 결제액", won(Math.max(0, out - inn)), out > inn ? "minus" : "") + tile("지금 카드값", won(Math.max(0, -run)))
       : tile(card ? "갚은 돈" : "입금", won(inn), "plus") + tile(card ? "쓴 돈" : "출금", won(out), "minus") + tile("합계", won(inn - out), inn - out < 0 ? "minus" : "plus") +
@@ -719,7 +720,7 @@ function renderTx(m, r) {
 export function txRow(x, ck, o = {}) {   // o.d = 이 자산 쪽에서 본 +/− (자산 화면), o.bal = 금액 밑 그때 잔액
         const kind = x.kind || "expense", n = x.pics && typeof x.pics === "object" ? Object.keys(x.pics).length : 0;
         const where = kind === "move" ? `${esc(acctName(x.account))} → ${esc(acctName(x.toAccount))}` : esc(acctName(x.account));
-        const cat = kind === "move" ? '<span class="muted">이체</span>' : `${x.cat ? esc(x.cat) : esc(KIND_LABEL[kind])}${kind === "transfer" ? ' <span class="muted small">💝</span>' : ""}${x.common ? ' <span class="m-common-mark" title="공통비용">❤️</span>' : ""}`;   // 표·목록 줄엔 색 동그라미 없이 (색은 원형·그 옆 목록·예산·설정에만)
+        const cat = kind === "move" ? '<span class="muted">이체</span>' : `${x.cat ? esc(x.cat) : esc(KIND_LABEL[kind])}${kind === "transfer" ? ' <span class="muted small">💝</span>' : ""}${x.common ? ' <span class="m-common-mark" title="공통비용">❤️</span>' : ""}${x.recvTo || x.recvOf ? ' <span class="m-common-mark" title="받을 돈">🤲</span>' : ""}`;   // 표·목록 줄엔 색 동그라미 없이 (색은 원형·그 옆 목록·예산·설정에만)
         return `<div class="tx-row k-${kind}${ck ? "" : " no-ck"}${ui.mEdit === x.id ? " cur" : ""}${ck && txSel.has(x.id) ? " sel" : ""}" data-act="editMoney" data-id="${esc(x.id)}" role="button" tabindex="0">` +
           (ck ? `<label class="tx-ck" data-noedit><input type="checkbox" data-txck="${esc(x.id)}" ${txSel.has(x.id) ? "checked" : ""} aria-label="고르기"></label>` : "") +
           `<span class="tx-d mono">${shortDate(x.date)}</span><span class="tx-a">${where}</span><span class="tx-c">${cat}</span><span class="tx-s">${x.common && E.commonCats ? (() => { const o = ccOf(x); return esc(o.c + (o.s ? " · " + o.s : "")); })() : esc(x.sub || "")}</span>` +
@@ -1075,8 +1076,10 @@ export function renderMoneyForm(fill) {
   $("mSubmit").textContent = editing ? "고친 내용 저장" : { income: "수입 기록", expense: "지출 기록", transfer: "보낸 돈 기록", move: "이체 기록" }[k];
   if (!$("mDate").value) $("mDate").value = today();
   if (E.recSplit) E.recSplit.sync();
+  if (E.recv) E.recv.formSync(fill);   // 🤲 냐냐: 받을 돈 칸 (recv.js)
 }
 export function editMoney(id) {
+  const x0 = S.money.get(id); if (x0 && x0.recvOf && S.money.has(x0.recvOf)) id = x0.recvOf;   // 🤲 냐냐: 받을 돈 짝을 누르면 실제 지출을 고침
   const x = S.money.get(id); if (!x) return;
   ui.mEdit = id; ui.kind = x.kind || "expense";
   $("mAmount").value = commaNum(x.amount || ""); $("mDate").value = x.date || today(); $("mMemo").value = x.memo || "";
@@ -1088,6 +1091,7 @@ export function resetMoneyForm() {
   ui.mEdit = null; $("mAmount").value = ""; $("mMemo").value = ""; $("mDate").value = today();
   $("mSub").value = ""; $("mNote").value = ""; $("mCur").value = "원"; setMPics([]);
   if ($("mCommon")) $("mCommon").checked = false;
+  if ($("mRecv")) $("mRecv").checked = false;
   closeDrawer();
   renderMoney();
 }
@@ -1105,6 +1109,7 @@ function drawerClosed() {
   if ($("mDrawer").open) return;   // 늦게 온 close 이벤트가 다시 연 창을 건드리지 않게
   if (drawerHome && $("moneyPanel").parentNode !== drawerHome) drawerHome.appendChild($("moneyPanel"));
   ui.asFor = null;
+  if ($("mRecv")) $("mRecv").checked = false;   // 🤲 냐냐: 저장 안 하고 닫으면 다음 기록에 안 남게
   if (ui.mEdit) resetMoneyForm();
 }
 // 저장한 기록이 보이는 달: 보통은 그 날짜의 달. 자산 탭에서 결제일 정한 카드를 보는 중이면 결제 달
@@ -1344,6 +1349,8 @@ export function initMoney() {
     if (!(amount > 0)) { toast("금액을 적어 주세요."); return; }
     const sp = E.recSplit ? E.recSplit.collect(amount) : null;   // ✂️ 냐냐: 나눠 적기 → 이 기록은 나머지 금액, 나눈 줄은 새 기록으로
     if (sp && sp.error) { toast(sp.error); return; }
+    const rv = E.recv ? E.recv.collect() : null;   // 🤲 냐냐: 받을 돈 → 저장 뒤 짝 기록 (recv.js)
+    if (rv && rv.error) { toast(rv.error); return; }
     const date = $("mDate").value || today(), k = ui.kind;
     const account = $("mAcct").value || null, toAccount = k === "move" ? ($("mTo").value || null) : null;
     if (k === "move" && (!account || !toAccount)) { toast("이체는 보내는 곳과 받는 곳을 골라 주세요."); return; }
@@ -1353,6 +1360,7 @@ export function initMoney() {
     const doc = { kind: k, amount: sp ? sp.left : amount, date, cat: k === "move" ? null : $("mCat").value, sub: k === "move" || !$("mSub").value || $("mSub").value === "__add" ? null : $("mSub").value, cur,
       memo: $("mMemo").value.trim(), note: $("mNote").value.trim() || null, account, toAccount,
       common: k === "expense" && $("mCommon") && $("mCommon").checked ? true : null, ccat: null, csub: null };
+    if (E.recv) doc.recvTo = rv;
     if (k === "expense" && ccOn()) { doc.ccat = doc.cat; doc.csub = doc.sub; doc.cat = commonCatName(); doc.sub = null; }   // 🏷 공통 분류 → ccat·csub, 내 분류는 '💙 공통비용'
     rememberAcct(k, account); if (k === "move") rememberAcct("moveTo", toAccount);
     const editing = ui.mEdit && S.money.has(ui.mEdit), id0 = editing ? ui.mEdit : null, old = editing ? S.money.get(id0).pics || {} : {};
@@ -1378,11 +1386,12 @@ export function initMoney() {
       const id = editing ? (await E.backend.update("money", id0, doc), id0) : await E.backend.add("money", { ...doc, createdAt: Date.now() });
       savedId = id;
       if (sp) await E.recSplit.save(sp, doc, id0);
+      if (E.recv) await E.recv.sync(id, doc);
       for (const p of fresh) await E.backend.putPic(p.id, { full: p.full, thumb: p.thumb, money: id, kind: "money", title: doc.memo || doc.cat || "", date, at: Date.now() });
       for (const pid of gone) await E.backend.putPic(pid, null);
       if (wantSettle) await E.settleCommon(amount, id, { date, memo: doc.memo || doc.note || "이체", money: id });
       else if (wasSettle) await E.unsettleCommon(id);
-    })(), settle ? `💸 정산했어요. ${settle.rest}` : wasSettle && !wantSettle ? "정산 장부에서 뺐어요." : sp ? `✂️ ${sp.lines.length + 1}건으로 나눠 적었어요.` : editing ? "고쳤어요." : "기록했어요.")
+    })(), settle ? `💸 정산했어요. ${settle.rest}` : wasSettle && !wantSettle ? "정산 장부에서 뺐어요." : sp ? `✂️ ${sp.lines.length + 1}건으로 나눠 적었어요.` : rv ? "🤲 받을 돈으로 적었어요." : editing ? "고쳤어요." : "기록했어요.")
       .then(() => { const mm = shownMonth(doc); if (mm !== ui.month) ui.month = mm; resetMoneyForm(); if (E.onMoneySaved && savedId) E.onMoneySaved(savedId); }).catch(() => {});   // 냐냐: 🏥보험금 저장 → 병원비 고르는 창
   });
 
@@ -1475,8 +1484,8 @@ export function moneyAction(a, el, id, t) {
   if (a === "mDelete") {
     if (!ready() || !ui.mEdit) return true;
     if (el.dataset.armed !== "1") { el.dataset.armed = "1"; el.classList.add("armed"); el.textContent = "정말 삭제?"; return true; }
-    const gone0 = ui.mEdit, wasS = !!(S.money.get(gone0) || {}).settle;
-    act(E.backend.remove("money", gone0).then(() => wasS && E.unsettleCommon ? E.unsettleCommon(gone0) : null), wasS ? "삭제했어요. 정산 장부에서도 뺐어요." : "삭제했어요.").then(resetMoneyForm).catch(() => {});
+    const gone0 = ui.mEdit, wasS = !!(S.money.get(gone0) || {}).settle, rvP = E.recv ? E.recv.partner(gone0) : null;
+    act(E.backend.remove("money", gone0).then(() => rvP ? E.backend.remove("money", rvP) : null).then(() => wasS && E.unsettleCommon ? E.unsettleCommon(gone0) : null), wasS ? "삭제했어요. 정산 장부에서도 뺐어요." : "삭제했어요.").then(resetMoneyForm).catch(() => {});
     return true;
   }
   if (a === "asSel") { ui.asSel = id; ui.asOpen = true; renderMoney(); if (window.matchMedia("(max-width: 1100px)").matches) $("asGrid").scrollIntoView({ block: "start" }); return true; }
@@ -1515,8 +1524,8 @@ export function moneyAction(a, el, id, t) {
   if (a === "txDel") {
     if (!ready() || !txSel.size) return true;
     if (el.dataset.armed !== "1") { el.dataset.armed = "1"; el.textContent = `정말 ${txSel.size}개 삭제?`; return true; }
-    const ids = [...txSel]; txSel.clear();
-    act((async () => { for (const k of ids) { const wasS = !!(S.money.get(k) || {}).settle; await E.backend.remove("money", k); if (wasS && E.unsettleCommon) await E.unsettleCommon(k); } })(), `${ids.length}개를 지웠어요. (↶로 되돌릴 수 있어요)`).catch(() => {});
+    const n0 = txSel.size, ids = [...new Set([...txSel].flatMap((k) => [k, E.recv && E.recv.partner(k)]).filter(Boolean))]; txSel.clear();   // 🤲 냐냐: 받을 돈 짝도 같이
+    act((async () => { for (const k of ids) { const wasS = !!(S.money.get(k) || {}).settle; await E.backend.remove("money", k); if (wasS && E.unsettleCommon) await E.unsettleCommon(k); } })(), `${n0}개를 지웠어요. (↶로 되돌릴 수 있어요)`).catch(() => {});
     return true;
   }
   if (a === "newAcct") { openAcct(null); return true; }

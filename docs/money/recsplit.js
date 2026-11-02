@@ -1,6 +1,7 @@
 // ✂️ 기록 창 금액 나눠 적기 (2026-11-02 냐냐 요청, 지출·수입, 새 기록·고치기 둘 다)
 // 위 금액 칸 = 전체. 나눈 줄마다 금액·분류·소분류·내용을 따로 고르고, 위 칸 기록은 나머지 금액으로 저장 → 기록이 여러 건으로 들어감.
 // 날짜·자산·화폐·메모는 위 칸과 같음, 내용은 비우면 위 칸과 같게. 사진·보험금 연결은 위 칸 기록에만 남음. 고치기면 카드 승인번호(bcNo)도 복사해서 다시 올려도 안 겹침.
+// 🤲 줄마다 받을 돈을 고르면 그 금액은 받을 돈으로 (recv.js, 분류를 안 골랐으면 기타로).
 // 분류에서 '💙 공통비용'을 고르면 소분류 칸이 공통 분류('식비 · 외식')로 → 기록 common·ccat·csub (엑셀 업로드 cardimport.js와 같은 방식).
 export function mountRecSplit(env) {
   const { $, esc, won, amtVal } = env;
@@ -32,15 +33,20 @@ export function mountRecSplit(env) {
         <select data-f="cat" aria-label="분류"><option value="">분류</option>${cats.map((c) => `<option${c === l.cat ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>
         <select data-f="sub" aria-label="소분류"${l.cat ? "" : " disabled"}>${subHtml(l)}</select>
         <button type="button" class="m-sp-del" data-sp="del" aria-label="이 줄 빼기">×</button>
-        <input type="text" data-f="memo" maxlength="80" value="${esc(l.memo)}" placeholder="내용 (비우면 위 내용과 같게)" aria-label="내용"></div>`).join("")}
+        <input type="text" data-f="memo" maxlength="80" value="${esc(l.memo)}" placeholder="내용 (비우면 위 내용과 같게)" aria-label="내용">
+        ${recvHtml(l)}</div>`).join("")}
       <div class="m-sp-btns"><button type="button" class="m-sp-open" data-sp="add">＋ 줄 더</button><button type="button" class="m-sp-open" data-sp="off">안 나누기</button></div></div>`;
+  }
+  function recvHtml(l) {
+    const list = env.kind() === "expense" && env.recv() ? env.recv().accts() : []; if (!list.length) return "";
+    return `<select data-f="recv" aria-label="받을 돈"${isCc(l.cat) ? " disabled" : ""}><option value="">내 돈</option>${list.map((a) => `<option value="${esc(a.id)}"${a.id === l.recv ? " selected" : ""}>🤲 ${esc(env.recvShort(a))}</option>`).join("")}</select>`;
   }
   const showRest = () => { const el = $("mSplit").querySelector("[data-sp-rest]"); if (el) el.innerHTML = restHtml(); };
 
   $("mSplit").addEventListener("click", (e) => {
     const b = e.target.closest("[data-sp]"); if (!b) return;
     if (b.dataset.sp === "add") {
-      lines.push({ k: n++, amt: 0, cat: "", sub: "", memo: "" }); draw();
+      lines.push({ k: n++, amt: 0, cat: "", sub: "", memo: "", recv: "" }); draw();
       const all = $("mSplit").querySelectorAll('[data-f="amt"]'); all[all.length - 1].focus();
     } else if (b.dataset.sp === "off") { lines = []; draw(); }
     else { const k = +b.closest("[data-k]").dataset.k; lines = lines.filter((l) => l.k !== k); draw(); }
@@ -52,7 +58,8 @@ export function mountRecSplit(env) {
   });
   $("mSplit").addEventListener("change", (e) => {
     const l = lineOf(e.target), f = e.target.dataset.f; if (!l) return;
-    if (f === "cat") { l.cat = e.target.value; l.sub = ""; const s = e.target.closest("[data-k]").querySelector('[data-f="sub"]'); s.innerHTML = subHtml(l); s.disabled = !l.cat; }
+    if (f === "cat") { l.cat = e.target.value; l.sub = ""; if (isCc(l.cat)) l.recv = ""; draw(); }
+    else if (f === "recv") { l.recv = e.target.value; if (l.recv && !l.cat) l.cat = env.moneyCats("expense").find((c) => /기타/.test(c)) || env.moneyCats("expense")[0] || ""; draw(); }
     else if (f === "sub") l.sub = e.target.value;
   });
   $("mAmount").addEventListener("input", showRest);
@@ -67,14 +74,18 @@ export function mountRecSplit(env) {
       if (lines.some((l) => !(l.amt > 0))) return { error: "나눌 금액을 적어 주세요." };
       const r = left(); if (r <= 0) return { error: `나눈 금액이 전체 ${won(total)}보다 많거나 같아요.` };
       if (lines.some((l) => !l.cat)) return { error: "나눈 줄의 분류를 골라 주세요." };
+      if (lines.some((l) => l.recv) && $("mCur").value && $("mCur").value !== "원") return { error: "🤲 받을 돈은 원화만 적을 수 있어요." };
+      if (lines.some((l) => l.recv && l.recv === $("mAcct").value)) return { error: "낸 곳과 받을 돈 자산이 같아요." };
       return { left: r, lines: lines.slice() };
     },
     async save(sp, doc, oldId) {
       const old = (oldId && env.S.money.get(oldId)) || {};
       for (const [i, l] of sp.lines.entries()) {
         const cc = isCc(l.cat), [c, s] = cc ? l.sub.split("|") : [];
-        await env.backend().add("money", { kind: doc.kind, amount: l.amt, date: doc.date, cat: l.cat, sub: cc ? null : l.sub || null, cur: doc.cur, memo: l.memo.trim() || doc.memo, note: doc.note, account: doc.account, toAccount: null,
-          common: cc ? true : null, ccat: cc ? c || null : null, csub: cc ? s || null : null, settle: null, pics: null, src: old.src || null, bcNo: old.bcNo || null, createdAt: Date.now() + i });
+        const d = { kind: doc.kind, amount: l.amt, date: doc.date, cat: l.cat, sub: cc ? null : l.sub || null, cur: doc.cur, memo: l.memo.trim() || doc.memo, note: doc.note, account: doc.account, toAccount: null,
+          common: cc ? true : null, ccat: cc ? c || null : null, csub: cc ? s || null : null, settle: null, pics: null, src: old.src || null, bcNo: old.bcNo || null, createdAt: Date.now() + i, recvTo: l.recv || null };
+        const id = await env.backend().add("money", d);
+        if (l.recv) await env.recv().sync(id, d);
       }
     },
   };
