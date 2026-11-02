@@ -6,7 +6,7 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261026e";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, moneyCats, subOptions, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab, lastAcct, rememberAcct } from "./money.js?v=20261102d";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, moneyCats, subOptions, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab, lastAcct, rememberAcct } from "./money.js?v=20261102e";
 import { mountRepeat } from "./repeat.js?v=20261021d";
 import { mountAcctSet } from "./acctset.js?v=20261102c";
 import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
@@ -20,6 +20,7 @@ import { mountExtras } from "./extras.js?v=20261102a";
 import { mountPicker } from "./picker.js?v=20261102a";
 import { mountRecSplit } from "./recsplit.js?v=20261102d";
 import { mountRecv } from "./recv.js?v=20261102c";
+import { mountTxFilter } from "./txfilter.js?v=20261102b";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -329,6 +330,8 @@ const uri = mountUri($("uriRoot"), {
 });
 // 🤲 받을 돈 (기록 창 체크 · 나눠 적기 · 엑셀 업로드 · 자산 화면에서 받기)
 const rv = mountRecv({ $, S, esc, moneyCats, won, act, rid, toast, render, today, shortDate, balances, sortedAccts, acctOptsHtml, lastAcct, rememberAcct, kind: () => ui.kind, backend: () => backend });
+// 🔎 내역 표 정렬·거르기 (머리줄 더블클릭, 폰은 표 위 버튼)
+const tf = mountTxFilter({ $, esc, won, toast, render, shortDate, acctName, ccOf, cntAmt, recvName: (id) => rv.nameOf(id) });
 bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum, deepMerge, esc, isAdminDevice, moneyShort, monthLabel, openDlg, pad, partner, quietly, ready, render, rid, rows, shiftMonth, shortDate, shrinkPic, statTile, toast, today, ui, viewPic, won,
   give: false,   // 💝 줄 돈(욱진 보드 전용)은 안 씀
   tabTitles: { budget: "예산", spend: "내역", cal: "달력", assets: "자산", stats: "통계", report: "보고서", common: "공통", settings: "설정" },   // 위 제목 = 지금 탭 이름 (냐냐 요청)
@@ -342,6 +345,7 @@ bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum,
   unsettleCommon: (tag) => uri.unsettle(tag),   // 💸 체크 빼거나 이체 지우면 장부에서 뺌
   recSplit: mountRecSplit({ $, S, esc, won, amtVal, moneyCats, subOptions, commonCatName, commonCats: () => uri.cats(), kind: () => ui.kind, backend: () => backend, recv: () => rv }),   // ✂️ 기록 창 금액 나눠 적기
   recv: rv,
+  txFilter: tf,
   onMoneySaved: (id) => ex.onSaved(id),   // 🏥보험금 저장 → 🔗 병원비 고르는 창 (extras.js)
   get backend() { return backend; }, get testMode() { return false; } });
 initMoney(); moneyBound = true;

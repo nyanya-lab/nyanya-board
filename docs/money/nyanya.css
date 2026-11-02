@@ -472,3 +472,34 @@ select:disabled { cursor: default; opacity: .6; }
 .rv-go .f { flex: 1 1 130px; min-width: 0; }
 .rv-go select, .rv-go input { width: 100%; min-width: 0; }
 .rv-go .btn { flex: 1 1 180px; }
+
+/* 🔎 내역 표 정렬·거르기 (txfilter.js) */
+.tx-th .tf-th { user-select: none; cursor: pointer; }
+.tx-th .tf-th:hover { color: var(--fg); }
+.tx-th .tf-th.on { color: var(--coral); font-weight: 600; }
+.tf-bar { flex: 0 0 auto; display: grid; gap: 6px; margin: 0 0 6px; }
+.tf-cols { display: none; flex-wrap: wrap; gap: 4px; }
+.tf-col { border: 1px solid var(--line); background: none; color: var(--muted); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.tf-col.on { border-color: var(--coral); color: var(--coral); font-weight: 600; }
+.tf-on { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tf-chip { border: 0; background: var(--coral-soft); color: inherit; border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.tf-pop { position: fixed; z-index: 70; box-sizing: border-box; width: 260px; max-width: calc(100vw - 16px); display: flex; flex-direction: column; gap: 8px; padding: 12px; overflow: auto; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 10px 30px rgba(23, 32, 51, .16); font-size: 13px; }
+.tf-title { font-size: 12.5px; }
+.tf-sort { display: flex; gap: 4px; }
+.tf-s { flex: 1; border: 0; border-radius: 999px; padding: 5px 8px; background: var(--sunk); color: inherit; font: inherit; cursor: pointer; }
+.tf-s:hover { background: var(--coral-soft); }
+.tf-s.on { background: var(--coral); color: #fff; font-weight: 600; }
+.tf-q, .tf-range input { width: 100%; min-width: 0; font-size: 13px; padding: 6px 8px; }
+.tf-range { display: flex; align-items: center; gap: 6px; }
+.tf-range input { text-align: right; font-variant-numeric: tabular-nums; }
+.tf-list { display: grid; gap: 1px; min-height: 60px; max-height: 240px; overflow-y: auto; }
+.tf-row { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 6px; cursor: pointer; }
+.tf-row[hidden] { display: none; }
+.tf-row:hover { background: var(--sunk); }
+.tf-row input { flex: none; accent-color: var(--coral); }
+.tf-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tf-row small { flex: none; color: var(--muted); }
+.tf-all { border-bottom: 1px solid var(--line); border-radius: 0; font-weight: 600; }
+.tf-btns { display: flex; justify-content: flex-end; gap: 6px; }
+@media (min-width: 921px) { #txBar:not(:has(.tf-on)) { display: none; } }
+@media (max-width: 920px) { .tf-cols { display: flex; } }
