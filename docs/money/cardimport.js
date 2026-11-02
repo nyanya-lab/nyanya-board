@@ -157,7 +157,8 @@ export function mountCardImport(root, env) {
     const ready = v.news.filter((r) => r.on && r.cat && !r.hold), noCat = v.news.filter((r) => r.on && !r.cat).length, held = new Set(v.news.filter((r) => r.on && r.hold).map((r) => r.sp)).size;
     return `<button class="btn" type="button" data-ci="go"${st.busy || !ready.length ? " disabled" : ""}>${st.busy ? "기록하는 중…" : `💳 ${ready.length}건 기록하기`}</button>
           ${noCat ? `<span class="small" style="color:var(--danger)">분류를 안 고른 ${noCat}건은 빼고 넣어요</span>` : ""}
-          ${held ? `<span class="small" style="color:var(--danger)">✂️ 금액·분류를 다 맞춰야 들어가요 (${held}건 대기)</span>` : ""}`;
+          ${held ? `<span class="small" style="color:var(--danger)">✂️ 금액·분류를 다 맞춰야 들어가요 (${held}건 대기)</span>` : ""}
+          ${env.close ? `<button class="btn ghost ci-close" type="button" data-ci="close">닫기</button>` : ""}`;
   }
   const leftText = (r) => `${r.amount < 0 ? "-" : ""}${won(r.amount)}`;
   function draw() {
@@ -239,6 +240,7 @@ export function mountCardImport(root, env) {
     }).catch(() => {});
   });
   root.addEventListener("click", async (e) => {
+    if (e.target.closest('[data-ci="close"]')) { env.close(); return; }
     const mg = e.target.closest('[data-ci="join"], [data-ci="split"]');
     if (mg) { st.merge[mg.dataset.g] = mg.dataset.ci === "join"; render(); return; }
     const cut = e.target.closest('[data-ci="cut"], [data-ci="cutadd"], [data-ci="cutoff"], [data-ci="cutdel"]');

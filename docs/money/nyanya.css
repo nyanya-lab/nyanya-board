@@ -175,6 +175,8 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 .dlg.ci-dlg { max-width: 1500px; }
 .ci-body { display: flex; flex-direction: column; gap: 10px; }
 .ci-dlg .ci-tbl { max-height: none; overflow: visible; }   /* 팝업 창이 스크롤 → 표 안에 따로 스크롤 안 생기게 */
+.ci-dlg .dlg-head { position: sticky; top: 0; z-index: 3; background: var(--surface); padding-bottom: 10px; }   /* 내역이 길어도 제목·×가 위에 보이게 (2026-11-02 냐냐) */
+.ci-go .ci-close { flex: 0 0 auto; margin-left: auto; }
 .ci-dlg .ci-go { position: sticky; bottom: 0; z-index: 2; background: var(--surface); padding: 10px 0; margin-bottom: -12px; border-top: 1px solid var(--line); }   /* [기록하기]는 늘 아래에 보이게 */
 /* 🏦 자산 탭 (냐냐 요청): PC에선 왼쪽 목록 · 오른쪽 자세히를 따로 스크롤 / 💳 결제는 ＋ 왼쪽에 작게 */
 @media (min-width: 721px) {
