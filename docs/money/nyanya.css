@@ -437,3 +437,21 @@ select:disabled { cursor: default; opacity: .6; }
 .pk-l button:hover { background: var(--coral-soft); }
 .pk-l button[aria-selected="true"] { background: var(--coral); color: #fff; font-weight: 600; }
 .pk-l button:disabled { opacity: .45; cursor: default; }
+
+/* ✂️ 기록 창 금액 나눠 적기 (recsplit.js) */
+#mSplit[hidden] { display: none; }
+.m-sp-open { border: 1px dashed var(--line); background: none; color: var(--muted); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.m-sp-open:hover { border-color: var(--coral); color: var(--coral); }
+.m-sp { display: grid; gap: 8px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--mint) 8%, transparent); box-shadow: inset 3px 0 0 var(--mint); }
+.m-sp-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 10px; font-size: 13px; }
+.m-sp-bad { color: var(--danger); }
+.m-sp-l { display: grid; grid-template-columns: 88px minmax(0, 1fr) minmax(0, 1fr) 22px; gap: 5px; align-items: center; }
+.m-sp-l input, .m-sp-l select { min-width: 0; width: 100%; font-size: 13px; padding: 6px 8px; }
+.m-sp-l [data-f="amt"] { text-align: right; font-variant-numeric: tabular-nums; }
+.m-sp-l [data-f="memo"] { grid-column: 1 / 5; }
+.m-sp-del { border: 0; background: none; color: var(--muted); font-size: 16px; padding: 0; cursor: pointer; }
+.m-sp-del:hover { color: var(--danger); }
+.m-sp-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+/* 기록 창 닫기: ×가 스크롤에 밀려 사라지지 않게 위에 붙여 둠 + 아래 [닫기] (2026-11-02 냐냐) */
+.drawer .drawer-x { position: sticky; top: 12px; right: auto; margin: 12px 12px -52px auto; z-index: 5; background: var(--surface); box-shadow: var(--shadow); }
+#mCloseBtn { flex: 0 0 auto; }

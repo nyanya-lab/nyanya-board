@@ -6,7 +6,7 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261026e";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab } from "./money.js?v=20261101b";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, moneyCats, subOptions, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab } from "./money.js?v=20261102a";
 import { mountRepeat } from "./repeat.js?v=20261021d";
 import { mountAcctSet } from "./acctset.js?v=20261026a";
 import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
@@ -18,6 +18,7 @@ import { mountReport } from "./report.js?v=20261101a";
 import { mountSummary } from "./summary.js?v=20261101a";
 import { mountExtras } from "./extras.js?v=20261101b";
 import { mountPicker } from "./picker.js?v=20261102a";
+import { mountRecSplit } from "./recsplit.js?v=20261102a";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -336,6 +337,7 @@ bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum,
   settlePreview: (amt) => uri.ready() ? uri.settlePreview(amt) : null,   // 💸 이체로 정산: 미리보기
   settleCommon: (amt, tag, meta) => uri.settleBy(amt, tag, meta),   // 💸 이체로 정산: 정산 장부 settles/{이체 id}에 금액
   unsettleCommon: (tag) => uri.unsettle(tag),   // 💸 체크 빼거나 이체 지우면 장부에서 뺌
+  recSplit: mountRecSplit({ $, S, esc, won, amtVal, moneyCats, subOptions, commonCatName, commonCats: () => uri.cats(), kind: () => ui.kind, backend: () => backend }),   // ✂️ 기록 창 금액 나눠 적기
   onMoneySaved: (id) => ex.onSaved(id),   // 🏥보험금 저장 → 🔗 병원비 고르는 창 (extras.js)
   get backend() { return backend; }, get testMode() { return false; } });
 initMoney(); moneyBound = true;

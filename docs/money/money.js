@@ -1074,6 +1074,7 @@ export function renderMoneyForm(fill) {
     : "내 자산끼리 옮긴 돈이에요 (통장 → 통장, 통장 → 카드값). 수입·지출로 치지 않아요.";
   $("mSubmit").textContent = editing ? "고친 내용 저장" : { income: "수입 기록", expense: "지출 기록", transfer: "보낸 돈 기록", move: "이체 기록" }[k];
   if (!$("mDate").value) $("mDate").value = today();
+  if (E.recSplit) E.recSplit.sync();
 }
 export function editMoney(id) {
   const x = S.money.get(id); if (!x) return;
@@ -1094,6 +1095,7 @@ export function resetMoneyForm() {
 let drawerHome = null;
 function openDrawer() {
   const d = $("mDrawer"), p = $("moneyPanel");
+  if (E.recSplit) E.recSplit.reset();   // ✂️ 냐냐: 창을 열 때마다 나눈 줄 비움 (recsplit.js)
   if (p.parentNode !== d) { drawerHome = p.parentNode; d.appendChild(p); }
   openDlg(d);
 }
@@ -1340,13 +1342,15 @@ export function initMoney() {
     if (!ready()) return;
     const amount = amtVal($("mAmount"));
     if (!(amount > 0)) { toast("금액을 적어 주세요."); return; }
+    const sp = E.recSplit ? E.recSplit.collect(amount) : null;   // ✂️ 냐냐: 나눠 적기 → 이 기록은 나머지 금액, 나눈 줄은 새 기록으로
+    if (sp && sp.error) { toast(sp.error); return; }
     const date = $("mDate").value || today(), k = ui.kind;
     const account = $("mAcct").value || null, toAccount = k === "move" ? ($("mTo").value || null) : null;
     if (k === "move" && (!account || !toAccount)) { toast("이체는 보내는 곳과 받는 곳을 골라 주세요."); return; }
     if (k === "move" && account === toAccount) { toast("보내는 곳과 받는 곳이 같아요."); return; }
     if (isSalary() && !mPics.length && !confirm("📄 월급명세서 사진을 아직 안 붙였어요.\n사진 없이 저장할까요? ([취소]를 누르면 돌아가서 붙일 수 있어요)")) return;
     const cur = $("mCur").value && $("mCur").value !== "원" && $("mCur").value !== "__add" ? $("mCur").value : null;
-    const doc = { kind: k, amount, date, cat: k === "move" ? null : $("mCat").value, sub: k === "move" || !$("mSub").value || $("mSub").value === "__add" ? null : $("mSub").value, cur,
+    const doc = { kind: k, amount: sp ? sp.left : amount, date, cat: k === "move" ? null : $("mCat").value, sub: k === "move" || !$("mSub").value || $("mSub").value === "__add" ? null : $("mSub").value, cur,
       memo: $("mMemo").value.trim(), note: $("mNote").value.trim() || null, account, toAccount,
       common: k === "expense" && $("mCommon") && $("mCommon").checked ? true : null, ccat: null, csub: null };
     if (k === "expense" && ccOn()) { doc.ccat = doc.cat; doc.csub = doc.sub; doc.cat = commonCatName(); doc.sub = null; }   // 🏷 공통 분류 → ccat·csub, 내 분류는 '💙 공통비용'
@@ -1373,11 +1377,12 @@ export function initMoney() {
     act((async () => {
       const id = editing ? (await E.backend.update("money", id0, doc), id0) : await E.backend.add("money", { ...doc, createdAt: Date.now() });
       savedId = id;
+      if (sp) await E.recSplit.save(sp, doc, id0);
       for (const p of fresh) await E.backend.putPic(p.id, { full: p.full, thumb: p.thumb, money: id, kind: "money", title: doc.memo || doc.cat || "", date, at: Date.now() });
       for (const pid of gone) await E.backend.putPic(pid, null);
       if (wantSettle) await E.settleCommon(amount, id, { date, memo: doc.memo || doc.note || "이체", money: id });
       else if (wasSettle) await E.unsettleCommon(id);
-    })(), settle ? `💸 정산했어요. ${settle.rest}` : wasSettle && !wantSettle ? "정산 장부에서 뺐어요." : editing ? "고쳤어요." : "기록했어요.")
+    })(), settle ? `💸 정산했어요. ${settle.rest}` : wasSettle && !wantSettle ? "정산 장부에서 뺐어요." : sp ? `✂️ ${sp.lines.length + 1}건으로 나눠 적었어요.` : editing ? "고쳤어요." : "기록했어요.")
       .then(() => { const mm = shownMonth(doc); if (mm !== ui.month) ui.month = mm; resetMoneyForm(); if (E.onMoneySaved && savedId) E.onMoneySaved(savedId); }).catch(() => {});   // 냐냐: 🏥보험금 저장 → 병원비 고르는 창
   });
 
