@@ -1,5 +1,5 @@
-// 🔎 내역 표 정렬·거르기 (2026-11-02 냐냐 요청): 표 머리줄 칸을 더블클릭하면 바로 정렬(오름차순 ↔ 내림차순), 오른쪽 클릭하면 엑셀 필터처럼 작은 창 → 값 체크(금액은 최소~최대).
-// 폰은 머리줄이 없고 더블클릭·오른쪽 클릭도 없어서 표 위 칸 이름 버튼을 누름 → 같은 창에 정렬 버튼까지. 표 위 #txBar에 지금 걸린 조건·건수·합계·[모두 풀기].
+// 🔎 내역 표 정렬·거르기 (2026-11-02 냐냐 요청): 표 머리줄 칸을 누르면 바로 정렬(오름차순 → 내림차순 → 원래 순서), 오른쪽 클릭하면 엑셀 필터처럼 작은 창 → 값 체크(금액은 최소~최대).
+// 폰은 머리줄이 없고 오른쪽 클릭도 없어서 표 위 칸 이름 버튼을 누름 → 같은 창에 정렬 버튼까지. 표 위 #txBar에 지금 걸린 조건·건수·합계·[모두 풀기].
 // 화면에서만 거름 (기록은 안 바꿈). 달을 옮겨도 그대로, 새로고침하면 풀림. 위 요약 칸(전체·수입·지출)은 그 기간 전체 그대로.
 const COLS = [["date", "날짜"], ["acct", "자산"], ["cat", "분류"], ["sub", "소분류"], ["amt", "금액"], ["memo", "내용"], ["note", "메모"]];
 const BLANK = "(비어 있음)";
@@ -40,7 +40,7 @@ export function mountTxFilter(env) {
   }
   const active = () => Object.keys(st.f).length > 0;
   const mark = (c) => (st.sort && st.sort.col === c ? (st.sort.dir === "asc" ? " ▲" : " ▼") : "") + (st.f[c] ? " ⏷" : "");
-  const head = () => COLS.map(([c, l]) => `<span class="tf-th${c === "amt" ? " tx-amt" : ""}${mark(c) ? " on" : ""}" data-col="${c}" title="더블클릭: 정렬 · 오른쪽 클릭: 거르기">${l}${mark(c)}</span>`).join("");
+  const head = () => COLS.map(([c, l]) => `<span class="tf-th${c === "amt" ? " tx-amt" : ""}${mark(c) ? " on" : ""}" data-col="${c}" title="클릭: 정렬 · 오른쪽 클릭: 거르기">${l}${mark(c)}</span>`).join("");
   const sortText = (c, dir) => c === "date" ? (dir === "desc" ? "최근순" : "옛날순") : c === "amt" ? (dir === "desc" ? "큰 순" : "작은 순") : dir === "asc" ? "가나다순" : "역순";
   function filterText(c) {
     const f = st.f[c];
@@ -52,7 +52,7 @@ export function mountTxFilter(env) {
     const on = [];
     if (st.sort && active()) on.push(`<button type="button" class="tf-chip" data-tf-off="sort">${label(st.sort.col)} ${sortText(st.sort.col, st.sort.dir)} ×</button>`);
     Object.keys(st.f).forEach((c) => on.push(`<button type="button" class="tf-chip" data-tf-off="${c}">${c === "amt" ? esc(filterText(c)) : filterText(c)} ×</button>`));
-    const sum = (k) => items.filter((x) => (k === "income" ? x.kind === "income" : x.kind === "expense" || !x.kind)).reduce((t, x) => t + env.cntAmt(x), 0);
+    const sum = (k) => items.filter((x) => !x.recvTo && !x.recvOf && (k === "income" ? x.kind === "income" : x.kind === "expense" || !x.kind)).reduce((t, x) => t + env.cntAmt(x), 0);
     $("txBar").innerHTML = `<div class="tf-cols">${COLS.map(([c, l]) => `<button type="button" class="tf-col${mark(c) ? " on" : ""}" data-tf-col="${c}">${l}${mark(c)}</button>`).join("")}</div>` +
       (on.length ? `<div class="tf-on">${on.join("")}<button type="button" class="link-btn" data-tf-off="all">모두 풀기</button>${active() ? `<span class="small muted">${items.length.toLocaleString()}건 · 지출 ${won(sum("expense"))} · 수입 ${won(sum("income"))}</span>` : ""}</div>` : "");
   }
@@ -113,13 +113,14 @@ export function mountTxFilter(env) {
     });
   }
 
-  $("txList").addEventListener("dblclick", (e) => {
+  // capture: money.js가 머리줄 클릭을 capture에서 막아서 같은 단계에서 받음
+  $("txList").addEventListener("click", (e) => {
     const th = e.target.closest(".tx-th [data-col]"); if (!th) return;
     const c = th.dataset.col;
     const now = st.sort && st.sort.col === c ? st.sort.dir : "";
     st.sort = now === "asc" ? { col: c, dir: "desc" } : now === "desc" ? null : { col: c, dir: "asc" };   // 오름차순 → 내림차순 → 원래 순서
     close(); env.render();
-  });
+  }, true);
   $("txList").addEventListener("contextmenu", (e) => {
     const th = e.target.closest(".tx-th [data-col]"); if (!th) return;
     e.preventDefault();

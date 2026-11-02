@@ -699,15 +699,18 @@ function drawChart(el) {
 // 이체(내 자산끼리)는 전체에서만 줄로 보이고 합계엔 안 들어감. 줄을 누르면 서랍 창에서 고치기, ☐로 골라 [선택 삭제]
 const TX_KINDS = [["all", "전체"], ["income", "수입"], ["expense", "지출"], ["transfer", "💝 준 돈"]];
 const txSel = new Set();
+// 🤲 냐냐: 받을 돈 짝(마이너스 줄)은 목록에서 빼고 실제 지출 한 줄로 보여 줌 (합계는 그대로 0, 자산 탭·보고서엔 그대로)
+const isRecvPair = (x) => !!x.recvOf && S.money.has(x.recvOf);
 function renderTx(m, r) {
-  const f = TX_KINDS.some(([k]) => k === ui.txKind) ? ui.txKind : "all", cnt = { all: r.items.length, income: 0, expense: 0, transfer: 0 };
-  r.items.forEach((x) => { const k = x.kind || "expense"; if (k in cnt && k !== "all") cnt[k]++; });
+  const list0 = r.items.filter((x) => !isRecvPair(x));
+  const f = TX_KINDS.some(([k]) => k === ui.txKind) ? ui.txKind : "all", cnt = { all: list0.length, income: 0, expense: 0, transfer: 0 };
+  list0.forEach((x) => { const k = x.kind || "expense"; if (k in cnt && k !== "all") cnt[k]++; });
   const sums = { all: r.inc - r.exp - r.out, income: r.inc, expense: r.exp, transfer: r.out };
   const lab = ui.txRange ? rangeLabel(ui.txRange.from, ui.txRange.to) : monthLabel(m);
   $("txMonth").textContent = lab;
   const mn = $("mineNote"); if (mn) { mn.hidden = !mineOn(); mn.textContent = mineOn() ? `💑 내 몫으로 보는 중 — 💙 공통비용은 절반만${r.settleIn ? ` · 💚 정산 받은 돈 ${won(r.settleIn)}은 수입에서 뺐어요` : ""}` : ""; }
   $("txSum").innerHTML = TX_KINDS.map(([k, l]) => `<button type="button" class="tx-k k-${k}" role="tab" data-act="txKind" data-k="${k}" aria-selected="${f === k}"><span>${l} (${cnt[k]})</span><b class="won${k === "all" ? (sums.all < 0 ? " minus" : " plus") : ""}"><span class="tx-l">${k === "all" ? won(sums[k]) : wonN(sums[k])}</span><span class="tx-short">${k !== "all" && sums[k] < 0 ? "-" : ""}${moneyShort(Math.abs(sums[k]))}</span></b></button>`).join("");
-  const items0 = r.items.filter((x) => f === "all" || (x.kind || "expense") === f).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+  const items0 = list0.filter((x) => f === "all" || (x.kind || "expense") === f).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
   const items = E.txFilter ? E.txFilter.apply(items0) : items0;   // 🔎 냐냐: 머리줄 더블클릭 정렬·거르기 (txfilter.js)
   if (E.txFilter) E.txFilter.bar(items);
   [...txSel].forEach((id) => { if (!items.some((x) => x.id === id)) txSel.delete(id); });
@@ -731,7 +734,7 @@ export function txRow(x, ck, o = {}) {   // o.d = 이 자산 쪽에서 본 +/−
           (o.d != null ? `<span class="tx-amt won ${o.d > 0 ? "plus" : "minus"}">${Number(x.amount) < 0 ? "-" : ""}${won(Math.abs(o.d))}${o.bal ? `<small class="tx-bal">${o.bal}</small>` : ""}</span>`
             : (() => {   // 마이너스 금액(환불·취소)은 부호를 뒤집어 보여 줌 (냐냐 쪽에서 더함 — 편한가계부 가져온 환불 줄)
               const neg = Number(x.amount) < 0, plus = kind === "income" ? !neg : kind === "move" ? null : neg;
-              return `<span class="tx-amt won ${plus == null ? "" : plus ? "plus" : "minus"}">${amtText(x)}</span>`;   // 냐냐: +·- 기호 없이 색으로만, 직접 -로 적은 것만 -
+              return `<span class="tx-amt won ${x.recvTo || x.recvOf ? "tx-rv" : plus == null ? "" : plus ? "plus" : "minus"}">${amtText(x)}</span>`;   // 냐냐: +·- 기호 없이 색으로만, 직접 -로 적은 것만 -
             })()) +
           `<span class="tx-m">${esc(x.memo || "")}</span><span class="tx-n">${x.note ? esc(x.note) : ""}${n ? ` <span class="m-mark">📷${n > 1 ? n : ""}</span>` : ""}</span></div>`;
 }
@@ -760,12 +763,12 @@ function renderMCal(m, r) {
   }
   $("mcCal").innerHTML = h;
   // 고른 날: 수입 · 지출 + 내역 (누르면 서랍 창에서 고치기)
-  const its = items.filter((x) => x.date === sel && want(x)).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)), dv = day[sel] || { inc: 0, out: 0 };
+  const its = items.filter((x) => x.date === sel && want(x) && !isRecvPair(x)).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)), dv = day[sel] || { inc: 0, out: 0 };
   $("mcDay").innerHTML = `<div class="mc-dh"><b>${shortDate(sel)}</b><button class="btn small" type="button" data-act="mcAdd">＋ 내역 추가</button></div>` +
     `<div class="mc-ds"><span>수입<b class="won plus">${won(dv.inc)}</b></span><span>지출<b class="won minus">${won(dv.out)}</b></span></div>` +
     `<div class="mc-list">${its.map((x) => { const k = x.kind || "expense";
-      return `<button type="button" class="mc-it" data-act="editMoney" data-id="${esc(x.id)}"><span class="c">${x.cat ? esc(x.cat) : esc(KIND_LABEL[k])}${x.sub ? ` <span class="muted small">· ${esc(x.sub)}</span>` : ""}${k === "transfer" ? " 💝" : ""}</span>` +
-        `<span class="a won ${k === "income" ? "plus" : k === "transfer" ? "give" : "minus"}">${amtText(x)}</span><span class="m">${esc([x.memo, acctName(x.account)].filter(Boolean).join(" · "))}${memoMarks({ ...x, sub: null })}</span></button>`; }).join("") ||
+      return `<button type="button" class="mc-it" data-act="editMoney" data-id="${esc(x.id)}"><span class="c">${x.recvTo ? "🤲 받을 돈" : x.cat ? esc(x.cat) : esc(KIND_LABEL[k])}${x.sub ? ` <span class="muted small">· ${esc(x.sub)}</span>` : ""}${k === "transfer" ? " 💝" : ""}</span>` +
+        `<span class="a won ${x.recvTo ? "tx-rv" : k === "income" ? "plus" : k === "transfer" ? "give" : "minus"}">${amtText(x)}</span><span class="m">${esc([x.memo, acctName(x.account)].filter(Boolean).join(" · "))}${memoMarks({ ...x, sub: null })}</span></button>`; }).join("") ||
       '<p class="muted small" style="margin:0">이 날 기록이 없어요.</p>'}</div>`;
 }
 
@@ -811,7 +814,7 @@ function renderStats() {
     if (ui.stCc) { shown = shown.filter((x) => ccOf(x).c === ui.stCc); stot = g[ui.stCc]; }
   } else ui.stCc = null;
   if ($("stCcSub")) $("stCcSub").hidden = true;
-  $("stCats").innerHTML = `<button type="button" class="st-cat all${sel ? "" : " on"}" data-act="stCat" data-k=""><span>${label} 전체 <small>${recs.length}</small></span><b class="won">${wonN(total)}</b></button>` +
+  $("stCats").innerHTML = `<button type="button" class="st-cat all${sel ? "" : " on"}" data-act="stCat" data-k=""><span>${label} 전체 <small>${recs.filter((x) => !isRecvPair(x)).length}</small></span><b class="won">${wonN(total)}</b></button>` +
     cats.map(([c, v]) => `<button type="button" class="st-cat${sel === c ? " on" : ""}" data-act="stCat" data-k="${esc(c)}"><i class="st-pct" style="--c:${catVar(kind, c)}">${pct(v)}%</i><span>${catDot(kind, c)}${esc(c)}</span><b class="won">${wonN(v)}</b></button>` + (sel === c ? ccHtml : "")).join("");
   $("stHead").innerHTML = `<h3>${esc(sel ? sel + (ui.stCc ? " › " + ui.stCc : "") : label + " 전체")}</h3><b class="won">${wonN(stot)}</b>`;
   $("stChip").innerHTML = `<i class="st-pct" style="--c:${sel ? catVar(kind, sel) : "var(--coral)"}">${sel ? pct(stot) : 100}%</i> ${esc(sel || "전체")} <b class="won">${won(stot)}</b>`;
@@ -820,7 +823,7 @@ function renderStats() {
   if (p === "range") { const ms = []; for (let mm = cur.from.slice(0, 7); mm <= cur.to.slice(0, 7) && ms.length < 24; mm = shiftMonth(mm, 1)) ms.push(mm); pts = ms.map((mm) => { const v = sum(mm + "-01" < cur.from ? cur.from : mm + "-01", dayInMonth(mm, 31) > cur.to ? cur.to : dayInMonth(mm, 31)); return { lab: `${+mm.slice(5)}월`, v, on: false, tip: `${mm} ${won(v)}` }; }); }
   else pts = Array.from({ length: p === "year" ? 5 : 12 }, (_, i) => i - (p === "year" ? 4 : 11)).map((k) => { const r = stRange(p, st.anchor, k), v = sum(r.from, r.to); return { lab: r.lab, v, on: k === 0, tip: `${r.name} ${won(v)}` }; });
   setChart($("stChart"), { pts, label: `${label} 흐름` });
-  shown.sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+  shown = shown.filter((x) => !isRecvPair(x)).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
   $("stList").innerHTML = shown.length ? `<div class="tx-row tx-th no-ck"><span>날짜</span><span>자산</span><span>분류</span><span>소분류</span><span class="tx-amt">금액</span><span>내용</span><span>메모</span></div>` + shown.map((x) => txRow(x, false)).join("")
     : `<p class="muted small" style="margin:8px 0">${esc(cur.name)} ${esc(sel || label)} 기록이 없어요.</p>`;
 }

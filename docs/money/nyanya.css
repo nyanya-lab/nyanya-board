@@ -503,3 +503,5 @@ select:disabled { cursor: default; opacity: .6; }
 .tf-btns { display: flex; justify-content: flex-end; gap: 6px; }
 @media (min-width: 921px) { #txBar:not(:has(.tf-on)) { display: none; } }
 @media (max-width: 920px) { .tf-cols { display: flex; } }
+
+#moneyPage .won.tx-rv { color: var(--muted); }   /* 🤲 받을 돈: 내 지출이 아니라서 회색 */

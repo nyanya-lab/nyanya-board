@@ -10,6 +10,7 @@
 //   기록 = { kind expense, amount, date, account, cat, sub, memo "", note 가맹점명, src "BC카드", bcNo 승인번호 } (공통이면 cat '💙 공통비용' + common·ccat·csub)
 //   → ✂️ 승인 한 건을 금액별로 나눠 적기 (2026-11-02 냐냐 요청): 금액 칸 ✂️ → 줄마다 금액·분류·소분류·내용·메모, 마지막 줄은 나머지 금액 자동. 기록 id = bc-… / bc-…-s1, bcNo는 같은 번호라 다시 올려도 안 겹침.
 //   → 🤲 분류에서 '🤲 받을 돈'을 고르면 소분류 칸이 이름 칸 (recv.js): 그 금액은 받을 돈으로, 짝 기록 {기록 id}-rv. 이름을 안 적으면 분류를 안 고른 것처럼 빠짐.
+//   → 🔁 매월 반복으로 들어간 기록(id rp-)과 같은 카드·같은 금액이 앞뒤 7일 안에 있으면 (날짜가 달라도, 2026-11-02 냐냐: 농협 213,400원) 체크를 빼 둠. 전에 다른 분류로 적던 가게면 우연이니 그대로 (티머니 11,100원 ≠ 아이클라우드).
 // 파일은 이 브라우저에서만 읽고 저장소에 안 올라감.
 import { recvPair, RECV_CAT } from "./recv.js?v=20261102c";
 const SHEETJS = "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
@@ -99,13 +100,21 @@ export function mountCardImport(root, env) {
     // 분류 미리 고르기: 전에 같은 가게를 적은 분류. 단 음식점·배달앱은 비워 둠 (냐냐 요청) — 평일 점심때(11:00~14:30)면 '점심'
     //   전에 적은 적 없는 가게도 평일 점심때면 '점심', 아니면 빈칸
     const lunchCat = env.cats("expense").find((c) => /점심/.test(c)) || "";
+    const dayGap = (a, b) => Math.abs(new Date(`${a}T00:00`) - new Date(`${b}T00:00`)) / 864e5;
+    const repeatOf = (r, g0) => {
+      if (r.have) return null;
+      for (const [id, x] of S.money) if (id.startsWith("rp-") && !used.has(id) && x && x.account === acct && Number(x.amount) === r.amount && dayGap(x.date, r.date) <= 7 && (!g0 || (!g0.common && g0.cat === x.cat))) { used.add(id); return x; }
+      return null;
+    };
     live.forEach((r) => {
       const g0 = guess(r.shop), g = g0 || {}, p = st.pick[r.i] || {}, d = new Date(`${r.date}T00:00`).getDay(), hm = r.time.slice(0, 5);
+      r.rp = repeatOf(r, g0);
       r.dow = DOW[d];
       const lunch = d >= 1 && d <= 5 && hm >= "11:00" && hm <= "14:30", food = DELIVERY.test(r.shop) || foodGuess(g0);
       let cat = g.common ? env.commonCatName() : g.cat || "", sub = g.common ? (g.ccat ? `${g.ccat}|${g.csub}` : "") : g.sub || "";
       if (food || !g0) { cat = lunch && lunchCat ? lunchCat : ""; sub = ""; }
-      r.cat = p.cat ?? cat; r.sub = p.sub ?? sub; r.on = p.on ?? true;
+      if (r.rp) { cat = r.rp.cat || ""; sub = r.rp.sub || ""; }
+      r.cat = p.cat ?? cat; r.sub = p.sub ?? sub; r.on = p.on ?? !r.rp;
       setRecv(r, p);
       r.memo = p.memo ?? ""; r.note = p.note ?? r.shop;   // 내용은 비우고, 메모엔 가게 이름 (냐냐가 지금까지 적던 대로)
     });
@@ -186,6 +195,7 @@ export function mountCardImport(root, env) {
             ${r.spN ? `<span class="ci-shop muted">↳ 나눈 줄 <button type="button" class="ci-mg" data-ci="cutdel" data-i="${esc(r.i)}" aria-label="이 줄 빼기">×</button></span>` : `<span class="ci-shop">${esc(r.shop)}${r.partial ? ' <span class="muted small">(부분취소)</span>' : ""}
               ${r.parts ? `<br><span class="ci-parts">🧸 ${r.parts.length}건 합: ${r.parts.map((x) => `${esc(x.time.slice(0, 5))} ${esc(won(x.amount))}`).join(" + ")}</span> <button type="button" class="ci-mg" data-ci="split" data-g="${esc(r.i)}">나누기</button>`
                 : r.grp ? `<br><span class="ci-parts">같은 날 같은 가게 ${r.gn}건</span>${r.first ? ` <button type="button" class="ci-mg" data-ci="join" data-g="${esc(r.grp)}">합치기</button>` : ""}` : ""}
+              ${r.rp && !r.parts ? `<br><span class="ci-parts">🔁 ${esc(r.rp.date.slice(5))} 반복 기록과 금액이 같아서 뺐어요. 다른 거면 체크해 주세요</span>` : ""}
               ${r.sp != null ? `<br><span class="ci-parts">✂️ 전체 ${esc(won(r.spTotal))}</span> <button type="button" class="ci-mg" data-ci="cutadd" data-g="${esc(r.sp)}">＋ 줄 더</button><button type="button" class="ci-mg" data-ci="cutoff" data-g="${esc(r.sp)}">안 나누기</button>` : ""}</span>`}
             ${r.sp == null ? `<span class="ci-amt"><button type="button" class="ci-cut" data-ci="cut" data-g="${esc(r.i)}" title="금액 나눠 적기" aria-label="금액 나눠 적기">✂️</button>${esc(won(r.amount))}</span>`
               : r.spLast ? `<span class="ci-amt" data-left><b>${esc(leftText(r))}</b><br><span class="muted small">나머지</span></span>`
