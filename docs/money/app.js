@@ -6,20 +6,20 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261026e";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, moneyCats, subOptions, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab, lastAcct, rememberAcct } from "./money.js?v=20261102b";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, moneyCats, subOptions, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab, lastAcct, rememberAcct } from "./money.js?v=20261102c";
 import { mountRepeat } from "./repeat.js?v=20261021d";
-import { mountAcctSet } from "./acctset.js?v=20261102a";
+import { mountAcctSet } from "./acctset.js?v=20261102b";
 import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
 import { startVerCheck } from "../vercheck.js?v=20261022a";
 import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
-import { mountCardImport } from "./cardimport.js?v=20261102c";
+import { mountCardImport } from "./cardimport.js?v=20261102d";
 import { mountReport } from "./report.js?v=20261101a";
 import { mountSummary } from "./summary.js?v=20261102a";
 import { mountExtras } from "./extras.js?v=20261102a";
 import { mountPicker } from "./picker.js?v=20261102a";
-import { mountRecSplit } from "./recsplit.js?v=20261102b";
-import { mountRecv, recvShort } from "./recv.js?v=20261102a";
+import { mountRecSplit } from "./recsplit.js?v=20261102c";
+import { mountRecv } from "./recv.js?v=20261102b";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -340,7 +340,7 @@ bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum,
   settlePreview: (amt) => uri.ready() ? uri.settlePreview(amt) : null,   // 💸 이체로 정산: 미리보기
   settleCommon: (amt, tag, meta) => uri.settleBy(amt, tag, meta),   // 💸 이체로 정산: 정산 장부 settles/{이체 id}에 금액
   unsettleCommon: (tag) => uri.unsettle(tag),   // 💸 체크 빼거나 이체 지우면 장부에서 뺌
-  recSplit: mountRecSplit({ $, S, esc, won, amtVal, moneyCats, subOptions, commonCatName, commonCats: () => uri.cats(), kind: () => ui.kind, backend: () => backend, recv: () => rv, recvShort }),   // ✂️ 기록 창 금액 나눠 적기
+  recSplit: mountRecSplit({ $, S, esc, won, amtVal, moneyCats, subOptions, commonCatName, commonCats: () => uri.cats(), kind: () => ui.kind, backend: () => backend, recv: () => rv }),   // ✂️ 기록 창 금액 나눠 적기
   recv: rv,
   onMoneySaved: (id) => ex.onSaved(id),   // 🏥보험금 저장 → 🔗 병원비 고르는 창 (extras.js)
   get backend() { return backend; }, get testMode() { return false; } });
@@ -350,7 +350,7 @@ const bal = mountBalance($("balPanel"), { S, backend: () => backend, toast, act,
 // 💳 카드 승인내역 올리기 (내역 탭 💳 버튼 → 팝업) — 승인취소 빼고, 이미 있는 건 건너뛰고
 $("cardOpen").addEventListener("click", () => { openDlg($("cardDlg")); ci.render(); });
 $("cardClose").addEventListener("click", () => closeDlg($("cardDlg")));
-const ci = mountCardImport($("cardImpPanel"), { S, backend: () => backend, close: () => closeDlg($("cardDlg")), recvAccts: () => rv.accts(), toast, esc, won, render, commonCatName, commonCats: () => uri.cats(), subs: subsOf, dialog: true,
+const ci = mountCardImport($("cardImpPanel"), { S, backend: () => backend, close: () => closeDlg($("cardDlg")), recv: rv, toast, esc, won, render, commonCatName, commonCats: () => uri.cats(), subs: subsOf, dialog: true,
   cats: (k) => { const c = (S.settings.moneyCats || {})[k]; return (c && c.length ? c : MONEY_CATS[k] || []).slice(); } });
 // 📥 편한가계부 가져오기 (가계부 설정 탭)
 mountImport($("importPanel"), { S, backend: () => backend, toast, act, esc, won, render, balances, catKey, defaultCats: (k) => (MONEY_CATS[k] || []).slice() });

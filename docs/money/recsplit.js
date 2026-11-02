@@ -38,8 +38,8 @@ export function mountRecSplit(env) {
       <div class="m-sp-btns"><button type="button" class="m-sp-open" data-sp="add">＋ 줄 더</button><button type="button" class="m-sp-open" data-sp="off">안 나누기</button></div></div>`;
   }
   function recvHtml(l) {
-    const list = env.kind() === "expense" && env.recv() ? env.recv().accts() : []; if (!list.length) return "";
-    return `<select data-f="recv" aria-label="받을 돈"${isCc(l.cat) ? " disabled" : ""}><option value="">내 돈</option>${list.map((a) => `<option value="${esc(a.id)}"${a.id === l.recv ? " selected" : ""}>🤲 ${esc(env.recvShort(a))}</option>`).join("")}</select>`;
+    if (env.kind() !== "expense" || !env.recv()) return "";
+    return `<input type="text" data-f="recv" list="recvNames" maxlength="20" autocomplete="off" value="${esc(l.recv)}" placeholder="🤲 받을 사람" aria-label="받을 사람 이름"${isCc(l.cat) ? " disabled" : ""}>`;
   }
   const showRest = () => { const el = $("mSplit").querySelector("[data-sp-rest]"); if (el) el.innerHTML = restHtml(); };
 
@@ -55,11 +55,17 @@ export function mountRecSplit(env) {
   $("mSplit").addEventListener("input", (e) => {
     const l = lineOf(e.target), f = e.target.dataset.f; if (!l) return;
     if (f === "amt") { l.amt = amtVal(e.target); showRest(); } else if (f === "memo") l.memo = e.target.value;
+    else if (f === "recv") {   // 적는 동안 안 다시 그림. 분류를 안 골랐으면 기타로
+      l.recv = e.target.value;
+      if (l.recv.trim() && !l.cat) {
+        l.cat = env.moneyCats("expense").find((c) => /기타/.test(c)) || env.moneyCats("expense")[0] || "";
+        const row = e.target.closest("[data-k]"), s = row.querySelector('[data-f="sub"]'); row.querySelector('[data-f="cat"]').value = l.cat; s.innerHTML = subHtml(l); s.disabled = false;
+      }
+    }
   });
   $("mSplit").addEventListener("change", (e) => {
     const l = lineOf(e.target), f = e.target.dataset.f; if (!l) return;
     if (f === "cat") { l.cat = e.target.value; l.sub = ""; if (isCc(l.cat)) l.recv = ""; draw(); }
-    else if (f === "recv") { l.recv = e.target.value; if (l.recv && !l.cat) l.cat = env.moneyCats("expense").find((c) => /기타/.test(c)) || env.moneyCats("expense")[0] || ""; draw(); }
     else if (f === "sub") l.sub = e.target.value;
   });
   $("mAmount").addEventListener("input", showRest);
@@ -74,8 +80,8 @@ export function mountRecSplit(env) {
       if (lines.some((l) => !(l.amt > 0))) return { error: "나눌 금액을 적어 주세요." };
       const r = left(); if (r <= 0) return { error: `나눈 금액이 전체 ${won(total)}보다 많거나 같아요.` };
       if (lines.some((l) => !l.cat)) return { error: "나눈 줄의 분류를 골라 주세요." };
-      if (lines.some((l) => l.recv) && $("mCur").value && $("mCur").value !== "원") return { error: "🤲 받을 돈은 원화만 적을 수 있어요." };
-      if (lines.some((l) => l.recv && l.recv === $("mAcct").value)) return { error: "낸 곳과 받을 돈 자산이 같아요." };
+      if (lines.some((l) => l.recv.trim()) && $("mCur").value && $("mCur").value !== "원") return { error: "🤲 받을 돈은 원화만 적을 수 있어요." };
+      if (lines.some((l) => l.recv.trim() && env.recv().idOf(l.recv) === $("mAcct").value)) return { error: "낸 곳과 받을 돈 자산이 같아요." };
       return { left: r, lines: lines.slice() };
     },
     async save(sp, doc, oldId) {
@@ -83,9 +89,9 @@ export function mountRecSplit(env) {
       for (const [i, l] of sp.lines.entries()) {
         const cc = isCc(l.cat), [c, s] = cc ? l.sub.split("|") : [];
         const d = { kind: doc.kind, amount: l.amt, date: doc.date, cat: l.cat, sub: cc ? null : l.sub || null, cur: doc.cur, memo: l.memo.trim() || doc.memo, note: doc.note, account: doc.account, toAccount: null,
-          common: cc ? true : null, ccat: cc ? c || null : null, csub: cc ? s || null : null, settle: null, pics: null, src: old.src || null, bcNo: old.bcNo || null, createdAt: Date.now() + i, recvTo: l.recv || null };
+          common: cc ? true : null, ccat: cc ? c || null : null, csub: cc ? s || null : null, settle: null, pics: null, src: old.src || null, bcNo: old.bcNo || null, createdAt: Date.now() + i, recvTo: l.recv.trim() ? env.recv().idOf(l.recv) : null };
         const id = await env.backend().add("money", d);
-        if (l.recv) await env.recv().sync(id, d);
+        if (d.recvTo) await env.recv().sync(id, d);
       }
     },
   };

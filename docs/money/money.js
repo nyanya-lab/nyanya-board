@@ -552,7 +552,8 @@ export function acctPeriod(a, m) { return a && a.type === "card" && a.pay && a.p
 const ymdDot = (s) => `${s.slice(2, 4)}.${+s.slice(5, 7)}.${+s.slice(8)}`;   // 2026-10-01 → 26.10.1
 function renderAssets(all, bal) {
   // 냐냐: 🤝 공동 자산(accounts.joint, 데이트통장 등)은 내 자산·부채·합계에서 빼고 맨 아래 '🤝 공동' 묶음으로 따로 (기록 칸에선 그대로 고를 수 있음)
-  const accts = all.filter((a) => !a.joint), joints = all.filter((a) => a.joint);
+  // 🤲 받을 돈 자산은 잔액 0원이면 목록에서 숨김 (보고 있는 동안은 그대로, recv.js)
+  const accts = all.filter((a) => !a.joint && !(E.recv && a.id !== ui.asSel && E.recv.zero(a.id))), joints = all.filter((a) => a.joint);
   const fold = asFold(), sel = asSelected(), owedOf = (a) => Math.max(0, -(bal[a.id] || 0));
   const total = accts.reduce((s2, a) => s2 + (bal[a.id] || 0), 0);
   const owed = accts.filter((a) => a.type === "card").reduce((s2, a) => s2 + owedOf(a), 0);
@@ -1007,7 +1008,8 @@ function mFormActive() { const p = $("moneyPanel"); return $("mDrawer").open || 
 
 // 자산 고르는 칸 (냐냐 쪽에서 더함, 편한가계부처럼): 자산 탭과 같은 순서로 현금 · 통장 · 카드 · 저축 묶음, 이름_계좌번호
 export const acctLabel = (a) => a.name + (a.number ? "_" + a.number : "");
-export function acctOptsHtml(list, cur) {
+export function acctOptsHtml(list, cur, keepRecv) {
+  if (E.recv && !keepRecv) list = list.filter((a) => a.id === cur || !E.recv.zero(a.id));   // 🤲 받을 돈 0원은 고르는 칸에서도 숨김
   return AS_GROUPS.map(([t, label]) => {
     const g = list.filter((a) => (ACCT_TYPES[a.type] ? a.type : "bank") === t); if (!g.length) return "";
     return `<optgroup label="${label}">${g.map((a) => `<option value="${esc(a.id)}"${a.id === cur ? " selected" : ""}>${esc(acctLabel(a))}</option>`).join("")}</optgroup>`;
@@ -1018,7 +1020,7 @@ export function acctOptions(sel, cur, kind) {
   const list = sortedAccts();
   // 수입은 카드로 받을 일이 없으니 카드 빼기
   const ok = list.filter((a) => !(kind === "income" && a.type === "card"));
-  sel.innerHTML = '<option value="">선택 안 함</option>' + acctOptsHtml(ok) +
+  sel.innerHTML = '<option value="">선택 안 함</option>' + acctOptsHtml(ok, cur, sel.id === "mTo") +   // 이체 받는 곳엔 남겨 둠 (돈을 빌려줄 때)
     (cur && !ok.some((a) => a.id === cur) ? `<option value="${esc(cur)}">${esc(acctName(cur))}</option>` : "");
   sel.value = cur || "";
 }

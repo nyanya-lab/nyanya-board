@@ -3,6 +3,8 @@
 // 기록: 실제 지출 recvTo = 받을 돈 자산 id / 짝 money/{id}-rv = { amount -금액, account 받을 돈 자산, recvOf 실제 지출 id } (날짜·분류·내용은 실제 지출과 같음)
 // 받았을 때: 받을 돈 자산 → 통장 이체 한 건 + 고른 줄마다 recvPaid = 이체 id. 그 이체를 지우면 다시 안 받은 돈으로 돌아옴.
 // 받을 돈 자산 = accounts.recv (안 정했으면 이름에 빌려준·받기·받을). 자산 관리 🤲에서 켜고 끔.
+// 이름 직접 적기 (같은 날 냐냐 요청): 칸에 이름을 적으면 그 이름의 자산을 찾고(이름 또는 괄호 안 이름, 자동완성 #recvNames), 없으면 '받기(이름)' 자산을 새로 만듦.
+// 잔액 0원이면 자산 탭 목록·고르는 칸에서 저절로 숨김 (zero, 기록은 그대로, 같은 이름을 다시 적으면 이어짐). 이체 받는 곳에는 남겨 둠 (돈을 빌려줄 때 고를 수 있게).
 // 2026-11-02 전에 적은 기록은 잔액이 다 맞춰져 있어서 목록에 안 나옴 (RECV_FROM).
 const RECV_FROM = new Date("2026-11-02T00:00:00+09:00").getTime();
 
@@ -18,21 +20,41 @@ export function mountRecv(env) {
   const accts = () => [...S.accounts.entries()].filter(([, a]) => isRecvAcct(a)).map(([id, a]) => ({ id, ...a }));
   const off = new Set();   // 받을 때 체크를 뺀 줄 (기본은 다 체크)
   const form = { to: null, date: "" };
+  const pending = new Map();   // 새로 만들 자산: id → 이름 (저장할 때 만듦)
+  const same = (x, y) => x.trim().toLowerCase() === y.trim().toLowerCase();
+  // 이름 → 자산 id (없으면 새 id를 정해 둠)
+  function idOf(name) {
+    const hit = accts().find((a) => same(a.name, name) || same(recvShort(a), name)); if (hit) return hit.id;
+    const p = [...pending].find(([, n]) => same(n, name)); if (p) return p[0];
+    const id = env.rid(); pending.set(id, name.trim()); return id;
+  }
+  const newDoc = (id) => pending.has(id) ? { name: `받기(${pending.get(id)})`, type: "cash", initial: 0, recv: true, createdAt: Date.now() } : null;
+  async function ensure(id) { const d = newDoc(id); if (d) { await env.backend().set("accounts", id, d); pending.delete(id); } }
+  // 자동완성 목록 (다 받은 사람도 나옴)
+  function fillNames() { $("recvNames").innerHTML = accts().map((a) => `<option value="${esc(recvShort(a))}"></option>`).join(""); }
+  // 받을 돈 자산인데 잔액 0원? (한 번 그리는 동안 한 번만 계산)
+  let zb = null;
+  function zero(id) {
+    if (!isRecvAcct(S.accounts.get(id))) return false;
+    if (!zb) { zb = env.balances(); queueMicrotask(() => { zb = null; }); }
+    return Math.round(zb[id] || 0) === 0;
+  }
 
   // ── 기록 창 칸 ──
   function formSync(fill) {
-    const wrap = $("mRecvWrap"), k = env.kind(), list = accts(); if (!wrap) return;
-    wrap.hidden = k !== "expense" || !list.length;
-    const ck = $("mRecv"), sel = $("mRecvTo"), want = fill ? fill.recvTo || "" : sel.value;
-    if (fill) ck.checked = !!fill.recvTo;
-    sel.innerHTML = list.map((a) => `<option value="${esc(a.id)}"${a.id === want ? " selected" : ""}>${esc(a.name)}</option>`).join("");
-    sel.hidden = !ck.checked;
+    const wrap = $("mRecvWrap"), ck = $("mRecv"), box = $("mRecvTo"); if (!wrap) return;
+    wrap.hidden = env.kind() !== "expense";
+    if (fill) { const a = fill.recvTo && S.accounts.get(fill.recvTo); ck.checked = !!fill.recvTo; box.value = a ? recvShort(a) : ""; }
+    if (!ck.checked) box.value = "";
+    box.hidden = !ck.checked;
+    fillNames();
   }
   // 저장 전 확인: 받을 돈 자산 id | null | { error }
   function collect() {
     if (env.kind() !== "expense" || !$("mRecv").checked) return null;
-    const to = $("mRecvTo").value;
-    if (!to) return { error: "받을 사람을 골라 주세요." };
+    const name = $("mRecvTo").value.trim();
+    if (!name) return { error: "받을 사람 이름을 적어 주세요." };
+    const to = idOf(name);
     if ($("mCommon") && $("mCommon").checked) return { error: "❤️ 공통비용과 🤲 받을 돈은 같이 못 적어요. 하나만 골라 주세요." };
     if ($("mCur").value && $("mCur").value !== "원") return { error: "🤲 받을 돈은 원화만 적을 수 있어요." };
     if ($("mAcct").value === to) return { error: "낸 곳과 받을 돈 자산이 같아요." };
@@ -42,6 +64,7 @@ export function mountRecv(env) {
   async function sync(id, doc) {
     const be = env.backend(), pid = `${id}-rv`;
     if (!doc.recvTo) { if (S.money.has(pid)) await be.remove("money", pid); return; }
+    await ensure(doc.recvTo);
     const had = S.money.get(pid), d = recvPair(id, doc, doc.recvTo, had ? had.createdAt : Date.now());
     await be.update("money", pid, d);
   }
@@ -73,7 +96,7 @@ export function mountRecv(env) {
     const on = openOf(box.dataset.rvAcct).filter((x) => !off.has(x.id)), go = box.querySelector('[data-rv="go"]');
     go.disabled = !on.length; go.textContent = `${on.length}건 받았어요 · ${won(on.reduce((t, x) => t + x.amt, 0))}`;
   }
-  $("mRecv").addEventListener("change", () => formSync());
+  $("mRecv").addEventListener("change", () => { formSync(); if ($("mRecv").checked) $("mRecvTo").focus(); });
   $("asDetail").addEventListener("change", (e) => {
     const k = e.target.dataset.rv; if (!k) return;
     if (k === "ck") { if (e.target.checked) off.delete(e.target.dataset.id); else off.add(e.target.dataset.id); goText(e.target.closest("[data-rv-acct]")); }
@@ -91,5 +114,5 @@ export function mountRecv(env) {
     env.rememberAcct("moveTo", to);
     env.act(env.backend().rootUpdate(p), `🤲 ${won(sum)} 받았다고 적었어요.`).then(() => { form.date = ""; env.render(); }).catch(() => {});
   });
-  return { accts, formSync, collect, sync, panel, partner: (id) => recvPartner(S, id) };
+  return { accts, idOf, newDoc, done: (id) => pending.delete(id), fillNames, zero, formSync, collect, sync, panel, partner: (id) => recvPartner(S, id) };
 }

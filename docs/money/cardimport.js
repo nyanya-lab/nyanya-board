@@ -9,9 +9,9 @@
 //     내용은 빈칸 · 메모는 가게 이름으로 채워 두고 미리보기에서 고칠 수 있음. 날짜 옆 요일·시간. 미리보기에서 바꾸고 [기록하기].
 //   기록 = { kind expense, amount, date, account, cat, sub, memo "", note 가맹점명, src "BC카드", bcNo 승인번호 } (공통이면 cat '💙 공통비용' + common·ccat·csub)
 //   → ✂️ 승인 한 건을 금액별로 나눠 적기 (2026-11-02 냐냐 요청): 금액 칸 ✂️ → 줄마다 금액·분류·소분류·내용·메모, 마지막 줄은 나머지 금액 자동. 기록 id = bc-… / bc-…-s1, bcNo는 같은 번호라 다시 올려도 안 겹침.
-//   → 🤲 줄마다 받을 돈 고르기 (recv.js): 그 금액은 받을 돈으로, 짝 기록 {기록 id}-rv. 분류가 비어 있으면 기타로. 공통비용 줄은 못 고름.
+//   → 🤲 줄마다 받을 사람 이름 적기 (recv.js): 그 금액은 받을 돈으로, 짝 기록 {기록 id}-rv. 분류가 비어 있으면 기타로. 공통비용 줄은 못 고름.
 // 파일은 이 브라우저에서만 읽고 저장소에 안 올라감.
-import { recvPair, recvShort } from "./recv.js?v=20261102a";
+import { recvPair } from "./recv.js?v=20261102b";
 const SHEETJS = "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 const norm = (s) => String(s || "").replace(/\s+/g, "");
 const num = (v) => typeof v === "number" ? v : Number(String(v || "").replace(/[^\d.-]/g, "")) || 0;
@@ -146,9 +146,9 @@ export function mountCardImport(root, env) {
   // 🤲 받을 돈: 분류가 비어 있으면 기타로 (어차피 내 지출에서 빠짐), 공통비용 줄은 안 됨
   function setRecv(r, p) {
     r.recv = isCc(r.cat) ? "" : p.recv ?? "";
-    if (r.recv && !r.cat) r.cat = env.cats("expense").find((c) => /기타/.test(c)) || env.cats("expense")[0] || "";
+    if (r.recv.trim() && !r.cat) r.cat = env.cats("expense").find((c) => /기타/.test(c)) || env.cats("expense")[0] || "";
   }
-  const recvSel = (r) => `<select data-ci="recv" data-i="${esc(r.i)}" aria-label="받을 돈"${isCc(r.cat) ? " disabled" : ""}><option value="">내 돈</option>${env.recvAccts().map((a) => `<option value="${esc(a.id)}"${a.id === r.recv ? " selected" : ""}>🤲 ${esc(recvShort(a))}</option>`).join("")}</select>`;
+  const recvSel = (r) => `<input type="text" data-ci="recv" data-i="${esc(r.i)}" list="recvNames" maxlength="20" autocomplete="off" value="${esc(r.recv)}" placeholder="🤲 받을 사람" aria-label="받을 사람 이름"${isCc(r.cat) ? " disabled" : ""}>`;
   function subOpts(r) {
     if (isCc(r.cat)) {
       const cc = env.commonCats() || [];
@@ -202,6 +202,7 @@ export function mountCardImport(root, env) {
       if (v.haves.length) h += `<details class="small"><summary>이미 있어서 건너뛰는 ${v.haves.length}건 보기</summary><div class="ci-tbl" style="margin-top:6px">${v.haves.map((r) => `<div class="ci-row ci-have"><span></span><span class="mono">${esc(r.date.slice(5))}</span><span class="ci-shop">${esc(r.shop)}</span><span class="ci-amt">${esc(won(r.amount))}</span><span class="muted">${r.have === "id" ? "전에 올림" : r.have === "same" ? "같은 날 같은 금액" : r.have.startsWith("sum") ? `가계부에 ${r.have.slice(4)}건으로 나눠 적음` : `가계부에 ${r.have.slice(7)}건 합쳐 적음`}</span><span></span></div>`).join("")}</div></details>`;
     }
     root.innerHTML = h;
+    env.recv.fillNames();
   }
   root.addEventListener("change", async (e) => {
     const t = e.target, k = t.dataset.ci, i = t.dataset.i;
@@ -212,14 +213,22 @@ export function mountCardImport(root, env) {
     else if (k === "on") (st.pick[i] ||= {}).on = t.checked;
     else if (k === "cat") { (st.pick[i] ||= {}).cat = t.value; st.pick[i].sub = ""; }
     else if (k === "sub") (st.pick[i] ||= {}).sub = t.value;
-    else if (k === "recv") (st.pick[i] ||= {}).recv = t.value;
     else if (k === "memo" || k === "note") { (st.pick[i] ||= {})[k] = t.value; return; }   // 적는 칸은 다시 그리지 않음 (다음 칸으로 넘어갈 때 안 끊기게)
     else return;
     render();
   });
   // ✂️ 나눌 금액: 적는 동안엔 칸을 다시 그리지 않고 나머지·빨간 줄·기록 버튼만 고침 (포커스·클릭이 안 끊기게)
   root.addEventListener("input", (e) => {
-    const t = e.target; if (t.dataset.ci !== "amt") return;
+    const t = e.target;
+    if (t.dataset.ci === "recv") {   // 🤲 적는 동안 안 다시 그림 (바로 [기록하기]를 눌러도 안 끊기게). 분류가 비면 기타로 보여 줌
+      (st.pick[t.dataset.i] ||= {}).recv = t.value;
+      const v = view(), r = v.news.find((x) => String(x.i) === t.dataset.i), row = t.closest(".ci-row"), c = row.querySelector('[data-ci="cat"]'), s = row.querySelector('[data-ci="sub"]');
+      if (r && c.value !== r.cat) { c.value = r.cat; s.innerHTML = subOpts(r); s.disabled = !r.cat; }
+      if (r) row.classList.toggle("bad", r.on && (!r.cat || r.bad));
+      root.querySelector(".ci-go").innerHTML = goHtml(v);
+      return;
+    }
+    if (t.dataset.ci !== "amt") return;
     const at = t.dataset.i.lastIndexOf("~"), g = t.dataset.i.slice(0, at), k = +t.dataset.i.slice(at + 1), x = st.splits[g] && st.splits[g].rows.find((y) => y.k === k); if (!x) return;
     x.amt = num(t.value); t.value = x.amt ? x.amt.toLocaleString() : "";
     const v = view();
@@ -272,14 +281,19 @@ export function mountCardImport(root, env) {
     if (!confirm(`💳 ${list.length}건 (${won(list.reduce((a, r) => a + r.amount, 0))})을 가계부에 넣을까요?`)) return;
     st.busy = true; render();
     try {
-      const p = {}, t0 = Date.now();
+      const p = {}, t0 = Date.now(), news = [];
       list.slice().sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).forEach((r, n) => {
-        const doc = { kind: "expense", amount: r.amount, date: r.date, account: v.acct, cat: r.cat, sub: r.sub || null, memo: (r.memo || "").trim(), note: (r.note || "").trim() || null, cur: null, toAccount: null, createdAt: t0 + n, src: "BC카드", bcNo: (r.nos ? r.nos.join(",") : r.no) || null, common: null, ccat: null, csub: null, recvTo: r.recv || null };
-        if (r.recv) p[`money/${r.id}-rv`] = recvPair(r.id, doc, r.recv, t0 + n);
+        const doc = { kind: "expense", amount: r.amount, date: r.date, account: v.acct, cat: r.cat, sub: r.sub || null, memo: (r.memo || "").trim(), note: (r.note || "").trim() || null, cur: null, toAccount: null, createdAt: t0 + n, src: "BC카드", bcNo: (r.nos ? r.nos.join(",") : r.no) || null, common: null, ccat: null, csub: null, recvTo: null };
+        if (r.recv.trim()) {
+          const to = env.recv.idOf(r.recv), nd = env.recv.newDoc(to);
+          doc.recvTo = to; p[`money/${r.id}-rv`] = recvPair(r.id, doc, to, t0 + n);
+          if (nd) { p[`accounts/${to}`] = nd; news.push(to); }
+        }
         if (isCc(r.cat)) { const [cc, cs] = (r.sub || "").split("|"); Object.assign(doc, { sub: null, common: true, ccat: cc || null, csub: cs || null }); }
         p[`money/${r.id}`] = doc;
       });
       await be.rootUpdate(p);
+      news.forEach((id) => env.recv.done(id));
       env.toast(`💳 ${list.length}건을 기록했어요.`);
       st.pick = {};
     } catch (err) { env.toast("기록하다가 멈췄어요. 다시 누르면 이미 들어간 건 건너뛰어요."); }
