@@ -1032,6 +1032,7 @@ export function acctOptions(sel, cur, kind) {
 }
 export function lastAcct(kind) { try { return localStorage.getItem("nyanya-lastacct-" + kind) || ""; } catch (e) { return ""; } }
 export function rememberAcct(kind, id) { try { localStorage.setItem("nyanya-lastacct-" + kind, id || ""); } catch (e) { /* 무시 */ } }
+const CAT_BLANK = '<option value="" hidden>분류 선택</option>';   // 냐냐: 기본 분류 없음, 새 기록은 빈칸에서 시작 (안 고르면 저장 안 됨)
 export function renderMoneyForm(fill) {
   const k = ui.kind, editing = ui.mEdit && S.money.get(ui.mEdit);
   document.querySelectorAll("#kindSeg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.k === k)));
@@ -1048,13 +1049,13 @@ export function renderMoneyForm(fill) {
   if (ccOn()) {   // 🏷 ❤️ 공통비용이면 공통 분류 (냐냐)
     const cc = ccList(), f0 = fill ? ccOf(fill) : null, want = f0 ? f0.c : mc.dataset.cc === "1" ? mc.value : "";
     const names = cc.map((c) => c.n); if (want && !names.includes(want)) names.push(want);
-    mc.innerHTML = names.map((c) => `<option>${esc(c)}</option>`).join(""); if (want) mc.value = want;
+    mc.innerHTML = CAT_BLANK + names.map((c) => `<option>${esc(c)}</option>`).join(""); mc.value = want || "";
     mc.dataset.cc = "1";
   } else {
-    const want = fill ? (fill.recvTo && E.recv ? E.recv.cat : fill.cat) : mc.dataset.cc === "1" ? "" : mc.value, list = moneyCats(k === "move" ? "expense" : k).concat(k === "expense" && E.recv ? [E.recv.cat] : []);   // 🤲 냐냐: 분류 칸에서 받을 돈 고르기 (recv.js)
+    const want = fill ? (fill.recvTo && E.recv ? E.recv.cat : fill.cat) : mc.dataset.cc === "1" || (k !== "expense" && E.recv && mc.value === E.recv.cat) ? "" : mc.value, list = moneyCats(k === "move" ? "expense" : k).concat(k === "expense" && E.recv ? [E.recv.cat] : []);   // 🤲 냐냐: 분류 칸에서 받을 돈 고르기 (recv.js)
     if (want && !list.includes(want)) list.push(want);
-    mc.innerHTML = list.map((c) => `<option>${esc(c)}</option>`).join("");
-    if (want && list.includes(want)) mc.value = want;
+    mc.innerHTML = CAT_BLANK + list.map((c) => `<option>${esc(c)}</option>`).join("");
+    mc.value = want && list.includes(want) ? want : "";
     mc.dataset.cc = "";
   }
   const lbl = $("mCatWrap") && $("mCatWrap").querySelector(".cat-lbl"); if (lbl) lbl.textContent = ccOn() ? "공통 분류" : "분류";
@@ -1099,6 +1100,7 @@ export function resetMoneyForm() {
   ui.mEdit = null; $("mAmount").value = ""; $("mMemo").value = ""; $("mDate").value = today();
   $("mSub").value = ""; $("mNote").value = ""; $("mCur").value = "원"; setMPics([]);
   if ($("mCommon")) $("mCommon").checked = false;
+  $("mCat").value = "";
   if (E.recv) E.recv.clear();
   closeDrawer();
   renderMoney();
@@ -1179,7 +1181,7 @@ function saveSubs(kind, cat, list, msg) {
 // 소분류 고르는 칸: 선택 안 함 + 그 분류 소분류 (+ 목록에 없는 예전 값) + '＋ 소분류 추가'
 export function subOptions(kind, cat, cur, add = true) {
   const list = subsOf(kind, cat).slice(); if (cur && !list.includes(cur)) list.push(cur);
-  return '<option value="">-</option>' + list.map((v) => `<option${v === cur ? " selected" : ""}>${esc(v)}</option>`).join("") + (add ? '<option value="__add">＋ 소분류 추가</option>' : "");
+  return '<option value="">-</option>' + list.map((v) => `<option${v === cur ? " selected" : ""}>${esc(v)}</option>`).join("") + (add && cat ? '<option value="__add">＋ 소분류 추가</option>' : "");
 }
 // 🏷 공통 소분류 고르는 칸 (공통 분류에서, 더하기는 공통 탭 '🏷 공통 분류'에서)
 function ccSubOptions(cat, cur) {
@@ -1355,6 +1357,7 @@ export function initMoney() {
     if (!ready()) return;
     const amount = amtVal($("mAmount"));
     if (!(amount > 0)) { toast("금액을 적어 주세요."); return; }
+    if (ui.kind !== "move" && !$("mCat").value) { toast("분류를 골라 주세요."); $("mCat").focus(); return; }
     const sp = E.recSplit ? E.recSplit.collect(amount) : null;   // ✂️ 냐냐: 나눠 적기 → 이 기록은 나머지 금액, 나눈 줄은 새 기록으로
     if (sp && sp.error) { toast(sp.error); return; }
     const rv = E.recv ? E.recv.collect() : null;   // 🤲 냐냐: 받을 돈 → 저장 뒤 짝 기록 (recv.js)

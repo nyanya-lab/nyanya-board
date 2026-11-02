@@ -505,3 +505,31 @@ select:disabled { cursor: default; opacity: .6; }
 @media (max-width: 920px) { .tf-cols { display: flex; } }
 
 #moneyPage .won.tx-rv { color: var(--muted); }   /* 🤲 받을 돈: 내 지출이 아니라서 회색 */
+
+/* 📅 날짜 칸 달력 (datepick.js): 마우스 기기만. 기본 달력 아이콘은 그림만 남기고 눌러도 칸을 누른 것으로 */
+@media (hover: hover) and (pointer: fine) { input[type="date"]::-webkit-calendar-picker-indicator { pointer-events: none; } input[type="date"] { cursor: pointer; } }
+.dp-pop { position: fixed; inset: auto; margin: 0; box-sizing: border-box; width: 292px; padding: 12px; display: grid; gap: 8px; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 10px 30px rgba(23, 32, 51, .16); font-size: 14px; animation: pk-in .12s ease-out; }
+@media (prefers-reduced-motion: reduce) { .dp-pop { animation: none; } }
+.dp-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.dp-title { flex: 1; border: 0; background: none; color: inherit; font: inherit; font-weight: 700; padding: 5px; border-radius: 10px; cursor: pointer; }
+.dp-title:hover, .dp-nav:hover { background: var(--sunk); }
+.dp-nav { width: 32px; height: 32px; border: 0; background: none; color: inherit; font-size: 18px; line-height: 1; border-radius: 50%; cursor: pointer; }
+.dp-wd, .dp-days { display: grid; grid-template-columns: repeat(7, 1fr); justify-items: center; }
+.dp-wd { font-size: 12px; color: var(--muted); }
+.dp-wd .sun { color: var(--danger); } .dp-wd .sat { color: var(--blue); }
+.dp-days { row-gap: 2px; }
+.dp-d { width: 36px; height: 36px; border: 0; border-radius: 50%; background: none; color: inherit; font: inherit; font-variant-numeric: tabular-nums; cursor: pointer; transition: background .1s; }
+.dp-d.sun { color: var(--danger); } .dp-d.sat { color: var(--blue); }
+.dp-d:hover { background: var(--coral-soft); }
+.dp-d.out { opacity: .35; }
+.dp-d.today { box-shadow: inset 0 0 0 1.5px var(--coral); font-weight: 700; }
+.dp-d.on, .dp-d.on:hover { background: var(--coral); color: #fff; font-weight: 700; }
+.dp-d:disabled { opacity: .25; cursor: default; background: none; }
+.dp-foot { display: flex; gap: 6px; }
+.dp-foot button { border: 0; border-radius: 999px; padding: 5px 12px; background: var(--sunk); color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+.dp-foot button:hover { background: var(--coral-soft); }
+.dp-foot .dp-clear { margin-left: auto; color: var(--muted); }
+.dp-months { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.dp-months button { border: 0; border-radius: 12px; padding: 12px 0; background: var(--sunk); color: inherit; font: inherit; cursor: pointer; }
+.dp-months button:hover { background: var(--coral-soft); }
+.dp-months button.on { background: var(--coral); color: #fff; font-weight: 700; }

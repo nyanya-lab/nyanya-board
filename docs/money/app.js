@@ -6,7 +6,7 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261026e";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, moneyCats, subOptions, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab, lastAcct, rememberAcct } from "./money.js?v=20261102f";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, moneyCats, subOptions, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab, lastAcct, rememberAcct } from "./money.js?v=20261102g";
 import { mountRepeat } from "./repeat.js?v=20261021d";
 import { mountAcctSet } from "./acctset.js?v=20261102c";
 import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
@@ -18,6 +18,7 @@ import { mountReport } from "./report.js?v=20261101a";
 import { mountSummary } from "./summary.js?v=20261102a";
 import { mountExtras } from "./extras.js?v=20261102a";
 import { mountPicker } from "./picker.js?v=20261102a";
+import { mountDatePick } from "./datepick.js?v=20261102a";
 import { mountRecSplit } from "./recsplit.js?v=20261102d";
 import { mountRecv } from "./recv.js?v=20261102c";
 import { mountTxFilter } from "./txfilter.js?v=20261102c";
@@ -386,6 +387,7 @@ try { setSubTab(localStorage.getItem("nyanya-stab") || "cat"); } catch (e) { set
 // 보드 첫 화면 '공통비용' 칸에서 바로 오면 (#common)
 if (location.hash === "#common") { try { localStorage.setItem("nyanya-mtab", "common"); } catch (e) { /* 무시 */ } }
 mountPicker();
+mountDatePick();
 setSync();
 firebaseStart().catch(() => { $("loginView").hidden = false; $("loginMsg").textContent = "저장소에 연결하지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요."; });
 // 🔄 새 버전 알림 (욱진 보드처럼)
