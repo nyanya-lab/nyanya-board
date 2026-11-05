@@ -401,9 +401,11 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 .sm-dv-b { display: grid; grid-template-columns: 1fr 1fr; margin: 0 6px 0 18px; position: relative; }
 /* 눈금 점선: 50만마다 (−100만 · −50만 · +50만 · +100만, 가운데 0은 기준선), 줄 위아래 여백까지 이어지게 */
 .sm-dv-row:not(.sm-dv-h) .sm-dv-b::before { content: ""; position: absolute; inset: -7px 0; pointer-events: none;
-  --tk: color-mix(in srgb, var(--muted) 40%, transparent);
+  --tk: color-mix(in srgb, var(--muted) 40%, transparent); --tk2: color-mix(in srgb, var(--muted) 24%, transparent);   /* 50만 진하게 · 25만 더 연하게 (글자는 50만만) */
   background: linear-gradient(var(--tk), var(--tk)) 0 0 / 1px 100% no-repeat, linear-gradient(var(--tk), var(--tk)) 25% 0 / 1px 100% no-repeat,
-    linear-gradient(var(--tk), var(--tk)) 75% 0 / 1px 100% no-repeat, linear-gradient(var(--tk), var(--tk)) 100% 0 / 1px 100% no-repeat;
+    linear-gradient(var(--tk), var(--tk)) 75% 0 / 1px 100% no-repeat, linear-gradient(var(--tk), var(--tk)) 100% 0 / 1px 100% no-repeat,
+    linear-gradient(var(--tk2), var(--tk2)) 12.5% 0 / 1px 100% no-repeat, linear-gradient(var(--tk2), var(--tk2)) 37.5% 0 / 1px 100% no-repeat,
+    linear-gradient(var(--tk2), var(--tk2)) 62.5% 0 / 1px 100% no-repeat, linear-gradient(var(--tk2), var(--tk2)) 87.5% 0 / 1px 100% no-repeat;
   -webkit-mask: linear-gradient(#000 50%, transparent 0) 0 0 / 100% 4px; mask: linear-gradient(#000 50%, transparent 0) 0 0 / 100% 4px; }
 .sm-dv-b i { position: relative; }   /* 막대가 점선 위로 */
 .sm-dv-tk { position: absolute; top: 0; transform: translateX(-50%); font-size: 11px; color: var(--muted); white-space: nowrap; }
