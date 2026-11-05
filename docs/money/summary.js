@@ -1,6 +1,6 @@
 // 📝 이번 달 정리 (냐냐 전용) — API 없이 가계부 숫자로 문장을 만듦 (2026-10-29)
 // 둘 다 씀: 예산 탭 '한 달 예산' 아래 #sumPanel = 한 줄 + [자세히 ›](env.openReport) · 📑 보고서 탭 '📝 월간 정리' 카드·화면 = full(m)·card(m)
-// 고른 달(예산 탭 달 넘기기)을 지난달과 비교 (2026-11-05 전엔 평소 = 앞 12달 평균도). 이번 달이면 오늘 날짜까지만, 지난달도 같은 날짜까지.
+// 고른 달(예산 탭 달 넘기기)을 고른 비교 기준(지난달·최근 6개월·최근 1년·작년 같은 달)과 비교. 이번 달이면 오늘 날짜까지만, 비교하는 달도 같은 날짜까지.
 // 화면: 쓴 돈 칸 4개 → 한 줄 → 왼쪽 분류별 차이 막대(diverge) · 오른쪽 예산·큰 지출·외식·택시·저축·순자산 (폰은 위아래)
 // 💑 내 몫 보기면 money.js monthTotals와 같게 공통비용 절반·욱진입금 뺌 (env.cntAmt). 데이터는 안 바꿈.
 export function mountSummary(root, env) {
@@ -101,7 +101,7 @@ export function mountSummary(root, env) {
     const d = s.me.exp - b.exp;
     return Math.abs(d) < 10000 ? `${b.name}이랑 비슷하게 썼어요.` : d < 0 ? `${b.name}보다 <b class="sm-good">${man(d)} 덜</b> 썼어요 👍` : `${b.name}보다 <b class="sm-bad">${man(d)} 더</b> 썼어요.`;
   };
-  const subOf = (s) => { const mon = Number(s.m.slice(5)); return `${s.now ? `${mon}월 1일~${s.day}일 · 비교하는 달도 ${s.day}일까지 · ` : ""}${s.prev.avg ? `기록 있는 ${s.prev.n}달 평균` : ""}${env.mineOn() ? `${s.now || s.prev.avg ? " · " : ""}💑 내 몫 기준` : ""}`; };
+  const subOf = (s) => { const mon = Number(s.m.slice(5)); return [s.now && `${mon}월 1일~${s.day}일 · 비교하는 달도 ${s.day}일까지`, s.prev.avg && `기록 있는 ${s.prev.n}달 평균`, env.mineOn() && "💑 내 몫 기준"].filter(Boolean).join(" · "); };
   const val = (n) => (n < 0 ? "−" : "") + man(n);
   const cnt = (n) => `${Math.round(n * 10) / 10}번`;
   const vsB = (s, t) => `<span class="muted">· ${s.prev.name} ${t}</span>`;

@@ -120,7 +120,7 @@ export function mountReport(root, env) {
     // 📝 월간 정리 (summary.js — 예산 탭 한 줄의 '자세히 ›'도 여기로)
     const cm = today0.slice(0, 7), mc = env.summary ? env.summary.card(cm) : null;
     const monthly = mc ? `<button type="button" class="rpt-card rpt-annual" data-rf="monthly"><span class="rpt-cn">📝 월간 정리 <small class="rpt-badge">기본</small></span>` +
-      `<span class="rpt-cp">${M + 1}월 1일~${now.getDate()}일 · 지난달 · 평소와 비교</span>` +
+      `<span class="rpt-cp">${M + 1}월 1일~${now.getDate()}일 · 고른 기준과 비교</span>` +
       `<span class="rpt-cv"><small>쓴 돈</small><b class="won minus">${won(mc.exp)}</b></span>` +
       `<span class="rpt-cc">${esc(mc.line)}</span></button>` : "";
     const cards = annual + monthly + (env.extras ? env.extras.claimCard() + env.extras.fundCard() : "") + sv.map(([id, s]) => {
