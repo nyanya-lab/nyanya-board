@@ -15,7 +15,7 @@ import { mountBalance } from "./balance.js?v=20261021a";
 import { mountImport } from "./import.js?v=20261021b";
 import { mountCardImport } from "./cardimport.js?v=20261102f";
 import { mountReport } from "./report.js?v=20261101a";
-import { mountSummary } from "./summary.js?v=20261105d";
+import { mountSummary } from "./summary.js?v=20261105e";
 import { mountExtras } from "./extras.js?v=20261102a";
 import { mountPicker } from "./picker.js?v=20261102a";
 import { mountDatePick } from "./datepick.js?v=20261102a";
@@ -368,7 +368,7 @@ const ccm = mountCcMigrate($("ccmPanel"), { S, backend: () => backend, toast, es
 // 🏥 보험금 챙기기 · 🎯 큰돈 모으기 (보고서 카드) + 🔗 보험금 저장하면 병원비 고르기 + 🔔 위쪽 알림
 const ex = mountExtras({ S, esc, won, isWon, toast, backend: () => backend, editMoney,
   openClaims: () => { setMTab("report"); rpt.openClaims(); } });
-const sm = mountSummary($("sumPanel"), { S, esc, won, isWon, mineOn, cntAmt, monthTotals, planOf, month: curMonth, balances, sortedAccts, toast, backend: () => backend,
+const sm = mountSummary($("sumPanel"), { S, esc, won, isWon, ccOf, mineOn, cntAmt, monthTotals, planOf, month: curMonth, balances, sortedAccts, toast, backend: () => backend,
   openReport: (m) => { setMTab("report"); rpt.openMonth(m); }, rerender: () => rpt.render() });
 // 📑 보고서 탭 (기간·자산·분류·검색으로 골라 보기, 저장한 보고서는 settings.reports)
 const rpt = mountReport($("reportRoot"), { S, backend: () => backend, summary: sm, extras: ex, toast, esc, won, isWon, acctName, subs: subsOf, chart: setChart, pie: pieHtml, txRow: (x) => txRow(x, false), mineOn, cntAmt, isSettleIn,

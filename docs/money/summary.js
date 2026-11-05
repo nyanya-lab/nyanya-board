@@ -18,7 +18,7 @@ export function mountSummary(root, env) {
   // 그 기간 기록: 분류별 지출(r.byCat, 💑 반영) + 지출 기록 목록(큰 순) + 저축 통장으로 넘긴 돈
   function take(range) {
     const r = env.monthTotals(null, range), list = [];
-    let save = 0, food = 0, foodN = 0, taxi = 0, taxiN = 0;
+    let save = 0, food = 0, foodN = 0, taxi = 0, taxiN = 0; const bySub = {};
     const typeOf = (id) => ((S.accounts.get(id) || {}).type);
     r.items.forEach((x) => {
       if (!env.isWon(x)) return;
@@ -28,13 +28,16 @@ export function mountSummary(root, env) {
       } else if (x.kind === "expense" || !x.kind) {
         if (x.recvTo || x.recvOf) return;   // 🤲 대신 낸 돈은 내 지출 아님 (합계는 짝과 합쳐 0)
         list.push({ ...x, amt: env.cntAmt(x) });
+        // 소분류별 (💙 공통비용은 report.js처럼 소분류 대신 공통 분류 ccat로)
+        const c = x.cat || "기타", sk = (x.common || /공통비용/.test(c)) ? env.ccOf(x).c : (x.sub || ""), o = bySub[c] || (bySub[c] = {});
+        o[sk] = (o[sk] || 0) + env.cntAmt(x);
         const a = Number(x.amount) || 0;
         if ((x.common || /공통비용/.test(x.cat || "")) && /식비/.test(x.ccat || "") && /외식|배달/.test(x.csub || "")) { food += a / 2; if (a > 0) foodN++; }   // 늘 내 몫(반)으로
         if (/택시/.test(x.sub || "")) { taxi += a; if (a > 0) taxiN++; }
       }
     });
     list.sort((a, b) => b.amt - a.amt);
-    return { exp: r.exp, inc: r.inc, byCat: r.byCat, list, save, food, foodN, taxi, taxiN };
+    return { exp: r.exp, inc: r.inc, byCat: r.byCat, bySub, list, save, food, foodN, taxi, taxiN };
   }
 
   function build(m) {
@@ -45,12 +48,22 @@ export function mountSummary(root, env) {
     const cmp = getCmp(), prev = baseOf(m, day, cmp);
     // 분류마다 이번 달 vs 비교 (차이 큰 순 — 더 쓴 곳 위, 덜 쓴 곳 아래)
     const cats = new Set([...Object.keys(me.byCat), ...Object.keys(prev.byCat)]);
-    const rows = [...cats].map((c) => { const v = me.byCat[c] || 0, p = prev.byCat[c] || 0; return { c, v, p, d: v - p }; })
+    const subsOf = (c) => {   // 분류를 누르면 펼치는 소분류 줄 (2026-11-05 냐냐)
+      // 그림 없는 예전 이름('식비')은 그림 붙은 이름('🍽️ 식비')과 합침
+      const keys = [...new Set([...Object.keys(me.bySub[c] || {}), ...Object.keys(prev.bySub[c] || {})])];
+      const to = (k) => keys.find((k2) => k2 !== k && k2.replace(/^\S+\s/, "") === k) || k;
+      const fold = (o) => { const r = {}; Object.entries(o || {}).forEach(([k, v]) => { r[to(k)] = (r[to(k)] || 0) + v; }); return r; };
+      const a = fold(me.bySub[c]), b = fold(prev.bySub[c]);
+      return [...new Set([...Object.keys(a), ...Object.keys(b)])].map((k) => ({ c: k, v: a[k] || 0, p: b[k] || 0, d: (a[k] || 0) - (b[k] || 0) }))
+        .filter((x) => Math.round(x.v) || Math.round(x.p)).sort((x, y) => y.d - x.d);
+    };
+    const rows = [...cats].map((c) => { const v = me.byCat[c] || 0, p = prev.byCat[c] || 0; return { c, v, p, d: v - p, subs: subsOf(c) }; })
       .filter((x) => Math.round(x.v) || Math.round(x.p)).sort((a, b) => b.d - a.d);
     const pl = env.planOf(m), over = pl.items.map((v) => ({ c: v.cat, amt: v.show, used: me.byCat[v.cat] || 0 })).filter((v) => v.used > v.amt && v.amt > 0).sort((a, b) => (b.used - b.amt) - (a.used - a.amt));
     return { m, now, day, me, prev, cmp, rows, pl, over, range: rangeOf(m, day) };
   }
   // 🔀 비교 기준 (2026-11-05 냐냐: 지난달 · 최근 6개월 · 최근 1년 · 1년 전 같은 달) — 이 기기에만 기억 (localStorage nyanya-sm-cmp)
+  const openCats = new Set();   // 월간 정리 표에서 펼친 분류 (메모리에만)
   const CMPS = { prev: "지난달", m6: "최근 6개월", y1: "최근 1년", ly: "작년 같은 달" };
   function getCmp() { try { const v = localStorage.getItem("nyanya-sm-cmp"); return CMPS[v] ? v : "prev"; } catch (e) { return "prev"; } }
   function setCmp(v) { try { localStorage.setItem("nyanya-sm-cmp", v); } catch (e) { /* 무시 */ } }
@@ -65,9 +78,13 @@ export function mountSummary(root, env) {
     const N = cmp === "m6" ? 6 : 12, ps = [];
     for (let k = 1; k <= N; k++) { const p = take(rangeOf(shift(m, -k), day)); if (p.exp > 0) ps.push(p); }
     const n = ps.length, avg = (f) => n ? ps.reduce((t, p) => t + f(p), 0) / n : 0, byCat = {};
-    ps.forEach((p) => Object.entries(p.byCat).forEach(([c, v]) => { byCat[c] = (byCat[c] || 0) + v / n; }));
+    const bySub = {};
+    ps.forEach((p) => {
+      Object.entries(p.byCat).forEach(([c, v]) => { byCat[c] = (byCat[c] || 0) + v / n; });
+      Object.entries(p.bySub).forEach(([c, o]) => { const t = bySub[c] || (bySub[c] = {}); Object.entries(o).forEach(([k, v]) => { t[k] = (t[k] || 0) + v / n; }); });
+    });
     const nm = cmp === "m6" ? "최근 6개월" : "최근 1년";
-    return { exp: avg((p) => p.exp), inc: avg((p) => p.inc), save: avg((p) => p.save), food: avg((p) => p.food), foodN: avg((p) => p.foodN), taxi: avg((p) => p.taxi), taxiN: avg((p) => p.taxiN), byCat, n, ok: n > 0,
+    return { exp: avg((p) => p.exp), inc: avg((p) => p.inc), save: avg((p) => p.save), food: avg((p) => p.food), foodN: avg((p) => p.foodN), taxi: avg((p) => p.taxi), taxiN: avg((p) => p.taxiN), byCat, bySub, n, ok: n > 0,
       name: `${nm} 평균`, col: `${N === 6 ? "6달" : "1년"} 평균`, avg: true };
   }
 
@@ -93,9 +110,16 @@ export function mountSummary(root, env) {
     const mon = Number(s.m.slice(5)), mx = Math.max(10000, ...s.rows.map((x) => Math.abs(x.d)));
     const dt = (d) => `<span class="${Math.abs(d) < 10000 ? "muted" : d > 0 ? "sm-bad" : "sm-good"}">${d > 0 ? "+" : d < 0 ? "−" : ""}${tn(Math.abs(d))}</span>`;   // 1만 원 안은 회색
     const bar = (d) => { const w = Math.round(Math.abs(d) / mx * 100), i = `<i style="width:${w}%"></i>`; return Math.abs(d) < 10000 ? `<span class="sm-dv-b"><span class="sm-dv-l"></span><span class="sm-dv-r"></span></span>` : `<span class="sm-dv-b"><span class="sm-dv-l">${d < 0 ? i : ""}</span><span class="sm-dv-r">${d > 0 ? i : ""}</span></span>`; };
-    const row = (c, v, p, cls = "") => `<div class="sm-dv-row${cls}"><span class="sm-dv-n">${c}</span><span class="num">${tn(v)}</span><span class="num muted">${tn(p)}</span><span class="num">${dt(v - p)}</span>${bar(v - p)}</div>`;
-    return `<div class="sm-dv"><div class="sm-dv-row sm-dv-h"><span class="sm-dv-n">분류 <small>(만원)</small></span><span class="num">${mon}월</span><span class="num">${esc(s.prev.col)}</span><span class="num">차이</span><span class="sm-dv-b"><span class="sm-dv-l">◀ 덜 씀</span><span class="sm-dv-r">더 씀 ▶</span></span></div>
-      ${s.rows.map((x) => row(esc(x.c), x.v, x.p)).join("")}${row("합계", s.me.exp, s.prev.exp, " sm-dv-sum")}</div>`;
+    const cells = (v, p) => `<span class="num">${tn(v)}</span><span class="num muted">${tn(p)}</span><span class="num">${dt(v - p)}</span>${bar(v - p)}`;
+    // 분류 줄: 소분류가 있으면 눌러서 펼침 (▸/▾, 펼친 분류는 openCats에 기억 — 달·비교를 바꿔도 그대로)
+    const catRow = (x) => {
+      const has = x.subs.length > 1 || (x.subs.length === 1 && x.subs[0].c), on = has && openCats.has(x.c);
+      const head = has ? `<button type="button" class="sm-dv-row sm-dv-cat" data-smcat="${esc(x.c)}" aria-expanded="${on}"><span class="sm-dv-n"><span class="sm-dv-car" aria-hidden="true">${on ? "▾" : "▸"}</span>${esc(x.c)}</span>${cells(x.v, x.p)}</button>`
+        : `<div class="sm-dv-row"><span class="sm-dv-n"><span class="sm-dv-car" aria-hidden="true"></span>${esc(x.c)}</span>${cells(x.v, x.p)}</div>`;
+      return head + (on ? x.subs.map((y) => `<div class="sm-dv-row sm-dv-sub"><span class="sm-dv-n">${y.c ? esc(y.c) : "소분류 없음"}</span>${cells(y.v, y.p)}</div>`).join("") : "");
+    };
+    return `<div class="sm-dv"><div class="sm-dv-row sm-dv-h"><span class="sm-dv-n">분류 <small>(만원)</small></span><span class="num">${mon}월</span><span class="num">${esc(s.prev.col)}</span><span class="num">차이</span><span class="sm-dv-b"></span></div>
+      ${s.rows.map(catRow).join("")}<div class="sm-dv-row sm-dv-sum"><span class="sm-dv-n">합계</span>${cells(s.me.exp, s.prev.exp)}</div></div>`;
   }
   function html(s) {
     const b = [], B = s.prev;
@@ -167,7 +191,11 @@ export function mountSummary(root, env) {
   }
   root.addEventListener("click", (e) => { if (e.target.closest("[data-sm='more']")) env.openReport(env.month()); });
   // 🔀 비교 기준 바꾸기 (월간 정리 화면은 보고서 탭 안이라 문서 전체에서 받음) → 예산 탭 한 줄·보고서 다시 그림
-  document.addEventListener("click", (e) => { const b = e.target.closest("[data-smcmp]"); if (!b) return; setCmp(b.dataset.smcmp); render(); if (env.rerender) env.rerender(); });
+  document.addEventListener("click", (e) => {
+    const c = e.target.closest("[data-smcat]");
+    if (c) { const k = c.dataset.smcat; if (openCats.has(k)) openCats.delete(k); else openCats.add(k); if (env.rerender) env.rerender(); return; }
+    const b = e.target.closest("[data-smcmp]"); if (!b) return; setCmp(b.dataset.smcmp); render(); if (env.rerender) env.rerender();
+  });
   root.addEventListener("change", (e) => {
     if (e.target.id !== "smGoal") return;
     const be = env.backend(), n = Number(String(e.target.value).replace(/[^\d]/g, "")) || 0, m = env.month(); if (!be) return;
