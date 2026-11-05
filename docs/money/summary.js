@@ -58,12 +58,16 @@ export function mountSummary(root, env) {
     const now = sum(env.balances(s.range.to)), prevEnd = `${shift(s.m, -1)}-${String(lastDay(shift(s.m, -1))).padStart(2, "0")}`;
     return { now, d: now - sum(env.balances(prevEnd)) };
   }
-  const headline = (s) => { const d = s.me.exp - s.avgExp; return Math.abs(d) < 10000 ? "평소랑 비슷하게 썼어요." : d < 0 ? `평소보다 <b class="sm-good">${man(d)} 덜</b> 썼어요 👍` : `평소보다 <b class="sm-bad">${man(d)} 더</b> 썼어요.`; };
+  // 첫 줄은 지난달과 비교 (2026-11-05 냐냐: 지난달보다 더/덜이 먼저), 지난달 기록이 없으면 평소와
+  const headline = (s) => {
+    const pv = s.prev.exp > 0, w = pv ? "지난달" : "평소", d = s.me.exp - (pv ? s.prev.exp : s.avgExp);
+    return Math.abs(d) < 10000 ? `${w}랑 비슷하게 썼어요.` : d < 0 ? `${w}보다 <b class="sm-good">${man(d)} 덜</b> 썼어요 👍` : `${w}보다 <b class="sm-bad">${man(d)} 더</b> 썼어요.`;
+  };
   const subOf = (s) => { const mon = Number(s.m.slice(5)); return `${s.now ? `${mon}월 1일~${s.day}일 · 지난달·평소도 ${s.day}일까지로 비교` : `지난달 · 평소(앞 ${s.n}달 평균)와 비교`}${env.mineOn() ? " · 💑 내 몫 기준" : ""}`; };
   function html(s) {
     const b = [];
-    const dAvg = s.me.exp - s.avgExp, dPrev = s.me.exp - s.prev.exp;
-    b.push(headline(s) + ` <span class="muted">(평소 ${man(s.avgExp)} · 지난달 ${man(s.prev.exp)}보다 ${diffTxt(dPrev)})</span>`);
+    const dAvg = s.me.exp - s.avgExp;
+    b.push(headline(s) + (s.prev.exp > 0 ? ` <span class="muted">(지난달 ${man(s.prev.exp)} · 평소 ${man(s.avgExp)}보다 ${diffTxt(dAvg)})</span>` : ` <span class="muted">(평소 ${man(s.avgExp)})</span>`));
     if (s.up.length) b.push(`<b>평소보다 많이 쓴 곳</b><ul>${s.up.map((x) => { const g = s.big(x.c); return `<li>${esc(x.c)} <b>${man(x.v)}</b> <span class="sm-bad">+${man(x.d)}</span>${g ? ` <span class="muted">· 제일 큰 건 ${esc(label(g))} ${man(g.amt)}</span>` : ""}</li>`; }).join("")}</ul>`);
     if (s.down.length) b.push(`<b>평소보다 덜 쓴 곳</b><ul>${s.down.map((x) => `<li>${esc(x.c)} <b>${man(x.v)}</b> <span class="sm-good">−${man(x.d)}</span></li>`).join("")}</ul>`);
     if (s.pl.items.length) {
