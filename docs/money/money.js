@@ -976,6 +976,7 @@ function bulkFillInit() {
 function txAdd() {
   ui.mEdit = null; ui.kind = "expense"; ui.asFor = null;
   $("mAmount").value = ""; $("mMemo").value = ""; $("mSub").value = ""; $("mNote").value = ""; $("mDate").value = today(); $("mAcct").value = ""; $("mCat").value = ""; setMPics([]);
+  if ($("mCommon")) $("mCommon").checked = false;   // 냐냐: 전에 저장 안 하고 닫은 ❤️ 체크가 새 기록에 안 남게
   renderMoneyForm();
   openDrawer(); $("mAmount").focus();
 }
@@ -1044,20 +1045,29 @@ export function renderMoneyForm(fill) {
   const keepAcct = fill ? fill.account : ($("mAcct").value || lastAcct(k));
   acctOptions($("mAcct"), keepAcct, k);
   if (k === "move") acctOptions($("mTo"), fill ? fill.toAccount : ($("mTo").value || lastAcct("moveTo")), k);
-  const mc = $("mCat");
+  const mc = $("mCat"); let sub0 = null, rv0 = null;
   if (fill && $("mCommon")) $("mCommon").checked = k === "expense" && !!fill.common;
   if (ccOn()) {   // 🏷 ❤️ 공통비용이면 공통 분류 (냐냐)
-    const cc = ccList(), f0 = fill ? ccOf(fill) : null, want = f0 ? f0.c : mc.dataset.cc === "1" ? mc.value : "";
+    const back = !fill && mc.dataset.k && mc.dataset.k !== k && editing && editing.kind === k && editing.common;   // 고치다가 종류를 바꿨다 돌아오면 원래 공통 분류로
+    const cc = ccList(), f0 = fill ? ccOf(fill) : back ? ccOf(editing) : null; if (back) sub0 = f0.s || "";
+    const want = f0 ? f0.c : mc.dataset.cc === "1" ? mc.value : "";
     const names = cc.map((c) => c.n); if (want && !names.includes(want)) names.push(want);
     mc.innerHTML = CAT_BLANK + names.map((c) => `<option>${esc(c)}</option>`).join(""); mc.value = want || "";
     mc.dataset.cc = "1";
   } else {
-    const want = fill ? (fill.recvTo && E.recv ? E.recv.cat : fill.cat) : mc.dataset.cc === "1" || (k !== "expense" && E.recv && mc.value === E.recv.cat) ? "" : mc.value, list = moneyCats(k === "move" ? "expense" : k).concat(k === "expense" && E.recv ? [E.recv.cat] : []);   // 🤲 냐냐: 분류 칸에서 받을 돈 고르기 (recv.js)
+    const list = moneyCats(k === "move" ? "expense" : k).concat(k === "expense" && E.recv ? [E.recv.cat] : []);   // 🤲 냐냐: 분류 칸에서 받을 돈 고르기 (recv.js)
+    let want = fill ? (fill.recvTo && E.recv ? E.recv.cat : fill.cat) : mc.dataset.cc === "1" || (k !== "expense" && E.recv && mc.value === E.recv.cat) ? "" : mc.value;
+    if (!fill && mc.dataset.k && mc.dataset.k !== k) {   // 냐냐: 고치다가 수입↔지출을 바꾸면 전 종류의 분류·소분류는 안 남게 (원래 종류로 돌아오면 원래 분류로)
+      const x0 = editing && editing.kind === k && !editing.common ? editing : null;
+      if (x0) { want = x0.recvTo && E.recv ? E.recv.cat : x0.cat || ""; sub0 = x0.recvTo ? "" : x0.sub || ""; if (x0.recvTo) rv0 = x0; }
+      else if (!list.includes(want)) { want = ""; sub0 = ""; }
+    }
     if (want && !list.includes(want)) list.push(want);
     mc.innerHTML = CAT_BLANK + list.map((c) => `<option>${esc(c)}</option>`).join("");
     mc.value = want && list.includes(want) ? want : "";
     mc.dataset.cc = "";
   }
+  mc.dataset.k = k;
   const lbl = $("mCatWrap") && $("mCatWrap").querySelector(".cat-lbl"); if (lbl) lbl.textContent = ccOn() ? "공통 분류" : "분류";
   // 💱 화폐 (끝에 '＋ 화폐 추가') · 소분류 (그 분류에서 전에 쓴 것 추천)
   const curs = currencies(), cv0 = fill ? fill.cur || "원" : $("mCur").value, cv = cv0 && cv0 !== "__add" ? cv0 : "원";
@@ -1065,7 +1075,7 @@ export function renderMoneyForm(fill) {
   $("mCur").innerHTML = curs.map((c) => `<option>${esc(c)}</option>`).join("") + '<option value="__add">＋ 화폐 추가</option>';
   $("mCur").value = cv;
   if (fill) $("mNote").value = fill.note || "";
-  const sv = fill ? (ccOn() ? ccOf(fill).s || "" : fill.sub || "") : $("mSub").value;
+  const sv = fill ? (ccOn() ? ccOf(fill).s || "" : fill.sub || "") : sub0 != null ? sub0 : $("mSub").value;
   $("mSub").innerHTML = ccOn() ? ccSubOptions(mc.value, sv && sv !== "__add" ? sv : "") : subOptions(k, mc.value, sv && sv !== "__add" ? sv : "");
   salaryHint();
   // ❤️ 공통비용 (냐냐 보드만 칸이 있음): 지출만. 체크하면 공통 저장소로 복사돼서 욱진이 가계부에도 보임
@@ -1085,7 +1095,7 @@ export function renderMoneyForm(fill) {
   $("mSubmit").textContent = editing ? "고친 내용 저장" : { income: "수입 기록", expense: "지출 기록", transfer: "보낸 돈 기록", move: "이체 기록" }[k];
   if (!$("mDate").value) $("mDate").value = today();
   if (E.recSplit) E.recSplit.sync();
-  if (E.recv) E.recv.formSync(fill);   // 🤲 냐냐: 받을 돈 칸 (recv.js)
+  if (E.recv) E.recv.formSync(fill || rv0 || undefined);   // 🤲 냐냐: 받을 돈 칸 (recv.js), 종류를 바꿨다 돌아오면 원래 이름으로
 }
 export function editMoney(id) {
   const x0 = S.money.get(id); if (x0 && x0.recvOf && S.money.has(x0.recvOf)) id = x0.recvOf;   // 🤲 냐냐: 받을 돈 짝을 누르면 실제 지출을 고침
@@ -1120,6 +1130,7 @@ function drawerClosed() {
   if (drawerHome && $("moneyPanel").parentNode !== drawerHome) drawerHome.appendChild($("moneyPanel"));
   ui.asFor = null;
   if (E.recv) E.recv.clear();   // 🤲 냐냐: 저장 안 하고 닫으면 다음 기록에 안 남게
+  if ($("mCommon")) $("mCommon").checked = false;   // ❤️도 같이
   if (ui.mEdit) resetMoneyForm();
 }
 // 저장한 기록이 보이는 달: 보통은 그 날짜의 달. 자산 탭에서 결제일 정한 카드를 보는 중이면 결제 달
