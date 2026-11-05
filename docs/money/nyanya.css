@@ -393,18 +393,24 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 .sm-good { color: var(--ok, #1a9a5b); } .sm-bad { color: var(--danger); }
 /* 📝 월간 정리: 왼쪽 분류별 차이 막대 · 오른쪽 정리 칸 (2026-11-05 냐냐 고름, summary.js diverge) */
 .sm-head { margin: 0; font-size: 16px; } .sm-head .muted { font-size: 13px; }
-.sm-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px 28px; align-items: start; }
+.sm-grid { display: grid; grid-template-columns: minmax(0, 2.3fr) minmax(0, 1fr); gap: 16px 28px; align-items: start; }
 .sm-grid .sm-list { gap: 8px; } .sm-grid .sm-li { background: var(--sunk); border-radius: 12px; padding: 9px 12px; }
+.sm-grid .sm-bigs { grid-column: 1 / -1; }   /* 큰 지출은 표 아래 한 줄 */
 .sm-dv { display: grid; font-variant-numeric: tabular-nums; }
-.sm-dv-row { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr); align-items: center; padding: 5px 0; border-bottom: 1px solid var(--sunk); font-size: 14px; }
-.sm-dv-n { min-width: 0; padding-right: 8px; } .sm-dv-n small { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; }
-.sm-dv-l, .sm-dv-r { display: flex; align-items: center; gap: 5px; min-height: 22px; }
-.sm-dv-l { justify-content: flex-end; border-right: 2px solid var(--line); padding-right: 2px; } .sm-dv-r { padding-left: 2px; }
-.sm-dv i { height: 14px; flex: none; min-width: 3px; } .sm-dv-r i { background: var(--danger); border-radius: 3px 7px 7px 3px; } .sm-dv-l i { background: var(--ok, #1a9a5b); border-radius: 7px 3px 3px 7px; }
-.sm-dv-v { font-size: 12.5px; white-space: nowrap; } .sm-dv-r.up .sm-dv-v { color: var(--danger); } .sm-dv-l.down .sm-dv-v { color: var(--ok, #1a9a5b); }
-.sm-dv-h { font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); } .sm-dv-h .sm-dv-l, .sm-dv-h .sm-dv-r { min-height: 0; } .sm-dv-h .sm-dv-l { padding-right: 6px; } .sm-dv-h .sm-dv-r { padding-left: 6px; }
+.sm-dv-row { display: grid; grid-template-columns: minmax(0, 1.1fr) 72px 72px 76px minmax(0, 1.5fr); gap: 0 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--sunk); font-size: 14px; }
+.sm-dv-n { min-width: 0; overflow-wrap: anywhere; } .sm-dv .num { text-align: right; white-space: nowrap; }
+.sm-dv-b { display: grid; grid-template-columns: 1fr 1fr; margin-left: 8px; }
+.sm-dv-l, .sm-dv-r { display: flex; align-items: center; min-height: 18px; }
+.sm-dv-l { justify-content: flex-end; border-right: 2px solid var(--line); } 
+.sm-dv i { height: 12px; min-width: 3px; } .sm-dv-r i { background: var(--danger); border-radius: 0 6px 6px 0; } .sm-dv-l i { background: var(--ok, #1a9a5b); border-radius: 6px 0 0 6px; }
+.sm-dv-h { font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); } .sm-dv-h .sm-dv-l { padding-right: 6px; } .sm-dv-h .sm-dv-r { padding-left: 6px; }
 .sm-dv-sum { font-weight: 700; border-top: 2px solid var(--fg); border-bottom: 0; margin-top: 2px; }
+.sm-cmp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
+.sm-cmp button { border: 1px solid var(--line); background: var(--surface); color: inherit; font: inherit; border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+.sm-cmp button:hover { background: var(--coral-soft); }
+.sm-cmp button[aria-pressed="true"] { background: var(--coral); border-color: var(--coral); color: #fff; font-weight: 700; }
 @media (max-width: 920px) { .sm-grid { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .sm-dv-row { grid-template-columns: minmax(0, 1fr) 64px 64px 64px; font-size: 13.5px; } .sm-dv-b { display: none; } }   /* 폰: 막대 없이 금액 표만 */
 
 /* 💰 저축 목표 · 📅 오늘 쓸 수 있는 돈 (summary.js, 예산 탭 #sumPanel) */
 .sm-goal { display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; font-size: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }

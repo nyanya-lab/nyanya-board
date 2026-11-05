@@ -38,14 +38,35 @@ export function mountSummary(root, env) {
   function build(m) {
     const t = ymd(new Date()), cur = t.slice(0, 7), now = m === cur, day = now ? Number(t.slice(8)) : 31;
     if (m > cur) return { empty: `${Number(m.slice(5))}월은 아직 안 왔어요. 지난달 정리는 ‹ 이전 달에서 볼 수 있어요.` };
-    const me = take(rangeOf(m, day)), prev = take(rangeOf(shift(m, -1), day));
+    const me = take(rangeOf(m, day));
     if (!me.exp && !me.inc) return { empty: "이 달은 아직 기록이 없어요." };
-    // 분류마다 이번 달 vs 지난달 (2026-11-05 냐냐: 평소 말고 지난달과, 차이 큰 순 — 더 쓴 곳 위, 덜 쓴 곳 아래)
+    const cmp = getCmp(), prev = baseOf(m, day, cmp);
+    // 분류마다 이번 달 vs 비교 (차이 큰 순 — 더 쓴 곳 위, 덜 쓴 곳 아래)
     const cats = new Set([...Object.keys(me.byCat), ...Object.keys(prev.byCat)]);
     const rows = [...cats].map((c) => { const v = me.byCat[c] || 0, p = prev.byCat[c] || 0; return { c, v, p, d: v - p }; })
       .filter((x) => Math.round(x.v) || Math.round(x.p)).sort((a, b) => b.d - a.d);
     const pl = env.planOf(m), over = pl.items.map((v) => ({ c: v.cat, amt: v.show, used: me.byCat[v.cat] || 0 })).filter((v) => v.used > v.amt && v.amt > 0).sort((a, b) => (b.used - b.amt) - (a.used - a.amt));
-    return { m, now, day, me, prev, rows, pl, over, range: rangeOf(m, day) };
+    return { m, now, day, me, prev, cmp, rows, pl, over, range: rangeOf(m, day) };
+  }
+  // 🔀 비교 기준 (2026-11-05 냐냐: 지난달 · 최근 6개월 · 최근 1년 · 1년 전 같은 달) — 이 기기에만 기억 (localStorage nyanya-sm-cmp)
+  const CMPS = { prev: "지난달", m6: "최근 6개월", y1: "최근 1년", ly: "작년 같은 달" };
+  function getCmp() { try { const v = localStorage.getItem("nyanya-sm-cmp"); return CMPS[v] ? v : "prev"; } catch (e) { return "prev"; } }
+  function setCmp(v) { try { localStorage.setItem("nyanya-sm-cmp", v); } catch (e) { /* 무시 */ } }
+  // 비교할 숫자: 지난달·작년 같은 달은 그 달, 6개월·1년은 기록 있는 달만 평균 (이번 달이면 모두 같은 날짜까지)
+  // name = 문장에 쓰는 이름, col = 표 머리줄
+  function baseOf(m, day, cmp) {
+    const mon = Number(m.slice(5));
+    if (cmp === "prev" || cmp === "ly") {
+      const k = cmp === "prev" ? -1 : -12, b = take(rangeOf(shift(m, k), day));
+      return { ...b, ok: b.exp > 0, name: cmp === "prev" ? "지난달" : `작년 ${mon}월`, col: cmp === "prev" ? `${Number(shift(m, -1).slice(5))}월` : `작년 ${mon}월` };
+    }
+    const N = cmp === "m6" ? 6 : 12, ps = [];
+    for (let k = 1; k <= N; k++) { const p = take(rangeOf(shift(m, -k), day)); if (p.exp > 0) ps.push(p); }
+    const n = ps.length, avg = (f) => n ? ps.reduce((t, p) => t + f(p), 0) / n : 0, byCat = {};
+    ps.forEach((p) => Object.entries(p.byCat).forEach(([c, v]) => { byCat[c] = (byCat[c] || 0) + v / n; }));
+    const nm = cmp === "m6" ? "최근 6개월" : "최근 1년";
+    return { exp: avg((p) => p.exp), inc: avg((p) => p.inc), save: avg((p) => p.save), food: avg((p) => p.food), foodN: avg((p) => p.foodN), taxi: avg((p) => p.taxi), taxiN: avg((p) => p.taxiN), byCat, n, ok: n > 0,
+      name: `${nm} 평균`, col: `${N === 6 ? "6달" : "1년"} 평균`, avg: true };
   }
 
   // 🏦 순자산: 자산 탭 합계와 같게 (숨긴 자산·공동 빼고, 카드값은 마이너스)
@@ -54,50 +75,50 @@ export function mountSummary(root, env) {
     const now = sum(env.balances(s.range.to)), prevEnd = `${shift(s.m, -1)}-${String(lastDay(shift(s.m, -1))).padStart(2, "0")}`;
     return { now, d: now - sum(env.balances(prevEnd)) };
   }
-  // 모두 지난달과 비교 (2026-11-05 냐냐: 평소 말고 지난달), 지난달 기록이 없으면 이번 달만
+  // 첫 줄: 고른 비교 기준과 (2026-11-05 냐냐), 비교할 기록이 없으면 그렇다고
   const headline = (s) => {
-    if (!(s.prev.exp > 0)) return `지난달 기록이 없어서 비교할 게 없어요.`;
-    const d = s.me.exp - s.prev.exp;
-    return Math.abs(d) < 10000 ? `지난달이랑 비슷하게 썼어요.` : d < 0 ? `지난달보다 <b class="sm-good">${man(d)} 덜</b> 썼어요 👍` : `지난달보다 <b class="sm-bad">${man(d)} 더</b> 썼어요.`;
+    const b = s.prev; if (!b.ok) return `${b.name} 기록이 없어서 비교할 게 없어요.`;
+    const d = s.me.exp - b.exp;
+    return Math.abs(d) < 10000 ? `${b.name}이랑 비슷하게 썼어요.` : d < 0 ? `${b.name}보다 <b class="sm-good">${man(d)} 덜</b> 썼어요 👍` : `${b.name}보다 <b class="sm-bad">${man(d)} 더</b> 썼어요.`;
   };
-  const subOf = (s) => { const mon = Number(s.m.slice(5)); return `${s.now ? `${mon}월 1일~${s.day}일 · 지난달도 ${s.day}일까지로 비교` : `지난달과 비교`}${env.mineOn() ? " · 💑 내 몫 기준" : ""}`; };
+  const subOf = (s) => { const mon = Number(s.m.slice(5)); return `${s.now ? `${mon}월 1일~${s.day}일 · 비교하는 달도 ${s.day}일까지 · ` : ""}${s.prev.avg ? `기록 있는 ${s.prev.n}달 평균` : ""}${env.mineOn() ? `${s.now || s.prev.avg ? " · " : ""}💑 내 몫 기준` : ""}`; };
   const val = (n) => (n < 0 ? "−" : "") + man(n);
-  const vsPrev = (prev) => `<span class="muted">· 지난달 ${val(prev)}</span>`;
-  // 📊 분류마다 차이 막대 (가운데 선 기준 오른쪽 빨강 = 더 씀, 왼쪽 초록 = 덜 씀) — 냐냐 고름: 시안 C-2 + C-4
+  const cnt = (n) => `${Math.round(n * 10) / 10}번`;
+  const vsB = (s, t) => `<span class="muted">· ${s.prev.name} ${t}</span>`;
+  const cmpBar = (s) => `<div class="sm-cmp" role="group" aria-label="비교 기준"><span class="muted">비교</span>${Object.entries(CMPS).map(([k, t]) => `<button type="button" data-smcmp="${k}" aria-pressed="${k === s.cmp}">${t}</button>`).join("")}</div>`;
+  // 📊 분류마다 금액 표 + 차이 막대 (가운데 선 기준 오른쪽 빨강 = 더 씀, 왼쪽 초록 = 덜 씀) — 냐냐 고름: 시안 C-2 + C-4, 폰은 막대 없이 표만
   function diverge(s) {
-    const mon = Number(s.m.slice(5)), pm = Number(shift(s.m, -1).slice(5)), mx = Math.max(10000, ...s.rows.map((x) => Math.abs(x.d)));
-    const bar = (d) => {
-      const w = Math.round(Math.abs(d) / mx * 60), t = `<span class="sm-dv-v">${man(d)}</span>`;
-      if (Math.abs(d) < 10000) return `<span class="sm-dv-l"></span><span class="sm-dv-r"><span class="sm-dv-v muted">비슷</span></span>`;
-      return d < 0 ? `<span class="sm-dv-l down">${t}<i style="width:${w}%"></i></span><span class="sm-dv-r"></span>` : `<span class="sm-dv-l"></span><span class="sm-dv-r up"><i style="width:${w}%"></i>${t}</span>`;
-    };
-    const row = (c, v, p, d, cls = "") => `<div class="sm-dv-row${cls}"><span class="sm-dv-n">${c}<small>${val(v)} ← ${val(p)}</small></span>${bar(d)}</div>`;
-    return `<div class="sm-dv"><div class="sm-dv-row sm-dv-h"><span class="sm-dv-n">분류 <small>${mon}월 ← ${pm}월</small></span><span class="sm-dv-l">◀ 덜 씀</span><span class="sm-dv-r">더 씀 ▶</span></div>
-      ${s.rows.map((x) => row(esc(x.c), x.v, x.p, x.d)).join("")}${row("합계", s.me.exp, s.prev.exp, s.me.exp - s.prev.exp, " sm-dv-sum")}</div>`;
+    const mon = Number(s.m.slice(5)), mx = Math.max(10000, ...s.rows.map((x) => Math.abs(x.d)));
+    const dt = (d) => Math.abs(d) < 10000 ? `<span class="muted">비슷</span>` : `<span class="${d > 0 ? "sm-bad" : "sm-good"}">${d > 0 ? "+" : "−"}${man(d)}</span>`;
+    const bar = (d) => { const w = Math.round(Math.abs(d) / mx * 100), i = `<i style="width:${w}%"></i>`; return Math.abs(d) < 10000 ? `<span class="sm-dv-b"><span class="sm-dv-l"></span><span class="sm-dv-r"></span></span>` : `<span class="sm-dv-b"><span class="sm-dv-l">${d < 0 ? i : ""}</span><span class="sm-dv-r">${d > 0 ? i : ""}</span></span>`; };
+    const row = (c, v, p, cls = "") => `<div class="sm-dv-row${cls}"><span class="sm-dv-n">${c}</span><span class="num">${val(v)}</span><span class="num muted">${val(p)}</span><span class="num">${dt(v - p)}</span>${bar(v - p)}</div>`;
+    return `<div class="sm-dv"><div class="sm-dv-row sm-dv-h"><span class="sm-dv-n">분류</span><span class="num">${mon}월</span><span class="num">${esc(s.prev.col)}</span><span class="num">차이</span><span class="sm-dv-b"><span class="sm-dv-l">◀ 덜 씀</span><span class="sm-dv-r">더 씀 ▶</span></span></div>
+      ${s.rows.map((x) => row(esc(x.c), x.v, x.p)).join("")}${row("합계", s.me.exp, s.prev.exp, " sm-dv-sum")}</div>`;
   }
   function html(s) {
-    const b = [];
+    const b = [], B = s.prev;
     if (s.pl.items.length) {
       const pct = s.pl.total ? Math.round(s.me.exp / s.pl.total * 100) : 0, time = s.now ? Math.round(s.day / lastDay(s.m) * 100) : 100;
       b.push(`<b>예산</b> ${man(s.pl.total)} 중 <b>${pct}%</b> 씀${s.now ? ` <span class="muted">(한 달의 ${time}% 지남)</span>` : ""}` +
         (s.over.length ? `<ul>${s.over.map((v) => `<li>${esc(v.c)} <span class="sm-bad">${man(v.used - v.amt)} 초과</span> <span class="muted">(${man(v.used)} / ${man(v.amt)})</span></li>`).join("")}</ul>` : ` · 분류마다 예산 안이에요 👍`));
     }
-    if (s.me.list.length) b.push(`<b>큰 지출</b><ul>${s.me.list.slice(0, 3).map((x) => `<li>${esc(label(x))} <b>${man(x.amt)}</b> <span class="muted">· ${esc(x.cat || "")} · ${Number(x.date.slice(5, 7))}/${Number(x.date.slice(8))}</span></li>`).join("")}</ul>`);
-    if (s.me.food || s.me.foodN || s.prev.foodN) b.push(`🍽️ 같이 먹은 외식·배달 <b>${man(s.me.food)}</b> (내 몫, ${s.me.foodN}번) <span class="muted">· 지난달 ${man(s.prev.food)}, ${s.prev.foodN}번</span>`);
-    if (s.me.taxiN || s.prev.taxiN) b.push(`🚖 택시 <b>${s.me.taxiN}번</b> ${man(s.me.taxi)} <span class="muted">· 지난달 ${s.prev.taxiN}번 ${man(s.prev.taxi)}</span>`);
-    b.push((s.me.save > 0 ? `💰 저축·투자 통장으로 <b class="sm-good">${man(s.me.save)}</b> 넘겼어요.` : s.me.save < 0 ? `💰 저축·투자 통장에서 <b>${man(s.me.save)}</b> 꺼내 썼어요.` : `💰 이번 달은 저축 통장으로 넘긴 돈이 아직 없어요.`) + ` ${vsPrev(s.prev.save)}`);
+    if (s.me.food || s.me.foodN || B.foodN) b.push(`🍽️ 같이 먹은 외식·배달 <b>${man(s.me.food)}</b> (내 몫, ${s.me.foodN}번) ${vsB(s, `${man(B.food)}, ${cnt(B.foodN)}`)}`);
+    if (s.me.taxiN || B.taxiN) b.push(`🚖 택시 <b>${s.me.taxiN}번</b> ${man(s.me.taxi)} ${vsB(s, `${cnt(B.taxiN)} ${man(B.taxi)}`)}`);
+    b.push((s.me.save > 0 ? `💰 저축·투자 통장으로 <b class="sm-good">${man(s.me.save)}</b> 넘겼어요.` : s.me.save < 0 ? `💰 저축·투자 통장에서 <b>${man(s.me.save)}</b> 꺼내 썼어요.` : `💰 이번 달은 저축 통장으로 넘긴 돈이 아직 없어요.`) + ` ${vsB(s, val(B.save))}`);
     const nw = netWorth(s);
     b.push(`🏦 순자산 <b>${nw.now < 0 ? "−" : ""}${man(nw.now)}</b> <span class="muted">· 지난달 끝보다</span> ${Math.abs(nw.d) < 10000 ? "비슷" : `<b class="${nw.d > 0 ? "sm-good" : "sm-bad"}">${man(nw.d)} ${nw.d > 0 ? "늘었어요" : "줄었어요"}</b>`} <span class="muted">(🙈 숨긴 자산·🤝 공동 빼고)</span>`);
-    const left = s.me.inc - s.me.exp;
-    return `<p class="muted small sm-sub">${subOf(s)}</p>
+    // 큰 지출은 표 아래 한 줄로 (PC에서 오른쪽 칸이 길어지지 않게, 2026-11-05 냐냐)
+    const big = s.me.list.length ? `<div class="sm-li sm-bigs"><b>큰 지출</b><ul>${s.me.list.slice(0, 3).map((x) => `<li>${esc(label(x))} <b>${man(x.amt)}</b> <span class="muted">· ${esc(x.cat || "")} · ${Number(x.date.slice(5, 7))}/${Number(x.date.slice(8))}</span></li>`).join("")}</ul></div>` : "";
+    const left = s.me.inc - s.me.exp, sub = subOf(s);
+    return `${cmpBar(s)}${sub ? `<p class="muted small sm-sub">${sub}</p>` : ""}
       <div class="plan-tiles sm-tiles">
-        <div class="plan-tile"><span>쓴 돈</span><b>${won(s.me.exp)}</b><small>${s.prev.exp > 0 ? `지난달보다 ${diffTxt(s.me.exp - s.prev.exp)}` : "지난달 기록 없음"}</small></div>
-        <div class="plan-tile"><span>들어온 돈</span><b>${won(s.me.inc)}</b><small>지난달 ${man(s.prev.inc)}</small></div>
+        <div class="plan-tile"><span>쓴 돈</span><b>${won(s.me.exp)}</b><small>${B.ok ? `${B.name}보다 ${diffTxt(s.me.exp - B.exp)}` : `${B.name} 기록 없음`}</small></div>
+        <div class="plan-tile"><span>들어온 돈</span><b>${won(s.me.inc)}</b><small>${B.name} ${man(B.inc)}</small></div>
         <div class="plan-tile${left < 0 ? " minus" : " left"}"><span>남은 돈</span><b>${left < 0 ? "-" : ""}${won(left)}</b><small>들어온 돈 − 쓴 돈</small></div>
         <div class="plan-tile"><span>저축으로</span><b>${s.me.save < 0 ? "-" : ""}${won(s.me.save)}</b><small>저축·투자 통장으로 넘긴 돈</small></div>
       </div>
-      <p class="sm-head">${headline(s)}${s.prev.exp > 0 ? ` <span class="muted">(${Number(s.m.slice(5))}월 ${man(s.me.exp)} · ${Number(shift(s.m, -1).slice(5))}월 ${man(s.prev.exp)})</span>` : ""}</p>
-      <div class="sm-grid">${diverge(s)}<div class="sm-list">${b.map((x) => `<div class="sm-li">${x}</div>`).join("")}</div></div>`;
+      <p class="sm-head">${headline(s)}${B.ok ? ` <span class="muted">(${Number(s.m.slice(5))}월 ${man(s.me.exp)} · ${esc(B.col)} ${man(B.exp)})</span>` : ""}</p>
+      <div class="sm-grid">${diverge(s)}<div class="sm-list">${b.map((x) => `<div class="sm-li">${x}</div>`).join("")}</div>${big}</div>`;
   }
 
   // 📑 보고서 화면 (월간 정리)
@@ -143,6 +164,8 @@ export function mountSummary(root, env) {
     root.innerHTML = daily(m) + saveRow(m) + `<div class="sm-line"><b class="sm-t">📝 ${mon}월 정리</b><span class="sm-txt">${line}</span>${s.empty ? "" : `<button type="button" class="btn ghost small" data-sm="more">자세히 ›</button>`}</div>`;
   }
   root.addEventListener("click", (e) => { if (e.target.closest("[data-sm='more']")) env.openReport(env.month()); });
+  // 🔀 비교 기준 바꾸기 (월간 정리 화면은 보고서 탭 안이라 문서 전체에서 받음) → 예산 탭 한 줄·보고서 다시 그림
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-smcmp]"); if (!b) return; setCmp(b.dataset.smcmp); render(); if (env.rerender) env.rerender(); });
   root.addEventListener("change", (e) => {
     if (e.target.id !== "smGoal") return;
     const be = env.backend(), n = Number(String(e.target.value).replace(/[^\d]/g, "")) || 0, m = env.month(); if (!be) return;
