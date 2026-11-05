@@ -396,9 +396,19 @@ table.bulk { min-width: 1200px; table-layout: fixed; }
 .sm-notes { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; align-items: start; }   /* 정리 칸은 표 아래 (냐냐: 표 크게) */
 .sm-notes .sm-li { background: var(--sunk); border-radius: 12px; padding: 9px 12px; }
 .sm-dv { display: grid; font-variant-numeric: tabular-nums; }
-.sm-dv-row { display: grid; grid-template-columns: minmax(0, 1fr) 84px 84px 84px minmax(0, 1.8fr); gap: 0 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--sunk); font-size: 14px; }
+.sm-dv-row { display: grid; grid-template-columns: minmax(110px, 180px) 76px 76px 76px minmax(0, 1fr); gap: 0 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--sunk); font-size: 14px; }
 .sm-dv-n { min-width: 0; overflow-wrap: anywhere; } .sm-dv-n small { font-size: 11.5px; } .sm-dv .num { text-align: right; white-space: nowrap; }
-.sm-dv-b { display: grid; grid-template-columns: 1fr 1fr; margin-left: 8px; }
+.sm-dv-b { display: grid; grid-template-columns: 1fr 1fr; margin: 0 6px 0 18px; position: relative; }
+/* 눈금 점선: 50만마다 (−100만 · −50만 · +50만 · +100만, 가운데 0은 기준선), 줄 위아래 여백까지 이어지게 */
+.sm-dv-row:not(.sm-dv-h) .sm-dv-b::before { content: ""; position: absolute; inset: -7px 0; pointer-events: none;
+  --tk: color-mix(in srgb, var(--muted) 40%, transparent);
+  background: linear-gradient(var(--tk), var(--tk)) 0 0 / 1px 100% no-repeat, linear-gradient(var(--tk), var(--tk)) 25% 0 / 1px 100% no-repeat,
+    linear-gradient(var(--tk), var(--tk)) 75% 0 / 1px 100% no-repeat, linear-gradient(var(--tk), var(--tk)) 100% 0 / 1px 100% no-repeat;
+  -webkit-mask: linear-gradient(#000 50%, transparent 0) 0 0 / 100% 4px; mask: linear-gradient(#000 50%, transparent 0) 0 0 / 100% 4px; }
+.sm-dv-b i { position: relative; }   /* 막대가 점선 위로 */
+.sm-dv-tk { position: absolute; top: 0; transform: translateX(-50%); font-size: 11px; color: var(--muted); white-space: nowrap; }
+.sm-dv-tk.s { transform: none; } .sm-dv-tk.e { transform: translateX(-100%); }
+.sm-dv-h .sm-dv-b { height: 16px; }
 .sm-dv-l, .sm-dv-r { display: flex; align-items: center; min-height: 18px; }
 .sm-dv-l { justify-content: flex-end; border-right: 1px solid var(--line); }   /* 가운데 기준선만 연하게 (표 칸 세로줄은 없음) */
 .sm-dv i { height: 12px; min-width: 3px; } .sm-dv-r i { background: var(--danger); border-radius: 0 6px 6px 0; } .sm-dv-l i { background: var(--ok, #1a9a5b); border-radius: 6px 0 0 6px; }

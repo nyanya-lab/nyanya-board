@@ -121,7 +121,7 @@ export function mountSummary(root, env) {
       // 소분류 줄(과 소분류 없는 분류 줄)을 누르면 그 내역 창 (2026-11-05 냐냐)
       return head + (on ? x.subs.map((y) => `<button type="button" class="sm-dv-row sm-dv-sub" data-smrec data-c="${esc(x.c)}" data-s="${esc(y.c)}"><span class="sm-dv-n">${y.c ? esc(y.c) : "소분류 없음"}</span>${cells(y.v, y.p)}</button>`).join("") : "");
     };
-    return `<div class="sm-dv"><div class="sm-dv-row sm-dv-h"><span class="sm-dv-n">분류 <small>(만원)</small></span><span class="num">${mon}월</span><span class="num">${esc(s.prev.col)}</span><span class="num">차이</span><span class="sm-dv-b"></span></div>
+    return `<div class="sm-dv"><div class="sm-dv-row sm-dv-h"><span class="sm-dv-n">분류 <small>(만원)</small></span><span class="num">${mon}월</span><span class="num">${esc(s.prev.col)}</span><span class="num">차이</span><span class="sm-dv-b" aria-hidden="true">${[[0, `−${man(BAR_MAX)}`, " s"], [25, `−${man(BAR_MAX / 2)}`, ""], [50, "0", ""], [75, `+${man(BAR_MAX / 2)}`, ""], [100, `+${man(BAR_MAX)}`, " e"]].map(([p, t, c]) => `<span class="sm-dv-tk${c}" style="left:${p}%">${t}</span>`).join("")}</span></div>
       ${s.rows.map(catRow).join("")}<div class="sm-dv-row sm-dv-sum"><span class="sm-dv-n">합계</span>${cells(s.me.exp, s.prev.exp)}</div></div>`;
   }
   function html(s) {
