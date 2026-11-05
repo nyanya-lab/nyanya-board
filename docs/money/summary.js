@@ -9,7 +9,9 @@ export function mountSummary(root, env) {
   const shift = (m, k) => { const [y, mo] = m.split("-").map(Number), d = new Date(y, mo - 1 + k, 1); return ymd(d).slice(0, 7); };
   const lastDay = (m) => { const [y, mo] = m.split("-").map(Number); return new Date(y, mo, 0).getDate(); };
   const rangeOf = (m, day) => ({ from: `${m}-01`, to: `${m}-${String(Math.min(day, lastDay(m))).padStart(2, "0")}` });
-  const man = (n) => { const a = Math.abs(Math.round(n)); return a >= 100000 ? `${Math.round(a / 10000).toLocaleString()}만` : won(a); };
+  // 금액 글자는 모두 '만' 단위 (2026-11-05 냐냐: 만·원이 섞여서 정신없음) — 100만 넘으면 정수, 그 아래는 소수 한 자리 (예: 253만 · 8.1만)
+  const man = (n) => { const a = Math.abs(n) / 10000; return `${(a >= 100 ? Math.round(a) : Math.round(a * 10) / 10).toLocaleString()}만`; };
+  const tn = (n) => (n < 0 ? "−" : "") + (Math.abs(n) / 10000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });   // 표 칸: 만원, 소수 한 자리
   const diffTxt = (d, unit = "") => Math.abs(d) < 10000 ? "비슷" : `${man(d)} ${d > 0 ? "더" : "덜"}${unit}`;
   const label = (x) => x.note || x.memo || x.sub || x.cat || "";
 
@@ -89,10 +91,10 @@ export function mountSummary(root, env) {
   // 📊 분류마다 금액 표 + 차이 막대 (가운데 선 기준 오른쪽 빨강 = 더 씀, 왼쪽 초록 = 덜 씀) — 냐냐 고름: 시안 C-2 + C-4, 폰은 막대 없이 표만
   function diverge(s) {
     const mon = Number(s.m.slice(5)), mx = Math.max(10000, ...s.rows.map((x) => Math.abs(x.d)));
-    const dt = (d) => Math.abs(d) < 10000 ? `<span class="muted">비슷</span>` : `<span class="${d > 0 ? "sm-bad" : "sm-good"}">${d > 0 ? "+" : "−"}${man(d)}</span>`;
+    const dt = (d) => `<span class="${Math.abs(d) < 10000 ? "muted" : d > 0 ? "sm-bad" : "sm-good"}">${d > 0 ? "+" : d < 0 ? "−" : ""}${tn(Math.abs(d))}</span>`;   // 1만 원 안은 회색
     const bar = (d) => { const w = Math.round(Math.abs(d) / mx * 100), i = `<i style="width:${w}%"></i>`; return Math.abs(d) < 10000 ? `<span class="sm-dv-b"><span class="sm-dv-l"></span><span class="sm-dv-r"></span></span>` : `<span class="sm-dv-b"><span class="sm-dv-l">${d < 0 ? i : ""}</span><span class="sm-dv-r">${d > 0 ? i : ""}</span></span>`; };
-    const row = (c, v, p, cls = "") => `<div class="sm-dv-row${cls}"><span class="sm-dv-n">${c}</span><span class="num">${val(v)}</span><span class="num muted">${val(p)}</span><span class="num">${dt(v - p)}</span>${bar(v - p)}</div>`;
-    return `<div class="sm-dv"><div class="sm-dv-row sm-dv-h"><span class="sm-dv-n">분류</span><span class="num">${mon}월</span><span class="num">${esc(s.prev.col)}</span><span class="num">차이</span><span class="sm-dv-b"><span class="sm-dv-l">◀ 덜 씀</span><span class="sm-dv-r">더 씀 ▶</span></span></div>
+    const row = (c, v, p, cls = "") => `<div class="sm-dv-row${cls}"><span class="sm-dv-n">${c}</span><span class="num">${tn(v)}</span><span class="num muted">${tn(p)}</span><span class="num">${dt(v - p)}</span>${bar(v - p)}</div>`;
+    return `<div class="sm-dv"><div class="sm-dv-row sm-dv-h"><span class="sm-dv-n">분류 <small>(만원)</small></span><span class="num">${mon}월</span><span class="num">${esc(s.prev.col)}</span><span class="num">차이</span><span class="sm-dv-b"><span class="sm-dv-l">◀ 덜 씀</span><span class="sm-dv-r">더 씀 ▶</span></span></div>
       ${s.rows.map((x) => row(esc(x.c), x.v, x.p)).join("")}${row("합계", s.me.exp, s.prev.exp, " sm-dv-sum")}</div>`;
   }
   function html(s) {
@@ -107,8 +109,8 @@ export function mountSummary(root, env) {
     b.push((s.me.save > 0 ? `💰 저축·투자 통장으로 <b class="sm-good">${man(s.me.save)}</b> 넘겼어요.` : s.me.save < 0 ? `💰 저축·투자 통장에서 <b>${man(s.me.save)}</b> 꺼내 썼어요.` : `💰 이번 달은 저축 통장으로 넘긴 돈이 아직 없어요.`) + ` ${vsB(s, val(B.save))}`);
     const nw = netWorth(s);
     b.push(`🏦 순자산 <b>${nw.now < 0 ? "−" : ""}${man(nw.now)}</b> <span class="muted">· 지난달 끝보다</span> ${Math.abs(nw.d) < 10000 ? "비슷" : `<b class="${nw.d > 0 ? "sm-good" : "sm-bad"}">${man(nw.d)} ${nw.d > 0 ? "늘었어요" : "줄었어요"}</b>`} <span class="muted">(🙈 숨긴 자산·🤝 공동 빼고)</span>`);
-    // 큰 지출은 표 아래 한 줄로 (PC에서 오른쪽 칸이 길어지지 않게, 2026-11-05 냐냐)
-    const big = s.me.list.length ? `<div class="sm-li sm-bigs"><b>큰 지출</b><ul>${s.me.list.slice(0, 3).map((x) => `<li>${esc(label(x))} <b>${man(x.amt)}</b> <span class="muted">· ${esc(x.cat || "")} · ${Number(x.date.slice(5, 7))}/${Number(x.date.slice(8))}</span></li>`).join("")}</ul></div>` : "";
+    // 정리 칸은 모두 표 아래로 (2026-11-05 냐냐: 표를 크게)
+    const big = s.me.list.length ? `<div class="sm-li"><b>큰 지출</b><ul>${s.me.list.slice(0, 3).map((x) => `<li>${esc(label(x))} <b>${man(x.amt)}</b> <span class="muted">· ${esc(x.cat || "")} · ${Number(x.date.slice(5, 7))}/${Number(x.date.slice(8))}</span></li>`).join("")}</ul></div>` : "";
     const left = s.me.inc - s.me.exp, sub = subOf(s);
     return `${cmpBar(s)}${sub ? `<p class="muted small sm-sub">${sub}</p>` : ""}
       <div class="plan-tiles sm-tiles">
@@ -118,7 +120,7 @@ export function mountSummary(root, env) {
         <div class="plan-tile"><span>저축으로</span><b>${s.me.save < 0 ? "-" : ""}${won(s.me.save)}</b><small>저축·투자 통장으로 넘긴 돈</small></div>
       </div>
       <p class="sm-head">${headline(s)}${B.ok ? ` <span class="muted">(${Number(s.m.slice(5))}월 ${man(s.me.exp)} · ${esc(B.col)} ${man(B.exp)})</span>` : ""}</p>
-      <div class="sm-grid">${diverge(s)}<div class="sm-list">${b.map((x) => `<div class="sm-li">${x}</div>`).join("")}</div>${big}</div>`;
+      ${diverge(s)}<div class="sm-list sm-notes">${b.map((x) => `<div class="sm-li">${x}</div>`).join("")}${big}</div>`;
   }
 
   // 📑 보고서 화면 (월간 정리)
