@@ -27,9 +27,9 @@ export function mountSummary(root, env) {
         if (t && !f) save += a; else if (f && !t) save -= a;
       } else if (x.kind === "expense" || !x.kind) {
         if (x.recvTo || x.recvOf) return;   // 🤲 대신 낸 돈은 내 지출 아님 (합계는 짝과 합쳐 0)
-        list.push({ ...x, amt: env.cntAmt(x) });
         // 소분류별 (💙 공통비용은 report.js처럼 소분류 대신 공통 분류 ccat로)
         const c = x.cat || "기타", sk = (x.common || /공통비용/.test(c)) ? env.ccOf(x).c : (x.sub || ""), o = bySub[c] || (bySub[c] = {});
+        list.push({ ...x, amt: env.cntAmt(x), sk });
         o[sk] = (o[sk] || 0) + env.cntAmt(x);
         const a = Number(x.amount) || 0;
         if ((x.common || /공통비용/.test(x.cat || "")) && /식비/.test(x.ccat || "") && /외식|배달/.test(x.csub || "")) { food += a / 2; if (a > 0) foodN++; }   // 늘 내 몫(반)으로
@@ -63,6 +63,7 @@ export function mountSummary(root, env) {
     return { m, now, day, me, prev, cmp, rows, pl, over, range: rangeOf(m, day) };
   }
   // 🔀 비교 기준 (2026-11-05 냐냐: 지난달 · 최근 6개월 · 최근 1년 · 1년 전 같은 달) — 이 기기에만 기억 (localStorage nyanya-sm-cmp)
+  const BAR_MAX = 1000000;   // 차이 막대 고정 눈금 (원)
   const openCats = new Set();   // 월간 정리 표에서 펼친 분류 (메모리에만)
   const CMPS = { prev: "지난달", m6: "최근 6개월", y1: "최근 1년", ly: "작년 같은 달" };
   function getCmp() { try { const v = localStorage.getItem("nyanya-sm-cmp"); return CMPS[v] ? v : "prev"; } catch (e) { return "prev"; } }
@@ -107,16 +108,18 @@ export function mountSummary(root, env) {
   const cmpBar = (s) => `<div class="sm-cmp" role="group" aria-label="비교 기준"><span class="muted">비교</span>${Object.entries(CMPS).map(([k, t]) => `<button type="button" data-smcmp="${k}" aria-pressed="${k === s.cmp}">${t}</button>`).join("")}</div>`;
   // 📊 분류마다 금액 표 + 차이 막대 (가운데 선 기준 오른쪽 빨강 = 더 씀, 왼쪽 초록 = 덜 씀) — 냐냐 고름: 시안 C-2 + C-4, 폰은 막대 없이 표만
   function diverge(s) {
-    const mon = Number(s.m.slice(5)), mx = Math.max(10000, ...s.rows.map((x) => Math.abs(x.d)));
+    // 막대 길이는 고정 눈금: 100만 = 반쪽 끝까지 (2026-11-05 냐냐: 달마다 눈금이 바뀌면 비교가 안 돼서), 넘으면 끝에 잘림 표시
+    const mon = Number(s.m.slice(5)), mx = BAR_MAX;
     const dt = (d) => `<span class="${Math.abs(d) < 10000 ? "muted" : d > 0 ? "sm-bad" : "sm-good"}">${d > 0 ? "+" : d < 0 ? "−" : ""}${tn(Math.abs(d))}</span>`;   // 1만 원 안은 회색
-    const bar = (d) => { const w = Math.round(Math.abs(d) / mx * 100), i = `<i style="width:${w}%"></i>`; return Math.abs(d) < 10000 ? `<span class="sm-dv-b"><span class="sm-dv-l"></span><span class="sm-dv-r"></span></span>` : `<span class="sm-dv-b"><span class="sm-dv-l">${d < 0 ? i : ""}</span><span class="sm-dv-r">${d > 0 ? i : ""}</span></span>`; };
+    const bar = (d) => { const w = Math.min(100, Math.round(Math.abs(d) / mx * 100)), i = `<i style="width:${w}%"${Math.abs(d) > mx ? ` class="cut" title="${man(d)} (막대는 ${man(mx)}까지)"` : ""}></i>`; return Math.abs(d) < 10000 ? `<span class="sm-dv-b"><span class="sm-dv-l"></span><span class="sm-dv-r"></span></span>` : `<span class="sm-dv-b"><span class="sm-dv-l">${d < 0 ? i : ""}</span><span class="sm-dv-r">${d > 0 ? i : ""}</span></span>`; };
     const cells = (v, p) => `<span class="num">${tn(v)}</span><span class="num muted">${tn(p)}</span><span class="num">${dt(v - p)}</span>${bar(v - p)}`;
     // 분류 줄: 소분류가 있으면 눌러서 펼침 (▸/▾, 펼친 분류는 openCats에 기억 — 달·비교를 바꿔도 그대로)
     const catRow = (x) => {
       const has = x.subs.length > 1 || (x.subs.length === 1 && x.subs[0].c), on = has && openCats.has(x.c);
       const head = has ? `<button type="button" class="sm-dv-row sm-dv-cat" data-smcat="${esc(x.c)}" aria-expanded="${on}"><span class="sm-dv-n"><span class="sm-dv-car" aria-hidden="true">${on ? "▾" : "▸"}</span>${esc(x.c)}</span>${cells(x.v, x.p)}</button>`
-        : `<div class="sm-dv-row"><span class="sm-dv-n"><span class="sm-dv-car" aria-hidden="true"></span>${esc(x.c)}</span>${cells(x.v, x.p)}</div>`;
-      return head + (on ? x.subs.map((y) => `<div class="sm-dv-row sm-dv-sub"><span class="sm-dv-n">${y.c ? esc(y.c) : "소분류 없음"}</span>${cells(y.v, y.p)}</div>`).join("") : "");
+        : `<button type="button" class="sm-dv-row sm-dv-cat" data-smrec data-c="${esc(x.c)}"><span class="sm-dv-n"><span class="sm-dv-car" aria-hidden="true"></span>${esc(x.c)}</span>${cells(x.v, x.p)}</button>`;
+      // 소분류 줄(과 소분류 없는 분류 줄)을 누르면 그 내역 창 (2026-11-05 냐냐)
+      return head + (on ? x.subs.map((y) => `<button type="button" class="sm-dv-row sm-dv-sub" data-smrec data-c="${esc(x.c)}" data-s="${esc(y.c)}"><span class="sm-dv-n">${y.c ? esc(y.c) : "소분류 없음"}</span>${cells(y.v, y.p)}</button>`).join("") : "");
     };
     return `<div class="sm-dv"><div class="sm-dv-row sm-dv-h"><span class="sm-dv-n">분류 <small>(만원)</small></span><span class="num">${mon}월</span><span class="num">${esc(s.prev.col)}</span><span class="num">차이</span><span class="sm-dv-b"></span></div>
       ${s.rows.map(catRow).join("")}<div class="sm-dv-row sm-dv-sum"><span class="sm-dv-n">합계</span>${cells(s.me.exp, s.prev.exp)}</div></div>`;
@@ -148,7 +151,21 @@ export function mountSummary(root, env) {
   }
 
   // 📑 보고서 화면 (월간 정리)
-  function full(m) { const s = build(m); return s.empty ? `<p class="muted">${esc(s.empty)}</p>` : html(s); }
+  let shown = null;   // 지금 화면에 그린 월간 정리 (내역 창이 씀)
+  function full(m) { const s = build(m); shown = s.empty ? null : s; return s.empty ? `<p class="muted">${esc(s.empty)}</p>` : html(s); }
+  // 🧾 내역 창: 분류(›소분류)의 이번 달 기록 + 비교 달 기록(지난달·작년 같은 달일 때, 평균이면 이번 달만). 줄을 누르면 그 기록 고치기
+  function recPop(c, sub) {
+    const s = shown; if (!s) return;
+    const hit = (x) => (x.cat || "기타") === c && (sub == null || x.sk === sub || sub.replace(/^\S+\s/, "") === x.sk);
+    const part = (t, list) => { const xs = list.filter(hit).sort((a, b) => (b.date || "").localeCompare(a.date || "")), tot = xs.reduce((a, x) => a + x.amt, 0);
+      return `<h3 class="sm-pop-t">${esc(t)} <span class="muted">${xs.length}건 · ${won(tot)}</span></h3>` + (xs.length ? xs.map((x) => { const d = new Date(`${x.date}T00:00`), m2 = x.memo && x.memo !== label(x) ? x.memo : "";
+        return `<button type="button" class="sm-pop-r" data-smedit="${esc(x.id)}"><span class="muted">${d.getMonth() + 1}/${d.getDate()} (${"일월화수목금토"[d.getDay()]})</span><span class="sm-pop-l">${esc(label(x))}${m2 ? `<small>${esc(m2)}</small>` : ""}</span><b class="${x.amt < 0 ? "sm-good" : ""}">${x.amt < 0 ? "−" : ""}${won(Math.abs(x.amt))}</b></button>`; }).join("") : `<p class="muted small">기록이 없어요.</p>`); };
+    let dl = document.getElementById("smPop");
+    if (!dl) { dl = document.createElement("dialog"); dl.id = "smPop"; dl.className = "sm-pop"; document.body.append(dl); dl.addEventListener("click", (e) => { if (e.target === dl) dl.close(); }); }
+    dl.innerHTML = `<div class="sm-pop-h"><b>${esc(c)}${sub != null ? ` › ${sub ? esc(sub) : "소분류 없음"}` : ""}</b><button type="button" class="sm-pop-x" data-smclose aria-label="닫기">×</button></div>
+      <div class="sm-pop-b">${part(`${Number(s.m.slice(5))}월${s.now ? ` (1~${s.day}일)` : ""}`, s.me.list)}${s.prev.list ? part(s.prev.col + (s.now ? ` (1~${s.day}일)` : ""), s.prev.list) : `<p class="muted small sm-pop-t">${esc(s.prev.name)}과 비교 중이라 내역은 이번 달만 보여요.</p>`}</div>`;
+    if (!dl.open) dl.showModal();
+  }
   // 📑 보고서 첫 화면 카드: 쓴 돈 + 한 줄
   function card(m) { const s = build(m); return s.empty ? { exp: 0, line: s.empty } : { exp: s.me.exp, line: headline(s).replace(/<[^>]+>/g, "") }; }
   // 💰 저축 목표: settings.saveGoals[월] = 금액, 안 정한 달은 그 전 가장 가까운 달 것 (예산처럼 이어짐)
@@ -192,6 +209,11 @@ export function mountSummary(root, env) {
   root.addEventListener("click", (e) => { if (e.target.closest("[data-sm='more']")) env.openReport(env.month()); });
   // 🔀 비교 기준 바꾸기 (월간 정리 화면은 보고서 탭 안이라 문서 전체에서 받음) → 예산 탭 한 줄·보고서 다시 그림
   document.addEventListener("click", (e) => {
+    const r = e.target.closest("[data-smrec]");
+    if (r) { recPop(r.dataset.c, r.dataset.s == null ? null : r.dataset.s); return; }
+    const ed = e.target.closest("[data-smedit]");
+    if (ed) { document.getElementById("smPop").close(); if (env.editMoney) env.editMoney(ed.dataset.smedit); return; }
+    if (e.target.closest("[data-smclose]")) { document.getElementById("smPop").close(); return; }
     const c = e.target.closest("[data-smcat]");
     if (c) { const k = c.dataset.smcat; if (openCats.has(k)) openCats.delete(k); else openCats.add(k); if (env.rerender) env.rerender(); return; }
     const b = e.target.closest("[data-smcmp]"); if (!b) return; setCmp(b.dataset.smcmp); render(); if (env.rerender) env.rerender();
