@@ -6,11 +6,15 @@
  *   · 스페인어 공부한 날(최근 60일) → '루틴관리' 캘린더: 📖 스페인어 12개 · 복습 끝 (보드 ⚙️ 연동에 스페인어 비밀번호가 있을 때)
  *   · 💰 돈은 안 보냄 (냐냐와 정함)
  *   · 구글 캘린더 전부(지난달~석 달 뒤) → 보드 달력 (nyanya/{방}/gcal, 캘린더마다 보드에서 켜고 끄기)
+ *   · 💌 욱진이가 욱진 보드에서 보낸 기능·쿠폰 요청(욱진 notify, 읽기만) → 보드 할 일 uk-{id} → 같은 실행에서 김윤아로 (보드 ⚙️ 연동에 욱진 보드가 이어져 있을 때)
  * 보드가 넣은 일정엔 nyanyaApp=1 · nyanyaKind(task|vocab) · nyanyaRef 표시 → 그것만 고치고 지움. 냐냐가 직접 넣은 일정은 안 건드림.
  */
-const CORE_VERSION = "2026-10-20b";
+const CORE_VERSION = "2026-11-06a";
 const DB_URL = "https://nyanya-board-default-rtdb.asia-southeast1.firebasedatabase.app";
 const VOCAB_URL = "https://nyanya-vocab-default-rtdb.firebaseio.com";
+const UKJIN_URL = "https://ukjin-207a3-default-rtdb.firebaseio.com";
+const UK_MARK = { req: "🛠️ 욱진 기능 요청: ", coupon: "💌 욱진 쿠폰 요청: " };
+const UK_DAYS = 30;   // 이보다 오래된 요청은 할 일로 안 만들고 본 것으로만 표시
 const TZ = "Asia/Seoul";
 const DESC = "냐냐 보드에서 넣은 일정";
 const CAL_NAME = { task: "김윤아", vocab: "루틴관리" };   // 보낼 캘린더 이름 (구글 캘린더 왼쪽 목록 이름 그대로)
@@ -25,6 +29,7 @@ function nyanyaSync(BOARD_PASSWORD) {
   const cals = calendars_();
   const byName = function (n) { return cals.filter(function (c) { return c.name === n; })[0]; };
   const res = { added: 0, updated: 0, deleted: 0 }, missing = [];
+  const uk = ukjinRequests_(base, settings, tasks);   // 새 요청은 tasks에도 넣어서 아래에서 바로 김윤아로
 
   // 📌 할 일 → 김윤아. 김윤아는 냐냐 기본(primary) 캘린더라 API에선 이름이 이메일로 나옴 → 이름으로 못 찾으면 기본 캘린더 (calendars_에서 이름도 김윤아로 붙임)
   const taskCal = byName(CAL_NAME.task) || cals.filter(function (c) { return c.primary; })[0];
@@ -61,10 +66,35 @@ function nyanyaSync(BOARD_PASSWORD) {
   putJson_(base + "/gcal.json", pullFromGoogle_(cals));
   putJson_(base + "/gsync.json", {
     at: Date.now(), email: Session.getEffectiveUser().getEmail(), version: CORE_VERSION,
-    added: res.added, updated: res.updated, deleted: res.deleted, missing: missing, vocab: vocabNote
+    added: res.added, updated: res.updated, deleted: res.deleted, missing: missing, vocab: vocabNote, uk: uk.note
   });
   Logger.log("동기화 코드 " + CORE_VERSION + " · 추가 " + res.added + " · 수정 " + res.updated + " · 삭제 " + res.deleted +
-    (missing.length ? " · 못 찾은 캘린더: " + missing.join(", ") : "") + (vocabNote ? " · " + vocabNote : ""));
+    (missing.length ? " · 못 찾은 캘린더: " + missing.join(", ") : "") + (vocabNote ? " · " + vocabNote : "") +
+    (uk.n ? " · 💌 욱진 요청 " + uk.n + "개" : "") + (uk.note && uk.note !== "ok" ? " · " + uk.note : ""));
+}
+
+// 💌 욱진이 요청: 욱진 보드 notify/{id} = {k req|coupon, text, at} (욱진이 기기에서만 적힘) → 보드 할 일 tasks/uk-{id}
+// 만든 것은 settings.ukSeen/{id}에 적어서 냐냐가 할 일을 지워도 다시 안 생김. 욱진 쪽 데이터는 읽기만. note: ""(연결 안 함) | "ok" | 못 읽은 이유
+function ukjinRequests_(base, settings, tasks) {
+  const room = settings.links && settings.links.ukjin;
+  if (!room) return { n: 0, note: "" };
+  if (!/^[0-9a-f]{64}$/.test(room)) return { n: 0, note: "욱진 보드 연결 값이 이상해요 (⚙️ 연동에서 다시 넣어 주세요)" };
+  let list;
+  try { list = getJson_(UKJIN_URL + "/ukjin/" + room + "/notify.json") || {}; } catch (e) { return { n: 0, note: "욱진 요청을 못 읽음" }; }
+  const seen = settings.ukSeen || {}, since = Date.now() - UK_DAYS * 864e5, patch = {}, made = {};
+  Object.keys(list).forEach(function (id) {
+    const x = list[id];
+    if (!x || seen[id] || !/^[\w-]+$/.test(id)) return;
+    patch["settings/ukSeen/" + id] = true;
+    if (!x.text || !(x.at > since)) return;
+    made["uk-" + id] = { title: (UK_MARK[x.k] || UK_MARK.req) + String(x.text).replace(/\s+/g, " ").trim().slice(0, 120),
+      date: Utilities.formatDate(new Date(x.at), TZ, "yyyy-MM-dd"), done: false, at: x.at, from: "ukjin" };
+    patch["tasks/uk-" + id] = made["uk-" + id];
+  });
+  if (!Object.keys(patch).length) return { n: 0, note: "ok" };
+  try { patchJson_(base + ".json", patch); } catch (e) { return { n: 0, note: "욱진 요청을 할 일로 못 넣음" }; }   // 캘린더 동기화는 그대로 이어서
+  Object.keys(made).forEach(function (k) { tasks[k] = made[k]; });
+  return { n: Object.keys(made).length, note: "ok" };
 }
 
 // 한 캘린더 안에서 보드가 넣은 같은 종류(kind) 일정만 맞추기: 없으면 넣고, 바뀌면 고치고, 보드에 없으면 지움
@@ -192,5 +222,10 @@ function getJson_(url) {
 }
 function putJson_(url, data) {
   const r = UrlFetchApp.fetch(url, { method: "put", contentType: "application/json", payload: JSON.stringify(data), muteHttpExceptions: true });
+  if (r.getResponseCode() !== 200) throw new Error("보드에 쓰지 못했어요 (" + r.getResponseCode() + ")");
+}
+// 여러 칸을 한 번에 (키 = "tasks/uk-…" 같은 경로)
+function patchJson_(url, data) {
+  const r = UrlFetchApp.fetch(url, { method: "patch", contentType: "application/json", payload: JSON.stringify(data), muteHttpExceptions: true });
   if (r.getResponseCode() !== 200) throw new Error("보드에 쓰지 못했어요 (" + r.getResponseCode() + ")");
 }

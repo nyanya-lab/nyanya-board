@@ -331,3 +331,17 @@ body:not(.locked) .loading { display: none; }
 
 /* 로고 = 냐냐 캐릭터 (avatar.png, 2026-10-20 냐냐가 고름) */
 .logo-img { width: 30px; height: 30px; border-radius: 50%; flex: none; display: block; }
+
+/* 💌 욱진이 요청 띠 (맨 위, app.js renderUkBar) */
+.uk-bar { display: flex; align-items: center; gap: 6px; margin: 0 0 16px; padding: 6px 6px 6px 4px; border-radius: 12px; background: var(--coral-soft); border: 1px solid color-mix(in srgb, var(--coral) 30%, transparent); }
+.uk-go { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 0; background: none; font: inherit; color: var(--fg); text-align: left; cursor: pointer; border-radius: 8px; }
+.uk-go:hover { background: color-mix(in srgb, var(--coral) 10%, transparent); }
+.uk-go b { color: var(--coral); flex: none; }
+.uk-go span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.uk-go i { flex: none; font-style: normal; font-size: 13px; color: var(--coral); font-weight: 600; }
+@media (max-width: 720px) {
+  .uk-bar { margin-bottom: 12px; }
+  .uk-go { flex-wrap: wrap; gap: 2px 10px; }
+  .uk-go span { flex-basis: 100%; order: 3; }
+  .uk-go i { margin-left: auto; }
+}

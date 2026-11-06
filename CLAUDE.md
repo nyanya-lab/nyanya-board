@@ -13,7 +13,7 @@
   (모듈이라 파일을 더블클릭해서 열면 안 됨)
 - 비밀번호·API 키 같은 비밀값은 저장소(공개)에 절대 넣지 않기.
 - 🔑 **서버 데이터(가계부·공통 저장소) 보기·고치기 = `python tools/db.py get|patch|put board|uri <경로> [body.json]`** — 냐냐에게 비밀번호 묻지 않기. 보드 비밀번호는 저장소 맨 위 `dev-local.json`(이 컴퓨터에만, .gitignore), 공통 비밀번호는 보드 settings.uriPw에서 꺼냄. 해시·비밀번호는 출력·커밋에 찍지 않기. (파일이 없는 클라우드 방이면 "이 컴퓨터 방에서 해야 해요") 화면 확인은 냐냐 크롬(Claude in Chrome)도 됨.
-- 🔒 **화면 확인 = 로컬 확인 모드**: `python tools/snapshot.py`(진짜 데이터 사본 → `docs/money/_local/snapshot.json`, .gitignore, uriPw·links는 뺌) → 내 브라우저에서 http://localhost:8010/money/?local (로그인 없이 진짜 숫자, 보기 전용 — 저장 안 됨, 공통 탭도 사본으로). 데이터를 고친 뒤엔 사본 다시 받기. 비밀번호를 브라우저에 넣는 건 안 함 → 실제 사이트 확인이 꼭 필요할 때만 냐냐 크롬.
+- 🔒 **화면 확인 = 로컬 확인 모드**: `python tools/snapshot.py`(진짜 데이터 사본 → `docs/money/_local/snapshot.json`, .gitignore, uriPw·links는 뺌) → 내 브라우저에서 http://localhost:8010/money/?local (로그인 없이 진짜 숫자, 보기 전용 — 저장 안 됨, 공통 탭도 사본으로). 보드 첫 화면도 http://localhost:8010/?local (같은 사본의 할 일·설정, `window.__local` = {S, render}로 가짜 할 일 넣어 보기, 2026-11-06). 데이터를 고친 뒤엔 사본 다시 받기. 비밀번호를 브라우저에 넣는 건 안 함 → 실제 사이트 확인이 꼭 필요할 때만 냐냐 크롬.
 - `gh`(GitHub CLI)는 `C:\Program Files\GitHub CLI\gh.exe`, nyanya-lab 계정으로 로그인돼 있음.
 
 ## 💰 가계부 (`docs/money/`) — 욱진 보드 가계부와 짝 (2026-10-20 만듦)
@@ -152,6 +152,7 @@ docs/money/coin-*.png     💰 가계부 아이콘 = 같은 얼굴, 분홍 배�
 ## 📅 구글 캘린더 연동 (2026-10-20 만듦 — 욱진 보드와 같은 Apps Script 방식)
 
 - 방식: 냐냐 구글 계정 Apps Script(`Code.gs` 로더 → `sync-core.js`)가 5분마다. 사이트에서 구글 로그인 없음. 양쪽 방향.
+- 💌 욱진이 요청 → 할 일 (2026-11-06, 욱진보드 방 부탁·주인이 '바로'(Apps Script) 방식 고름): 욱진 보드 PR #196이 욱진이 기기에서 기능·쿠폰 요청을 보내면 욱진 Firebase `ukjin/{욱진방}/notify/{id}` = {k req|coupon, text, at} (관리자·테스트 모드는 안 적음). sync-core.js `ukjinRequests_`가 5분마다 **읽기만** → 새 id는 냐냐 `tasks/uk-{id}` {title '💌 욱진 쿠폰 요청: …'/'🛠️ 욱진 기능 요청: …', date = at의 서울 날짜, from "ukjin"} + `settings.ukSeen/{id}`(지워도 다시 안 생김, 30일 넘은 건 표시만) → 같은 실행에서 김윤아 📌. 욱진 방 = 냐냐 `settings.links.ukjin`(비밀번호 말고 해시만, false = 일부러 끊음): 보드가 열릴 때 이 브라우저 `ukjin-board-pw`가 있으면 저절로(app.js `ukjinAutoLink`, 그 방이 있는지 shallow로 확인), 없으면 ⚙️ 연동 '💌 욱진 보드' 칸. 상태 `gsync.uk` ("ok" 또는 못 읽은 이유). 보드 맨 위 띠 #ukBar(`renderUkBar`) = 안 끝낸 uk- 할 일 중 이 기기에서 안 본 것(localStorage `nyanya-uk-seen`), 누르면 그 날짜 창, × = 봤어요.
 - 보드 → 구글: 보드가 넣은 일정엔 private 표시 `nyanyaApp=1` · `nyanyaKind`(task|vocab) · `nyanyaRef` → 그것만 고치고 지움. 냐냐가 직접 넣은 일정은 안 건드림. 할 일 `noGoogle: true`면 안 보냄(화면 버튼은 아직 없음). 캘린더는 **이름**으로 찾음(`CAL_NAME`), 못 찾으면 `gsync.missing`에 적고 할 일은 기본 캘린더로.
 - 구글 → 보드: 캘린더 전부, 지난달~석 달 뒤 → `nyanya/{방}/gcal` = {at, cals{키:{name,color,sel(구글에서 체크됨),o}}, ev{e0:{t,c,d,e(종일 끝 다음 날),tm,link}}}. 키 = 캘린더 id에서 . # $ [ ] / → _. 동기화 상태 `gsync` = {at, email, version, added, updated, deleted, missing[], vocab}.
 - 보드 화면: 하루짜리·시간 일정은 칸 안 글자(캘린더 색 `--gc`), 여러 날 종일 일정은 🎬처럼 막대(`weekBars`). 날짜 창 아래 '📅 구글 일정'. 오늘 옆 [📅 구글] 전체 켜고 끄기(`view.google`), ⚙️ 설정에서 캘린더마다(`view.gcal[키]`, 안 정했으면 구글에서 체크된 캘린더만 = 기본으로 '욱진'은 꺼짐).

@@ -153,11 +153,12 @@ async function firebaseStart() {
       }, onErr));
     });
     unsubs.push(rt.onValue(path(room, "gcal"), (snap) => { S.gcal = snap.val(); renderCalendar(); renderDay(); renderGoogleSettings(); }, onErr));
-    unsubs.push(rt.onValue(path(room, "gsync"), (snap) => { S.gsync = snap.val(); renderGoogleSettings(); }, onErr));
+    unsubs.push(rt.onValue(path(room, "gsync"), (snap) => { S.gsync = snap.val(); renderGoogleSettings(); renderLinkSettings(); }, onErr));
     unsubs.push(rt.onValue(path(room, "settings"), (snap) => {
       S.settings = snap.val() || {};
       links.setPasswords(S.settings.links);
       if (S.settings.uriPw) uri.usePassword(S.settings.uriPw);   // 🤝 보드에 기억한 공통 비밀번호로 우리 탭 열기
+      ukjinAutoLink();
       renderLinkSettings();
       renderToggles();
       renderCalendar();
@@ -231,8 +232,52 @@ async function moveOldLocal() {
   moving = false;
 }
 
+// 💌 욱진이 요청: 욱진 보드 방 이름(해시)만 보드 설정 links.ukjin에 저장 → 구글 동기화(apps-script/sync-core.js)가 5분마다
+// 욱진 notify를 읽어 할 일 uk-{id}로 만들고 김윤아 캘린더로. 이 브라우저에 욱진 보드 비밀번호가 있으면(같은 주소라 냐냐 기기엔 있음) 저절로,
+// 없으면 ⚙️ 연동에서. 지우기를 누르면 false로 남겨서 다시 저절로 안 이어짐
+const UK_DB = "https://ukjin-207a3-default-rtdb.firebaseio.com/ukjin/";
+async function ukjinRoom(pw) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("ukjin-board:" + pw));
+  const room = [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const r = await fetch(UK_DB + room + ".json?shallow=true", { cache: "no-store" });
+  return r.ok && (await r.json()) ? room : null;   // 그 비밀번호로 만든 욱진 보드가 있을 때만
+}
+let ukTried = false;
+async function ukjinAutoLink() {
+  if (ukTried || !backend || (S.settings.links && S.settings.links.ukjin !== undefined)) return;
+  let pw = null;
+  try { pw = localStorage.getItem("ukjin-board-pw"); } catch (e) { /* 무시 */ }
+  if (!pw) return;
+  ukTried = true;
+  try { const room = await ukjinRoom(pw); if (room && backend) await backend.saveLinks({ ukjin: room }); } catch (e) { /* 다음에 열 때 다시 */ }
+}
+
+// 💌 욱진이 요청 띠 (맨 위): 할 일 uk-… 중 안 끝냈고 이 기기에서 아직 안 본 것. 누르면 그 날짜 창, × = 봤어요
+const UK_SEEN = "nyanya-uk-seen";
+function ukSeenMap() { try { return JSON.parse(localStorage.getItem(UK_SEEN)) || {}; } catch (e) { return {}; } }
+const ukNew = () => {
+  const seen = ukSeenMap();
+  return Object.entries(S.tasks).filter(([id, t]) => id.startsWith("uk-") && t && t.title && !t.done && !seen[id])
+    .sort(([, a], [, b]) => (b.at || 0) - (a.at || 0));
+};
+function renderUkBar() {
+  const list = S.loaded ? ukNew() : [], el = $("#ukBar");
+  el.hidden = !list.length;
+  if (!list.length) return;
+  const first = list[0][1].title.replace(/^\S+ 욱진 /, "");
+  el.innerHTML = `<button type="button" class="uk-go" data-act="ukOpen"><b>💌 욱진이 요청 ${list.length}개</b><span>${esc(first)}${list.length > 1 ? ` 외 ${list.length - 1}개` : ""}</span><i>보기 ›</i></button>
+    <button type="button" class="icon-btn" data-act="ukSeen" aria-label="봤어요" title="봤어요">×</button>`;
+}
+function markUkSeen() {
+  const seen = ukSeenMap(), out = {};
+  for (const id of Object.keys(S.tasks)) if (id.startsWith("uk-") && (seen[id] || !S.tasks[id].done)) out[id] = 1;   // 지운 할 일은 목록에서 빼서 안 쌓이게
+  try { localStorage.setItem(UK_SEEN, JSON.stringify(out)); } catch (e) { /* 무시 */ }
+  renderUkBar();
+}
+
 // ── 그리기 ──
 function render() {
+  renderUkBar();
   renderTiles();
   renderCalendar();
   renderDay();
@@ -473,6 +518,12 @@ function renderLinkSettings() {
     $(`#link-${kind}`).placeholder = L[kind] ? "•••••• (보드에 저장됨)" : `${name} 동기화 비밀번호`;
     $(`#link-${kind}-clear`).hidden = !L[kind];
   }
+  const g = S.gsync || {};
+  $("#link-ukjin-st").textContent = !L.ukjin ? "아직 연결 안 됨 · 욱진 보드 비밀번호를 넣으면 욱진이가 보낸 기능·쿠폰 요청이 할 일로 들어와요"
+    : g.uk && g.uk !== "ok" ? `⚠️ ${g.uk}`
+      : `✅ 연결됨 · 욱진이 요청이 5분 안에 할 일과 구글 캘린더(김윤아)로 들어와요${g.uk === "ok" ? "" : " (구글 동기화가 새 코드로 한 번 돌면 시작)"}`;
+  $("#link-ukjin").placeholder = L.ukjin ? "•••••• (연결됨)" : "욱진 보드 비밀번호";
+  $("#link-ukjin-clear").hidden = !L.ukjin;
   // 이 브라우저의 스페인어·왓치로그 앱에 비밀번호가 있고 보드엔 아직 없으면 [가져오기]
   $("#linkImport").hidden = !backend || !["vocab", "watch"].some((k) => !L[k] && links.appPassword(k));
 }
@@ -536,6 +587,16 @@ document.addEventListener("click", (e) => {
       act(backend.saveView({ [k]: !viewOn(k) })).catch(() => {});
     }
     else if (a === "lock" && lockAction && confirm("이 기기를 잠글까요? 다시 열려면 비밀번호가 필요해요.")) lockAction();
+    else if (a === "ukSeen") markUkSeen();
+    else if (a === "ukOpen") {
+      const t = (ukNew()[0] || [])[1];
+      markUkSeen();
+      if (!t || !t.date) return;
+      if (location.hash !== "#home" && location.hash !== "") location.hash = "#home";
+      ui.sel = t.date; ui.month = t.date.slice(0, 7);
+      renderCalendar(); renderDay();
+      if (!$("#dayDlg").open) $("#dayDlg").showModal();
+    }
     return;
   }
   const go = e.target.closest("[data-go]");
@@ -578,13 +639,20 @@ document.addEventListener("change", (e) => {
   act(backend.saveView({ ["gcal/" + k]: e.target.checked })).catch(() => { e.target.checked = !e.target.checked; });
 });
 
-$("#linkForm").addEventListener("submit", (e) => {
+$("#linkForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!backend) return;
   const patch = {};
   for (const kind of ["vocab", "watch"]) { const v = $(`#link-${kind}`).value.trim(); if (v) patch[kind] = v; }
+  const ukPw = $("#link-ukjin").value.trim();
+  if (ukPw) {   // 욱진 보드는 비밀번호 대신 방 이름(해시)만 저장
+    let room = null;
+    try { room = await ukjinRoom(ukPw); } catch (err) { toast("욱진 보드에 연결하지 못했어요. 인터넷 연결을 확인해 주세요."); return; }
+    if (!room) { toast("그 비밀번호로 만든 욱진 보드가 없어요."); return; }
+    patch.ukjin = room;
+  }
   if (!Object.keys(patch).length) { toast("넣은 비밀번호가 없어요."); return; }
-  act(backend.saveLinks(patch), "연동 비밀번호를 저장했어요. 다른 기기에서도 같이 써요.").then(() => {
+  act(backend.saveLinks(patch), "연동을 저장했어요. 다른 기기에서도 같이 써요.").then(() => {
     for (const kind of Object.keys(patch)) $(`#link-${kind}`).value = "";
   }).catch(() => {});
 });
@@ -599,6 +667,11 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-link-clear]");
   if (!b || !backend) return;
   const kind = b.dataset.linkClear;
+  if (kind === "ukjin") {
+    if (!confirm("욱진 보드 연결을 끊을까요? 욱진이 요청이 더는 할 일로 안 들어와요. (이미 들어온 할 일은 그대로예요)")) return;
+    act(backend.saveLinks({ ukjin: false }), "끊었어요.").catch(() => {});   // false = 일부러 끊음 (저절로 다시 안 이어짐)
+    return;
+  }
   if (!confirm("보드에 저장한 이 비밀번호를 지울까요? (그 앱의 데이터는 그대로예요)")) return;
   act(backend.saveLinks({ [kind]: null }), "지웠어요.").catch(() => {});
 });
@@ -637,7 +710,17 @@ renderLinkSettings();
 renderToggles();
 renderGoogleSettings();
 setSync();
-firebaseStart().catch(() => {
+// 🔒 로컬 확인 모드 (Claude용, localhost에서만): python tools/snapshot.py 사본(money/_local/snapshot.json)으로 보기만, 서버엔 안 붙음
+const LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && new URLSearchParams(location.search).has("local");
+if (LOCAL) {
+  fetch("money/_local/snapshot.json", { cache: "no-store" }).then((r) => r.json()).then((s) => {
+    S.tasks = s.tasks || {}; S.settings = s.settings || {}; S.loaded = true;
+    document.body.classList.remove("locked");
+    $("#loadingView").hidden = true;
+    window.__local = { S, render };   // 시험용 (가짜 할 일 넣고 다시 그리기)
+    render(); renderToggles();
+  }).catch(() => { $("#loadingView").textContent = "사본이 없어요 (python tools/snapshot.py)"; });
+} else firebaseStart().catch(() => {
   document.body.classList.add("locked");
   $("#loadingView").hidden = true;
   $("#loginView").hidden = false;

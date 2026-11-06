@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="style.css?v=20261101a">
+<link rel="stylesheet" href="style.css?v=20261106a">
 </head>
 <body class="locked">
 
@@ -54,6 +54,8 @@
 </aside>
 
 <main class="main">
+  <!-- 💌 욱진이 요청 띠 (구글 동기화가 만든 할 일 uk-…, app.js renderUkBar) -->
+  <div class="uk-bar" id="ukBar" role="status" hidden></div>
   <!-- 🗓️ 달력 (첫 화면) -->
   <section class="page" id="page-home">
     <header class="page-head">
@@ -154,12 +156,14 @@
         <ul class="bak-list" id="bakList"><li class="muted">불러오는 중…</li></ul>
       </div>
       <form class="card link-form" id="linkForm" autocomplete="off">
-        <h3>연동 (스페인어 · 왓치로그)</h3>
+        <h3>연동 (스페인어 · 왓치로그 · 욱진 보드)</h3>
         <p class="muted small">각 앱의 <b>동기화 비밀번호</b>를 넣으면 그 기록을 냐냐 보드에서 볼 수 있어요 (읽기만 해요). <b>지금 열린 보드에만</b> 저장돼서, 이 보드에서만 보이고 폰·PC 어디서든 한 번만 넣으면 돼요.</p>
         <label class="link-row"><span>📖 스페인어</span><input type="password" id="link-vocab" autocomplete="off"><button class="btn ghost small" type="button" id="link-vocab-clear" data-link-clear="vocab" hidden>지우기</button></label>
         <p class="muted small link-st" id="link-vocab-st"></p>
         <label class="link-row"><span>🎬 왓치로그</span><input type="password" id="link-watch" autocomplete="off"><button class="btn ghost small" type="button" id="link-watch-clear" data-link-clear="watch" hidden>지우기</button></label>
         <p class="muted small link-st" id="link-watch-st"></p>
+        <label class="link-row"><span>💌 욱진 보드</span><input type="password" id="link-ukjin" autocomplete="off"><button class="btn ghost small" type="button" id="link-ukjin-clear" data-link-clear="ukjin" hidden>끊기</button></label>
+        <p class="muted small link-st" id="link-ukjin-st"></p>
         <div class="row"><button class="btn" type="submit">저장</button><button class="btn ghost" type="button" id="linkImport" hidden>이 브라우저 앱에서 가져오기</button></div>
       </form>
       <div class="card">
@@ -190,6 +194,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script type="module" src="app.js?v=20261101a"></script>
+<script type="module" src="app.js?v=20261106a"></script>
 </body>
 </html>
