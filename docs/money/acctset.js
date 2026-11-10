@@ -1,10 +1,11 @@
-// 🏦 자산 관리 (가계부 설정 탭, 냐냐 가계부 전용 — 욱진 보드 짝 코드 아님)
+// ★ 두 가계부(냐냐·욱진)가 같이 쓰는 파일 — 원본은 냐냐 보드 docs/money/, 욱진 보드 docs/는 글자 하나까지 같은 복사본. 한쪽만 고치지 말고, 보드마다 달라야 하는 건 env로 가르기.
+// 🏦 자산 관리 (가계부 설정 '자산' 작은 탭)
 // 자산마다 이름 · 계좌번호(accounts.number) · 메모(accounts.memo) · 🤝 공동(accounts.joint) · 🙈 숨기기(accounts.hidden)를 한곳에서 고침.
-// 🤝 공동 = 둘이 같이 쓰는 통장(데이트통장, 결혼 후 합친 통장): 이 자산으로 적은 ❤️ 공통비용은 '같이 냄'(정산할 돈에서 빠짐, 2026-10-26부터 적은 것만 — app.js mirrorCommon)
+// 🤝 공동 = 둘이 같이 쓰는 통장(데이트통장, 결혼 후 합친 통장): 이 자산으로 적은 ❤️ 공통비용은 '같이 냄'(정산할 돈에서 빠짐 — 냐냐: app.js mirrorCommon, 2026-10-26부터 적은 것만 / 욱진: app.js renderCommon, 날짜 기준 없이 전부)
 // 칸에서 나가면(change) 그 칸만 저장. 계좌번호·메모는 자산 목록·자산별 보기에 보임 (money.js).
 // 숨긴 자산도 여기엔 다 보임 (흐리게) → 다시 보이게 할 수 있음.
 
-import { isRecvAcct } from "./recv.js?v=20261102c";
+import { isRecvAcct } from "./recv.js?v=20261110a";
 const ICON = { cash: "💵", bank: "🏦", card: "💳", save: "🐷" };
 const GROUPS = [["cash", "현금"], ["bank", "통장"], ["card", "카드"], ["save", "저축·투자"]];
 
@@ -23,7 +24,7 @@ export function mountAcctSet(root, env) {
           <input type="text" class="ak-num" data-ak="number" data-id="${esc(a.id)}" value="${esc(a.number || "")}" maxlength="40" placeholder="계좌번호" aria-label="${esc(a.name)} 계좌번호">
           <input type="text" class="ak-memo" data-ak="memo" data-id="${esc(a.id)}" value="${esc(a.memo || "")}" maxlength="200" placeholder="메모 (예: 월급통장, 적금 만기 27.3)" aria-label="${esc(a.name)} 메모">
           <label class="ak-hide" title="공동 통장: 이 자산으로 낸 ❤️ 공통비용은 '같이 냄'"><input type="checkbox" data-ak="joint" data-id="${esc(a.id)}"${a.joint ? " checked" : ""}> 🤝</label>
-          <label class="ak-hide" title="받을 돈 자산: 기록 창의 🤲 받을 돈에서 고를 수 있어요"><input type="checkbox" data-ak="recv" data-id="${esc(a.id)}"${isRecvAcct(a) ? " checked" : ""}> 🤲</label>
+          <label class="ak-hide" title="받을 돈 자산: 기록 창의 🤲 받을 돈 이름으로 찾아져요"><input type="checkbox" data-ak="recv" data-id="${esc(a.id)}"${isRecvAcct(a) ? " checked" : ""}> 🤲</label>
           <label class="ak-hide" title="숨기기"><input type="checkbox" data-ak="hidden" data-id="${esc(a.id)}"${a.hidden ? " checked" : ""}> 🙈</label>
         </div>`).join("");
       }).join("") || '<p class="muted small" style="margin:0">자산이 아직 없어요.</p>'}</div>`;

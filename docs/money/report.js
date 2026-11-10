@@ -1,4 +1,5 @@
-// 📑 보고서 탭 (냐냐 가계부 전용 — 욱진 보드 짝 코드 아님). 데이터(기록)는 안 바꾸고 보여 주기만.
+// ★ 두 가계부(냐냐·욱진)가 같이 쓰는 파일 — 원본은 냐냐 보드 docs/money/, 욱진 보드 docs/는 글자 하나까지 같은 복사본. 한쪽만 고치지 말고, 보드마다 달라야 하는 건 env로 가르기.
+// 📑 보고서 탭 — 데이터(기록)는 안 바꾸고 보여 주기만. 이 기기에 기억하는 이름 앞말 = env.ls (냐냐 "nyanya", 욱진 "ukjin")
 // 2026-10-26 처음 만듦 → 같은 날 냐냐: "생각보다 쓰기 힘듦"(조건 칸이 길고 · 분류 고르기 어렵고 · 결과 보기 불편 · 저장한 것 쓰기 불편) → 카드 먼저로 다시 만듦
 //   ① 첫 화면 = 저장한 보고서 카드 (이름 · 기간 · 조건 한 줄 · 쓴 돈/남은 돈 · 건수) + ＋ 새 보고서 (없으면 예시로 시작)
 //   ② 카드를 누르면 결과: 기간(‹ › 로 앞뒤 달·해) · 조건 한 줄 · 합계 · 왼쪽 원형 + 분류 목록(누르면 그 분류만, 소분류까지) · 오른쪽 달마다 막대 · 달마다 표(누르면 그 달만) · 내역
@@ -22,7 +23,7 @@ const TPL = [   // 저장한 보고서가 없을 때 '예시로 시작'
 ];
 
 export function mountReport(root, env) {
-  const { esc, won, S } = env;
+  const { esc, won, S } = env, LS_CMP = (env.ls || "nyanya") + "-rpt-cmp";
   const now = new Date(), Y = now.getFullYear(), M = now.getMonth(), today0 = ymd(now);
   const norm = (f = {}) => ({ per: f.per != null ? f.per : f.from ? "" : "이번 달", from: f.from || ymd(new Date(Y, M, 1)), to: f.to || today0,
     kinds: f.kinds && f.kinds.length ? f.kinds.slice() : ["expense", "income"], accts: (f.accts || []).slice(), cats: (f.cats || []).slice(), q: f.q || "", common: f.common || "all" });
@@ -225,7 +226,7 @@ export function mountReport(root, env) {
     return D;
   }
   let cmpMemo = null;
-  const cmpOf = () => { if (cmpMemo) return cmpMemo; try { cmpMemo = JSON.parse(localStorage.getItem("nyanya-rpt-cmp") || "{}") || {}; } catch (e) { cmpMemo = {}; } return cmpMemo; };
+  const cmpOf = () => { if (cmpMemo) return cmpMemo; try { cmpMemo = JSON.parse(localStorage.getItem(LS_CMP) || "{}") || {}; } catch (e) { cmpMemo = {}; } return cmpMemo; };
   const num = (v) => { v = Math.round(v); return v ? v.toLocaleString("ko-KR") : ""; };
   function yTable(head, rows, foot) {   // rows = [{name, vals, cls, sel(그래프로 고르기 data-k·data-c·data-s), key(▾ 소분류 펼치기), open, can, on}]
     const cells = (vals) => vals.map((v) => `<td>${num(v)}</td>`).join("") + `<td class="yr-avg">${num(sum(vals) / 12)}</td><td class="yr-sum">${num(sum(vals))}</td>`;
@@ -448,7 +449,7 @@ export function mountReport(root, env) {
     else if (k === "msh") st.mo = v;
     else if (k === "annual") { st.yr = Y; scrollTo(0, 0); }
     else if (k === "ysh") st.yr += +v;
-    else if (k === "ycmp") { const c = cmpOf(); c[v] = !c[v]; try { localStorage.setItem("nyanya-rpt-cmp", JSON.stringify(c)); } catch (err) { /* 무시 */ } }
+    else if (k === "ycmp") { const c = cmpOf(); c[v] = !c[v]; try { localStorage.setItem(LS_CMP, JSON.stringify(c)); } catch (err) { /* 무시 */ } }
     else if (k === "yopen") st.yopen[v] = !st.yopen[v];
     else if (k === "ysel") { const c = b.dataset.c, sb = b.dataset.s, cur = st.ysel[v]; st.ysel[v] = c == null || (cur && cur.c === c && cur.s === sb) ? null : { c, s: sb }; }
     else if (k === "print") { window.print(); return; }

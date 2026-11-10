@@ -8,20 +8,20 @@ import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261026e";
 import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, moneyCats, subOptions, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab, lastAcct, rememberAcct } from "./money.js?v=20261105a";
 import { mountRepeat } from "./repeat.js?v=20261021d";
-import { mountAcctSet } from "./acctset.js?v=20261102c";
+import { mountAcctSet } from "./acctset.js?v=20261110a";
 import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
 import { startVerCheck } from "../vercheck.js?v=20261022a";
-import { mountBalance } from "./balance.js?v=20261021a";
+import { mountBalance } from "./balance.js?v=20261110a";
 import { mountImport } from "./import.js?v=20261021b";
-import { mountCardImport } from "./cardimport.js?v=20261102f";
-import { mountReport } from "./report.js?v=20261105a";
+import { mountCardImport } from "./cardimport.js?v=20261110a";
+import { mountReport } from "./report.js?v=20261110a";
 import { mountSummary } from "./summary.js?v=20261105h";
 import { mountExtras } from "./extras.js?v=20261102a";
-import { mountPicker } from "./picker.js?v=20261102a";
-import { mountDatePick } from "./datepick.js?v=20261102a";
-import { mountRecSplit } from "./recsplit.js?v=20261102d";
-import { mountRecv } from "./recv.js?v=20261102c";
-import { mountTxFilter } from "./txfilter.js?v=20261102c";
+import { mountPicker } from "./picker.js?v=20261110a";
+import { mountDatePick } from "./datepick.js?v=20261110a";
+import { mountRecSplit } from "./recsplit.js?v=20261110a";
+import { mountRecv } from "./recv.js?v=20261110a";
+import { mountTxFilter } from "./txfilter.js?v=20261110a";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -371,7 +371,7 @@ const ex = mountExtras({ S, esc, won, isWon, toast, backend: () => backend, edit
 const sm = mountSummary($("sumPanel"), { S, esc, won, isWon, ccOf, editMoney, mineOn, cntAmt, monthTotals, planOf, month: curMonth, balances, sortedAccts, toast, backend: () => backend,
   openReport: (m) => { setMTab("report"); rpt.openMonth(m); }, rerender: () => rpt.render() });
 // 📑 보고서 탭 (기간·자산·분류·검색으로 골라 보기, 저장한 보고서는 settings.reports)
-const rpt = mountReport($("reportRoot"), { S, backend: () => backend, summary: sm, extras: ex, toast, esc, won, isWon, acctName, subs: subsOf, chart: setChart, pie: pieHtml, txRow: (x) => txRow(x, false), mineOn, cntAmt, isSettleIn,
+const rpt = mountReport($("reportRoot"), { ls: "nyanya", S, backend: () => backend, summary: sm, extras: ex, toast, esc, won, isWon, acctName, subs: subsOf, chart: setChart, pie: pieHtml, txRow: (x) => txRow(x, false), mineOn, cntAmt, isSettleIn,
   accts: () => sortedAccts(), cats: (k) => { const c = (S.settings.moneyCats || {})[k]; return (c && c.length ? c : MONEY_CATS[k] || []).slice(); } });
 // 🏦 자산 관리 (가계부 설정 탭) — 이름 · 계좌번호 · 메모 · 🙈 숨기기
 const ak = mountAcctSet($("acctSetPanel"), { S, backend: () => backend, toast, act, esc, rows });
