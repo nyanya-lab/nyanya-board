@@ -1,4 +1,5 @@
-// 🔁 매월 반복 (냐냐 가계부 전용 — 욱진 보드 짝 코드 아님. 편한가계부 '반복'처럼)
+// ★ 두 가계부(냐냐·욱진)가 같이 쓰는 파일 — 원본은 냐냐 보드 docs/money/, 욱진 보드 docs/는 글자 하나까지 같은 복사본. 한쪽만 고치지 말고, 보드마다 달라야 하는 건 env로 가르기.
+// 🔁 매월 반복 (편한가계부 '반복'처럼. 2026-11-11부터 욱진 보드도 이 파일을 씀 — 그 전엔 money.js 안에 따로 있었음)
 // 규칙: settings.moneyRepeat/{id} = { kind: expense|income|move(이체), amount(마이너스 가능 = 환불처럼), account, toAccount(이체만), cat, sub, memo, day(1~31), from: "YYYY-MM", at, made: {YYYY-MM: true} }
 // 가계부를 열 때마다: 규칙마다 from 달부터 이번 달까지, 그 달 day일(달이 짧으면 말일)이 오늘이거나 지났고 made에 없으면
 //   기록 money/rp-{id}-{YYYYMM} 을 만들고 made[YYYY-MM] = true (지운 기록은 다시 안 생김, 폰·PC가 같이 열어도 같은 id라 안 겹침)
@@ -28,6 +29,7 @@ export function duePatch(rules, today) {
 }
 
 // env = { S, backend(), toast, act, esc, won, rows, today, cats(kind), subs(kind, cat), rid, acctOpts(list, cur) = 자산 고르는 칸 (묶음·계좌번호) }
+//   보드마다 다른 모양(선택): amtHtml(rule) = 목록의 금액 칸 · btnSm = 작은 버튼 class(기본 "sm") · amtHint = 금액 칸 안내 글. run()은 보드가 부름(욱진: 테스트 모드·관리자 보드에선 안 부름)
 export function mountRepeat(root, env) {
   const { esc, won } = env;
   const f = { kind: "expense", amount: "", day: "", account: "", toAccount: "", cat: "", sub: "", memo: "", from: "" };
@@ -50,12 +52,12 @@ export function mountRepeat(root, env) {
     root.innerHTML = `<div class="panel-head"><div><h3>🔁 매월 반복</h3><span class="muted small">보험료·월세·구독료처럼 매달 같은 날 나가는 돈. 그날이 되면 가계부를 열 때 기록이 저절로 생겨요 (생긴 기록은 내역에서 고치거나 지울 수 있어요).</span></div></div>
       <div class="rp-list">${rules.length ? rules.sort((a, b) => (a[1].day || 0) - (b[1].day || 0)).map(([id, r]) => `<div class="rp-row">
           <span><b>매월 ${r.day}일</b> · ${r.kind === "move" ? `${esc(acctName(r.account))} → ${esc(acctName(r.toAccount))} <span class="muted">이체</span>` : `${esc(acctName(r.account))} · ${esc(r.cat || "기타")}${r.sub ? " / " + esc(r.sub) : ""}`}${r.memo ? ` <span class="muted">${esc(r.memo)}</span>` : ""}</span>
-          <b class="${r.kind === "income" ? "rp-in" : r.kind === "move" ? "muted" : ""}">${r.amount < 0 ? "-" : ""}${esc(won(r.amount))}</b>
+          ${env.amtHtml ? env.amtHtml(r) : `<b class="${r.kind === "income" ? "rp-in" : r.kind === "move" ? "muted" : ""}">${r.amount < 0 ? "-" : ""}${esc(won(r.amount))}</b>`}
           <span class="small muted">${esc(r.from.replace("-", "."))}부터</span>
-          <button class="btn ghost sm" type="button" data-rp-del="${esc(id)}">그만하기</button></div>`).join("") : '<p class="muted small" style="margin:0">아직 반복이 없어요.</p>'}</div>
+          <button class="btn ghost ${env.btnSm || "sm"}" type="button" data-rp-del="${esc(id)}">그만하기</button></div>`).join("") : '<p class="muted small" style="margin:0">아직 반복이 없어요.</p>'}</div>
       <div class="rp-form">
         <select data-rp="kind" aria-label="수입/지출"><option value="expense"${f.kind === "expense" ? " selected" : ""}>지출</option><option value="income"${f.kind === "income" ? " selected" : ""}>수입</option><option value="move"${move ? " selected" : ""}>이체</option></select>
-        <input type="text" class="amt-in" data-neg inputmode="numeric" data-rp="amount" placeholder="금액" aria-label="금액" value="${esc(f.amount)}">
+        <input type="text" class="amt-in" data-neg inputmode="numeric" data-rp="amount" placeholder="${esc(env.amtHint || "금액")}" aria-label="금액" value="${esc(f.amount)}">
         <label class="rp-day">매월 <input type="number" min="1" max="31" data-rp="day" value="${esc(f.day)}" aria-label="며칠"> 일</label>
         <select data-rp="account" aria-label="${move ? "보내는 곳" : "자산"}"><option value="">${move ? "보내는 곳" : "자산 고르기"}</option>${env.acctOpts ? env.acctOpts(accts, f.account) : accts.map((a) => `<option value="${esc(a.id)}"${a.id === f.account ? " selected" : ""}>${esc(a.name)}</option>`).join("")}</select>
         ${move ? `<select data-rp="toAccount" aria-label="받는 곳"><option value="">받는 곳</option>${(() => { const l = accts.filter((a) => a.id !== f.account); return env.acctOpts ? env.acctOpts(l, f.toAccount) : l.map((a) => `<option value="${esc(a.id)}"${a.id === f.toAccount ? " selected" : ""}>${esc(a.name)}</option>`).join(""); })()}</select>` : `<select data-rp="cat" aria-label="분류"><option value="">분류 고르기</option>${cats.map((c) => `<option${c === f.cat ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>
