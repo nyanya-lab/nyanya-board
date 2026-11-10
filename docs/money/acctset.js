@@ -5,7 +5,7 @@
 // 칸에서 나가면(change) 그 칸만 저장. 계좌번호·메모는 자산 목록·자산별 보기에 보임 (money.js).
 // 숨긴 자산도 여기엔 다 보임 (흐리게) → 다시 보이게 할 수 있음.
 
-import { isRecvAcct } from "./recv.js?v=20261110b";
+import { isRecvAcct } from "./recv.js?v=20261110c";
 const ICON = { cash: "💵", bank: "🏦", card: "💳", save: "🐷" };
 const GROUPS = [["cash", "현금"], ["bank", "통장"], ["card", "카드"], ["save", "저축·투자"]];
 

@@ -6,22 +6,22 @@
 
 import { firebaseConfig } from "../firebase-config.js?v=20261020a";
 import { mountUri } from "../uri/uri.js?v=20261026e";
-import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, moneyCats, subOptions, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab, lastAcct, rememberAcct } from "./money.js?v=20261105a";
+import { bindMoney, initMoney, moneyAction, renderMoney, renderMoneyForm, renderCatEditor, editMoney, isWon, moneyCats, subOptions, MONEY_CATS, catKey, balances, subsOf, acctOptsHtml, ccOf, commonCatName, pieHtml, stRange, setChart, acctName, acctFlow, sortedAccts, txRow, mineOn, cntAmt, isSettleIn, monthTotals, planOf, curMonth, setMTab, lastAcct, rememberAcct } from "./money.js?v=20261110c";
 import { mountRepeat } from "./repeat.js?v=20261021d";
-import { mountAcctSet } from "./acctset.js?v=20261110a";
+import { mountAcctSet } from "./acctset.js?v=20261110c";
 import { mountCcMigrate } from "./ccmigrate.js?v=20261021b";
 import { startVerCheck } from "../vercheck.js?v=20261022a";
-import { mountBalance } from "./balance.js?v=20261110a";
+import { mountBalance } from "./balance.js?v=20261110c";
 import { mountImport } from "./import.js?v=20261021b";
-import { mountCardImport } from "./cardimport.js?v=20261110a";
-import { mountReport } from "./report.js?v=20261110a";
-import { mountSummary } from "./summary.js?v=20261110b";
-import { mountExtras } from "./extras.js?v=20261110b";
-import { mountPicker } from "./picker.js?v=20261110a";
-import { mountDatePick } from "./datepick.js?v=20261110a";
-import { mountRecSplit } from "./recsplit.js?v=20261110a";
-import { mountRecv } from "./recv.js?v=20261110b";
-import { mountTxFilter } from "./txfilter.js?v=20261110a";
+import { mountCardImport } from "./cardimport.js?v=20261110c";
+import { mountReport } from "./report.js?v=20261110c";
+import { mountSummary } from "./summary.js?v=20261110c";
+import { mountExtras } from "./extras.js?v=20261110c";
+import { mountPicker } from "./picker.js?v=20261110c";
+import { mountDatePick } from "./datepick.js?v=20261110c";
+import { mountRecSplit } from "./recsplit.js?v=20261110c";
+import { mountRecv } from "./recv.js?v=20261110c";
+import { mountTxFilter } from "./txfilter.js?v=20261110c";
 
 const FB_VER = "10.12.2";
 const ROOT = "nyanya";
@@ -333,9 +333,11 @@ const uri = mountUri($("uriRoot"), {
 const rv = mountRecv({ $, S, esc, moneyCats, won, act, rid, toast, render, today, shortDate, balances, sortedAccts, acctOptsHtml, lastAcct, rememberAcct, kind: () => ui.kind, backend: () => backend });
 // 🔎 내역 표 정렬·거르기 (머리줄 더블클릭, 폰은 표 위 버튼)
 const tf = mountTxFilter({ $, esc, won, toast, render, shortDate, acctName, ccOf, cntAmt, recvName: (id) => rv.nameOf(id) });
-bindMoney({ $, DEFAULTS, DEMO: false, S, act, amtVal, clone, closeDlg, commaNum, deepMerge, esc, isAdminDevice, moneyShort, monthLabel, openDlg, pad, partner, quietly, ready, render, rid, rows, shiftMonth, shortDate, shrinkPic, statTile, toast, today, ui, viewPic, won,
+bindMoney({ ls: "nyanya", $, DEFAULTS, S, act, amtVal, clone, closeDlg, commaNum, deepMerge, esc, isAdminDevice, moneyShort, monthLabel, openDlg, pad, partner, quietly, ready, render, rid, rows, shiftMonth, shortDate, shrinkPic, statTile, toast, today, ui, viewPic, won,
   give: false,   // 💝 줄 돈(욱진 보드 전용)은 안 씀
   tabTitles: { budget: "예산", spend: "내역", cal: "달력", assets: "자산", stats: "통계", report: "보고서", common: "공통", settings: "설정" },   // 위 제목 = 지금 탭 이름 (냐냐 요청)
+  commonOpen: () => true,   // ❤️ 공통 탭·체크 칸은 늘 보임 (욱진 보드는 공개 전·관리자 기기면 숨김)
+  defaultCats: { income: ["월급", "현장 수당", "부업·알바", "이자·환급", "기타 수입"] },   // 기본 수입 분류 (욱진 보드엔 '보험금'도 있음)
   mineView: true,   // 💑 내 몫으로 보기 버튼 (공통비용 절반·욱진입금 빼고, 기본 꺼짐 — settings.moneyMine)
   catRank: true,   // 분류 색: 원형마다 금액 큰 8개가 서로 다른 색, 9번째부터 '그 밖' (냐냐 요청)
   pieFull: true,   // 분류 원형(통계·내역 지출·예산)은 가운데 구멍 없이 꽉 찬 원형 (냐냐 요청, 자산 구성 원형은 그대로)
