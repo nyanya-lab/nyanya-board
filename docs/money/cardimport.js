@@ -12,7 +12,7 @@
 //   → 🤲 분류에서 '🤲 받을 돈'을 고르면 소분류 칸이 이름 칸 (recv.js): 그 금액은 받을 돈으로, 짝 기록 {기록 id}-rv. 이름을 안 적으면 분류를 안 고른 것처럼 빠짐.
 //   → 🔁 매월 반복으로 들어간 기록(id rp-)과 같은 카드·같은 금액이 앞뒤 7일 안에 있으면 (날짜가 달라도, 2026-11-02 냐냐: 농협 213,400원) 체크를 빼 둠. 전에 다른 분류로 적던 가게면 우연이니 그대로 (티머니 11,100원 ≠ 아이클라우드).
 // 파일은 이 브라우저에서만 읽고 저장소에 안 올라감.
-import { recvPair, RECV_CAT } from "./recv.js?v=20261110a";
+import { recvPair, RECV_CAT } from "./recv.js?v=20261110b";
 const SHEETJS = "https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 const norm = (s) => String(s || "").replace(/\s+/g, "");
 const num = (v) => typeof v === "number" ? v : Number(String(v || "").replace(/[^\d.-]/g, "")) || 0;

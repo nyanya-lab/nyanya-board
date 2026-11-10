@@ -15,12 +15,12 @@ import { mountBalance } from "./balance.js?v=20261110a";
 import { mountImport } from "./import.js?v=20261021b";
 import { mountCardImport } from "./cardimport.js?v=20261110a";
 import { mountReport } from "./report.js?v=20261110a";
-import { mountSummary } from "./summary.js?v=20261105h";
-import { mountExtras } from "./extras.js?v=20261102a";
+import { mountSummary } from "./summary.js?v=20261110b";
+import { mountExtras } from "./extras.js?v=20261110b";
 import { mountPicker } from "./picker.js?v=20261110a";
 import { mountDatePick } from "./datepick.js?v=20261110a";
 import { mountRecSplit } from "./recsplit.js?v=20261110a";
-import { mountRecv } from "./recv.js?v=20261110a";
+import { mountRecv } from "./recv.js?v=20261110b";
 import { mountTxFilter } from "./txfilter.js?v=20261110a";
 
 const FB_VER = "10.12.2";
@@ -366,9 +366,9 @@ const rp = mountRepeat($("repeatPanel"), { S, backend: () => backend, toast, act
 const ccm = mountCcMigrate($("ccmPanel"), { S, backend: () => backend, toast, esc, won, ccOf, commonCatName, commonCats: () => uri.cats() });
 // 📝 이번 달 정리 — 예산 탭엔 한 줄 + [자세히 ›] → 📑 보고서 '월간 정리' 화면 (지난달·평소와 비교해서 문장으로)
 // 🏥 보험금 챙기기 · 🎯 큰돈 모으기 (보고서 카드) + 🔗 보험금 저장하면 병원비 고르기 + 🔔 위쪽 알림
-const ex = mountExtras({ S, esc, won, isWon, toast, backend: () => backend, editMoney,
+const ex = mountExtras({ dogIns: true, S, esc, won, isWon, toast, backend: () => backend, editMoney,
   openClaims: () => { setMTab("report"); rpt.openClaims(); } });
-const sm = mountSummary($("sumPanel"), { S, esc, won, isWon, ccOf, editMoney, mineOn, cntAmt, monthTotals, planOf, month: curMonth, balances, sortedAccts, toast, backend: () => backend,
+const sm = mountSummary($("sumPanel"), { ls: "nyanya", S, esc, won, isWon, ccOf, editMoney, mineOn, cntAmt, monthTotals, planOf, month: curMonth, balances, sortedAccts, toast, backend: () => backend,
   openReport: (m) => { setMTab("report"); rpt.openMonth(m); }, rerender: () => rpt.render() });
 // 📑 보고서 탭 (기간·자산·분류·검색으로 골라 보기, 저장한 보고서는 settings.reports)
 const rpt = mountReport($("reportRoot"), { ls: "nyanya", S, backend: () => backend, summary: sm, extras: ex, toast, esc, won, isWon, acctName, subs: subsOf, chart: setChart, pie: pieHtml, txRow: (x) => txRow(x, false), mineOn, cntAmt, isSettleIn,

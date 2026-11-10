@@ -1,4 +1,6 @@
-// 🏥 보험금 챙기기 · 🎯 큰돈 모으기 (냐냐 전용, 2026-10-31) — 📑 보고서 첫 화면 카드 → 화면 (report.js가 그려 줌)
+// ★ 두 가계부(냐냐·욱진)가 같이 쓰는 파일 — 원본은 냐냐 보드 docs/money/, 욱진 보드 docs/는 글자 하나까지 같은 복사본. 한쪽만 고치지 말고, 보드마다 달라야 하는 건 env로 가르기.
+// 🏥 보험금 챙기기 · 🎯 큰돈 모으기 (2026-10-31 냐냐 가계부에서 시작) — 📑 보고서 첫 화면 카드 → 화면 (report.js가 그려 줌)
+// 보드마다 다른 것 (env): claimCat = true(욱진)면 분류 이름에 병원·약국이 있어도 병원비 · dogIns = true(냐냐)면 보험금 소분류 돌돌이/실손에 따라 병원비를 먼저 걸러 보여 줌
 // 🏥 병원비(지출, 소분류에 병원·약국, ❤️ 공통 빼고) 마다 money/{id}/ins = "asked"(청구함) | "got"(받음) | "skip"(청구 안 함), 없으면 아직 표시 안 함. 금액은 안 바꿈.
 // 🔗 보험금 ↔ 병원비 잇기 (2026-11-01 냐냐 요청): 🏥보험금 수입을 저장하면 고르는 창 #insPick → 수입 money/{id}/insFor/{병원비 id} = true, 병원비 money/{id}/insBy/{수입 id} = true + ins "got".
 //    한 보험금에 병원비 여러 건, 병원비 하나에 보험금 여러 건(중복) 다 됨. 이어진 보험금을 지우면 그 병원비는 다시 '청구 전'으로 보임(statusOf). 금액은 안 바꿈.
@@ -6,7 +8,7 @@
 // 🎯 settings.funds/{id} = {name, goal, saved, date(목표일, 없어도 됨), at} — 통장 잔액과 상관없는 '봉투' 메모. 기록·잔액은 안 건드림.
 const ST = { asked: "청구함", got: "받음", skip: "청구 안 함" };
 export function mountExtras(env) {
-  const { esc, won, S } = env;
+  const { esc, won, S } = env, CLAIM_CAT = !!env.claimCat, DOG = !!env.dogIns;
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const ui = { per: 3, show: "" };   // 🏥 몇 달 · 보는 상태 ("" = 청구 전, "in" = 들어온 보험금)
   // 상태: 이어진 보험금이 살아 있으면 받음. 이어졌던 보험금을 다 지웠으면 표시 없음으로
@@ -15,7 +17,7 @@ export function mountExtras(env) {
   const isIns = (x) => x && x.kind === "income" && /보험금/.test(x.cat || "");
   const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`;
   const fromOf = (n) => { const d = new Date(); return ymd(new Date(d.getFullYear(), d.getMonth() - n + 1, 1)); };
-  const isClaim = (x) => x && (x.kind === "expense" || !x.kind) && !x.common && !x.recvTo && !/공통비용/.test(x.cat || "") && /병원|약국/.test(x.sub || "") && (Number(x.amount) || 0) > 0;
+  const isClaim = (x) => x && (x.kind === "expense" || !x.kind) && !x.common && !x.recvTo && !/공통비용/.test(x.cat || "") && /병원|약국/.test(`${CLAIM_CAT ? x.cat || "" : ""} ${x.sub || ""}`) && (Number(x.amount) || 0) > 0;
   function claims(from) {
     const out = []; S.money.forEach((x, id) => { if (isClaim(x) && env.isWon(x) && x.date >= from) out.push({ ...x, id }); });
     return out.sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -34,10 +36,10 @@ export function mountExtras(env) {
   function claimHtml() {
     const from = fromOf(ui.per), all = claims(from), by = (k) => all.filter((x) => statusOf(x) === k), list = ui.show === "in" ? [] : by(ui.show), incs = insList(from);
     const tile = (k, label) => { const g = by(k); return `<button type="button" class="plan-tile ex-tile${ui.show === k ? " on" : ""}" data-rf="clf" data-k="${k}"><span>${label}</span><b>${won(total(g))}</b><small>${g.length}건</small></button>`; };
-    const rows = list.map((x) => `<div class="ex-row"><div class="ex-main"><b>${esc(x.note || x.memo || x.sub)}</b><span class="muted small">${Number(x.date.slice(5, 7))}/${Number(x.date.slice(8))} · ${esc(x.cat || "")} › ${esc(x.sub || "")}</span></div>` +
+    const rows = list.map((x) => `<div class="ex-row"><div class="ex-main"><b>${esc(x.note || x.memo || x.sub || x.cat)}</b><span class="muted small">${Number(x.date.slice(5, 7))}/${Number(x.date.slice(8))} · ${esc(x.cat || "")}${x.sub ? ` › ${esc(x.sub)}` : ""}</span></div>` +
       `<b class="won ex-amt">${won(x.amount)}</b><div class="ex-btns">${Object.entries(ST).map(([k, n]) => `<button type="button" class="rpt-chip${statusOf(x) === k ? " on" : ""}" aria-pressed="${statusOf(x) === k}" data-rf="cls" data-k="${esc(x.id)}" data-s="${k}">${n}</button>`).join("")}${liveBy(x).map((id) => { const i = S.money.get(id); return `<button type="button" class="ex-link" data-rf="clo" data-k="${esc(id)}">🔗 ${md(i.date)} 보험금 ${won(i.amount)}</button>`; }).join("")}</div></div>`).join("");
     // 들어온 보험금: 누르면 기록, [잇기]로 병원비 고르기
-    const inRows = incs.map((x) => { const f = Object.keys(x.insFor || {}).filter((id) => S.money.has(id)); return `<div class="ex-row"><div class="ex-main"><button type="button" class="ex-open" data-rf="clo" data-k="${esc(x.id)}"><b>${esc(x.memo || x.note || x.sub || "보험금")}</b></button><span class="muted small">${md(x.date)} · ${esc(x.sub || "")}</span></div><b class="won plus ex-amt">${won(x.amount)}</b><div class="ex-btns"><button type="button" class="rpt-chip${f.length ? "" : " on"}" data-rf="cli" data-k="${esc(x.id)}">${f.length ? "고치기" : "병원비 잇기"}</button>${f.map((id) => { const e = S.money.get(id); return `<button type="button" class="ex-link" data-rf="clo" data-k="${esc(id)}">🔗 ${md(e.date)} ${esc(e.note || e.sub || "")} ${won(e.amount)}</button>`; }).join("")}</div></div>`; }).join("");
+    const inRows = incs.map((x) => { const f = Object.keys(x.insFor || {}).filter((id) => S.money.has(id)); return `<div class="ex-row"><div class="ex-main"><button type="button" class="ex-open" data-rf="clo" data-k="${esc(x.id)}"><b>${esc(x.memo || x.note || x.sub || "보험금")}</b></button><span class="muted small">${md(x.date)} · ${esc(x.sub || "")}</span></div><b class="won plus ex-amt">${won(x.amount)}</b><div class="ex-btns"><button type="button" class="rpt-chip${f.length ? "" : " on"}" data-rf="cli" data-k="${esc(x.id)}">${f.length ? "고치기" : "병원비 잇기"}</button>${f.map((id) => { const e = S.money.get(id); return `<button type="button" class="ex-link" data-rf="clo" data-k="${esc(id)}">🔗 ${md(e.date)} ${esc(e.note || e.sub || e.cat || "")} ${won(e.amount)}</button>`; }).join("")}</div></div>`; }).join("");
     return `<div class="rpt-top"><button type="button" class="btn ghost small" data-rf="back">‹ 보고서</button><h2 class="rpt-title">🏥 보험금 챙기기</h2></div>
       <div class="rpt-chips">${[3, 6, 12].map((n) => `<button type="button" class="rpt-chip${ui.per === n ? " on" : ""}" data-rf="clp" data-k="${n}">최근 ${n}달</button>`).join("")}</div>
       <div class="panel sm-panel">
@@ -106,10 +108,10 @@ export function mountExtras(env) {
   // ---------- 🔗 병원비 고르는 창 ----------
   let dlg = null, pk = null;   // pk = { id(보험금), sel:Set, all(이미 받은 것도 보기) }
   function pickHtml() {
-    const inc = S.money.get(pk.id), wantDog = /돌돌이/.test(inc.sub || ""), wantMe = /실손/.test(inc.sub || "");
+    const inc = S.money.get(pk.id), wantDog = DOG && /돌돌이/.test(inc.sub || ""), wantMe = DOG && /실손/.test(inc.sub || "");
     const from = fromOf(pk.per), l = claims(from).filter((x) => pk.any || !(wantDog || wantMe) || (wantDog ? /돌돌이/.test(x.cat || "") : !/돌돌이/.test(x.cat || "")) || pk.sel.has(x.id));
     const open = l.filter((x) => ["", "asked"].includes(statusOf(x)) || pk.sel.has(x.id)), done = l.filter((x) => !open.includes(x));
-    const row = (x) => { const by = liveBy(x).filter((i) => i !== pk.id); return `<label class="ex-pk"><input type="checkbox" data-pk="${esc(x.id)}"${pk.sel.has(x.id) ? " checked" : ""}><span class="ex-main"><b>${esc(x.note || x.memo || x.sub)}</b><span class="muted small">${md(x.date)} · ${esc(x.cat || "")}${by.length ? ` · 이미 보험금 ${by.length}건 이어짐` : ""}</span></span><b class="won">${won(x.amount)}</b></label>`; };
+    const row = (x) => { const by = liveBy(x).filter((i) => i !== pk.id); return `<label class="ex-pk"><input type="checkbox" data-pk="${esc(x.id)}"${pk.sel.has(x.id) ? " checked" : ""}><span class="ex-main"><b>${esc(x.note || x.memo || x.sub || x.cat)}</b><span class="muted small">${md(x.date)} · ${esc(x.cat || "")}${by.length ? ` · 이미 보험금 ${by.length}건 이어짐` : ""}</span></span><b class="won">${won(x.amount)}</b></label>`; };
     const sum = claims("2000-01-01").filter((x) => pk.sel.has(x.id)).reduce((t, x) => t + (Number(x.amount) || 0), 0), amt = Number(inc.amount) || 0;
     return `<div class="dlg-head"><h3>🔗 어떤 병원비의 보험금이에요?</h3></div>
       <div class="rpt-ed-body"><div class="rpt-es"><p class="small" style="margin:0">${md(inc.date)} ${esc(inc.sub || "보험금")} <b class="won plus">${won(amt)}</b> · 여러 건 고를 수 있고, 이미 받은 병원비도 또 고를 수 있어요.</p>
