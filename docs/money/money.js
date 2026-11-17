@@ -223,6 +223,13 @@ export const cardValue = (n) => /카드$/.test(n || "") ? n + "값" : (n || "카
 export function dayInMonth(m, d) { const last = new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate(); return `${m}-${pad(Math.min(d, last))}`; }
 export function cardPayPlan(p, m) { return { date: dayInMonth(m, p.day), from: dayInMonth(shiftMonth(m, p.fm ?? -1), p.fd || 1), to: dayInMonth(shiftMonth(m, p.tm ?? -1), p.td || 31) }; }
 export function cardSpent(id, from, to) { let s = 0; S.money.forEach((x) => { if ((x.kind === "expense" || !x.kind) && isWon(x) && x.account === id && x.date >= from && x.date <= to) s += Number(x.amount) || 0; }); return s; }
+// 카드값 이체 금액 = 결제예정(자산 탭과 같은 셈): 지금 카드값(갚을 돈) − 그 이용기간 끝(to) 뒤에 쓴 돈(미결제)
+//   → 지난 결제 때 덜 내거나 더 낸 것·이용기간 지난 기록을 고친 것(환불 등)도 저절로 들어감 (2026-11-18 냐냐: 전엔 이용기간 기록 합만이라 9월분 환불이 안 빠짐)
+export function cardPayAmt(id, to) {
+  const owed = Math.max(0, -(balances()[id] || 0)); let open = 0;
+  S.money.forEach((x) => { if ((x.kind === "expense" || !x.kind) && isWon(x) && x.account === id && x.date > to) open += Number(x.amount) || 0; });
+  return Math.max(0, owed - Math.min(open, owed));
+}
 export function syncCardPays() {
   if (cardPaySyncing || !E.backend || !S.loaded || E.testMode) return;
   const t = today(), m = t.slice(0, 7), made = S.settings.autoTasks || {}, jobs = [], flags = {};
@@ -230,9 +237,9 @@ export function syncCardPays() {
     const p = a && a.type === "card" && a.pay; if (!p || !p.day || !p.from || !S.accounts.has(p.from)) return;
     const pl = cardPayPlan(p, m), key = `cp-${id}-${m}`;
     if (pl.date > t || pl.date < (p.since || t) || made[key] || S.money.has(key) || S.tasks.has(key)) return;
-    const amt = cardSpent(id, pl.from, pl.to);
+    const amt = cardPayAmt(id, pl.to);
     flags[key] = true;
-    jobs.push(() => E.backend.set("tasks", key, { title: `💳 ${cardValue(a.name)} 이체하기 (${amt > 0 ? "예상 " + won(amt) : "이 기간 사용 없음"})`, repeat: "none", date: pl.date, done: false, doneDate: null, noPractice: true,
+    jobs.push(() => E.backend.set("tasks", key, { title: `💳 ${cardValue(a.name)} 이체하기 (${amt > 0 ? "예상 " + won(amt) : "결제할 돈 없음"})`, repeat: "none", date: pl.date, done: false, doneDate: null, noPractice: true,
       cardPay: { card: id, from: p.from, start: pl.from, end: pl.to }, createdAt: Date.now() }));
   });
   if (!jobs.length) return;
@@ -260,14 +267,14 @@ export function syncGive() {
 export let cardPayFor = null;
 export function openCardPay(taskId) {
   const x = S.tasks.get(taskId), c = x && x.cardPay; if (!c) return;
-  showCardPay({ taskId, card: c.card, from: c.from, start: c.start, end: c.end, date: x.date || today(), amt: cardSpent(c.card, c.start, c.end) });
+  showCardPay({ taskId, card: c.card, from: c.from, start: c.start, end: c.end, date: x.date || today(), amt: cardPayAmt(c.card, c.end) });
 }
 function showCardPay(o) {
   const card = S.accounts.get(o.card); if (!card) return;
   cardPayFor = o;
   const banks = sortedAccts().filter((a) => a.type !== "card");
   $("mvTitle").textContent = `💳 ${cardValue(card.name)} 결제`;
-  $("mvText").innerHTML = `<p class="small muted">${o.start ? `이용기간 ${shortDate(o.start)} ~ ${shortDate(o.end)} 사용분이에요. ` : ""}카드 앱의 실제 청구 금액과 다르면 고쳐 주세요 (할부·연회비 등). [이체 기록하기]를 눌러야 기록돼요.</p>` +
+  $("mvText").innerHTML = `<p class="small muted">${o.start ? `이용기간 ${shortDate(o.start)} ~ ${shortDate(o.end)} 결제예정 금액이에요 (지금 카드값에서 ${shortDate(o.end)} 뒤에 쓴 돈을 뺀 것). ` : ""}카드 앱의 실제 청구 금액과 다르면 고쳐 주세요 (할부·연회비 등). [이체 기록하기]를 눌러야 기록돼요.</p>` +
     `<div class="form"><label class="f">금액 (원)<input type="text" class="amt-in" id="cpAmt" inputmode="numeric" autocomplete="off" value="${o.amt ? commaNum(o.amt) : ""}"></label>` +
     `<div class="row"><label class="f">날짜<input type="date" id="cpDate" value="${esc(o.date || today())}"></label>` +
     `<label class="f">빠지는 통장<select id="cpFrom">${acctOptsHtml(banks, o.from) || '<option value="">통장을 먼저 추가해 주세요</option>'}</select></label></div>` +
@@ -307,7 +314,7 @@ function payCardNow(id) {
   // 아직 안 한 '카드값 이체하기' 할 일이 있으면 그걸로 (이번 달 → 다음 결제 달)
   const taskId = [m0, d ? d.m : m0].map((mm) => `cp-${id}-${mm}`).find((k) => S.tasks.has(k) && !S.tasks.get(k).done && !S.money.has(k)) || null;
   const tc = taskId && S.tasks.get(taskId).cardPay;
-  showCardPay({ taskId, card: id, from, start: tc ? tc.start : d ? d.from : null, end: tc ? tc.end : d ? d.to : null, date: t, amt: tc ? cardSpent(id, tc.start, tc.end) : d ? d.due : owed });
+  showCardPay({ taskId, card: id, from, start: tc ? tc.start : d ? d.from : null, end: tc ? tc.end : d ? d.to : null, date: t, amt: tc ? cardPayAmt(id, tc.end) : d ? d.due : owed });
 }
 
 // ---------- 한 달 예산: settings.budgets[월] = { income, items: {id: {cat, memo, amount, createdAt}} } ----------
