@@ -1109,7 +1109,7 @@ export function editMoney(id) {
   const x0 = S.money.get(id); if (x0 && x0.recvOf && S.money.has(x0.recvOf)) id = x0.recvOf;   // 🤲 받을 돈 짝을 누르면 실제 지출을 고침
   const x = S.money.get(id); if (!x) return;
   ui.mEdit = id; ui.kind = x.kind || "expense";
-  $("mAmount").value = commaNum(x.amount || ""); $("mDate").value = x.date || today(); $("mMemo").value = x.memo || "";
+  $("mAmount").value = commaNum(x.amount || "", true); $("mDate").value = x.date || today(); $("mMemo").value = x.memo || "";
   setMPics(Object.keys(x.pics && typeof x.pics === "object" ? x.pics : {}).map((pid) => ({ id: pid, old: true, thumb: null })));
   renderMoneyForm(x); renderMoney();
   openDrawer();   // 어느 탭에서든 서랍 창에서 고침
@@ -1350,7 +1350,10 @@ export function initMoney() {
     ev.preventDefault();
     if (!ready()) return;
     const amount = amtVal($("mAmount"));
-    if (!(amount > 0)) { toast("금액을 적어 주세요."); return; }
+    if (!amount) { toast("금액을 적어 주세요."); return; }
+    // 지출·수입은 마이너스도 (환불·할인·캐시백, 냐냐 방식, 2026-11-23) — 이체·✂️ 나눠 적기·🤲 받을 돈은 플러스만
+    if (amount < 0 && ui.kind === "move") { toast("이체 금액은 마이너스로 적을 수 없어요."); return; }
+    if (amount < 0 && ((E.recSplit && E.recSplit.collect(1)) || (E.recv && E.recv.collect()))) { toast("마이너스 금액은 나눠 적기·받을 돈과 같이 쓸 수 없어요."); return; }
     if (ui.kind !== "move" && !$("mCat").value) { toast("분류를 골라 주세요."); $("mCat").focus(); return; }
     const sp = E.recSplit ? E.recSplit.collect(amount) : null;   // ✂️ 나눠 적기 → 이 기록은 나머지 금액, 나눈 줄은 새 기록으로
     if (sp && sp.error) { toast(sp.error); return; }
