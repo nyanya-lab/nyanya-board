@@ -852,7 +852,7 @@ function bulkRowHtml(v) {
     `<td><select data-c="cur" aria-label="화폐">${currencies().map((c) => `<option${c === (v.cur || "원") ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></td>` +
     `<td><input type="text" data-c="memo" maxlength="80" value="${esc(v.memo || "")}" aria-label="내용"></td>` +
     `<td><input type="text" data-c="note" maxlength="500" value="${esc(v.note || "")}" aria-label="메모"></td>` +
-    `<td><button class="bk-del" type="button" data-act="bulkDel" aria-label="이 줄 비우기" title="이 줄 비우기">✕</button></td></tr>`;
+    `<td class="bk-btns"><button class="bk-del" type="button" data-act="bulkDup" aria-label="이 줄을 아래에 복사" title="이 줄을 아래에 복사">⧉</button><button class="bk-del" type="button" data-act="bulkDel" aria-label="이 줄 비우기" title="이 줄 비우기">✕</button></td></tr>`;
 }
 const bulkRead = (tr) => { const v = {}; tr.querySelectorAll("[data-c]").forEach((el) => { v[el.dataset.c] = el.value; }); return v; };
 function bulkNumber() { [...$("bulkBody").rows].forEach((tr, i) => { tr.cells[0].textContent = i + 1; }); bulkCount(); }
@@ -1515,6 +1515,8 @@ export function moneyAction(a, el, id, t) {
   if (a === "bulkClose") { closeDlg($("bulkDlg")); return true; }
   if (a === "bulkMore") { bulkAdd(5); return true; }
   if (a === "bulkSave") { bulkSave(); return true; }
+  // ⧉ 이 줄을 바로 아래에 한 줄 더 (구분·날짜·자산·분류·금액·내용 다 같게 → 다른 칸만 고치면 됨, 2026-11-23 냐냐)
+  if (a === "bulkDup") { const tr = el.closest("tr"), nt = Object.assign(document.createElement("tbody"), { innerHTML: bulkRowHtml(bulkRead(tr)) }).firstElementChild; tr.after(nt); bulkNumber(); const f = nt.querySelector('[data-c="amt"]'); if (f) f.focus(); return true; }
   if (a === "bulkDel") { const tr = el.closest("tr"); tr.replaceWith(Object.assign(document.createElement("tbody"), { innerHTML: bulkRowHtml({}) }).firstElementChild); bulkNumber(); return true; }
   if (a === "monthNow") { ui.month = today().slice(0, 7); renderMoney(); return true; }
   if (a === "mineToggle") { if (!ready()) return true; const on = !mineOn(); act(E.backend.saveSettings({ moneyMine: on || null }), on ? "💑 내 몫으로 보기: 공통비용은 절반, 정산 받은 돈은 수입에서 빼고 봐요." : "실제로 오간 돈 그대로 봐요.").catch(() => {}); return true; }
