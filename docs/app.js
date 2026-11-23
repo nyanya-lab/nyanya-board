@@ -629,8 +629,10 @@ document.addEventListener("change", (e) => {
   act(backend.update("tasks", id, { done: e.target.checked })).catch(() => { e.target.checked = !e.target.checked; });
 });
 
-// 창 바깥(어두운 곳)을 누르면 닫기
-$("#dayDlg").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+// 창 바깥(어두운 곳)을 누르면 닫기 — 창 안에서 누른 채(글자 고르기 등) 바깥에서 뗀 건 빼고 (2026-11-23)
+let dayDown = null;
+$("#dayDlg").addEventListener("pointerdown", (e) => { dayDown = e.target; });
+$("#dayDlg").addEventListener("click", (e) => { if (e.target === e.currentTarget && dayDown === e.currentTarget) e.currentTarget.close(); });
 
 // 캘린더마다 보드에 보이기
 document.addEventListener("change", (e) => {

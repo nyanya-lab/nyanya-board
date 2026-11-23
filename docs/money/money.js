@@ -1295,6 +1295,11 @@ function renameSub(k, cat, old) {
 // 돈 관리 화면의 입력 칸 연결 (bindMoney 다음에 한 번)
 export function initMoney() {
   document.addEventListener("mousemove", pieTip); document.addEventListener("click", pieTip);
+  // 창 안에서 누른 채(글자 고르기 등) 창 바깥에서 떼면 브라우저가 창(dialog) 자체를 누른 걸로 쳐서 '바깥 누르면 닫기'에 걸려 꺼지던 것 막기:
+  //   창 바깥(어두운 곳)에서 누르고 뗀 것만 바깥 누름으로 (가계부의 모든 창, 2026-11-23 냐냐)
+  let downOn = null;
+  document.addEventListener("pointerdown", (ev) => { downOn = ev.target; }, true);
+  document.addEventListener("click", (ev) => { if (ev.target instanceof HTMLDialogElement && downOn && downOn !== ev.target) ev.stopImmediatePropagation(); }, true);
   $("mCat").addEventListener("change", () => { $("mSub").innerHTML = ccOn() ? ccSubOptions($("mCat").value, "") : subOptions(ui.kind, $("mCat").value, ""); salaryHint(); });
   if ($("mCommon")) $("mCommon").addEventListener("change", () => renderMoneyForm());   // 🏷 ❤️ 체크하면 분류 칸이 공통 분류로 (냐냐)
   $("mSub").addEventListener("change", () => { if ($("mSub").value === "__add") askNewSub(ui.kind, $("mCat").value, $("mSub")); });
